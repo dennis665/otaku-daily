@@ -4,6 +4,7 @@ from django.shortcuts import render
 from django.templatetags.static import static
 from django.views.decorators.cache import cache_control
 
+from .events import get_events
 from .playlist import get_playlist
 
 
@@ -15,6 +16,14 @@ def home(request):
         "audio_count": sum(1 for s in playlist if s["audio"]),
         "video_count": sum(1 for s in playlist if s["video"]),
     })
+
+
+@login_required
+def events_api(request):
+    """北部動漫活動（資料來自 Google 試算表，每天 08:30 後更新一次）"""
+    events, fresh = get_events()
+    checked = max((e["checked"] for e in events if e["checked"]), default="")
+    return JsonResponse({"events": events, "updated": checked, "fresh": fresh}, json_dumps_params={"ensure_ascii": False})
 
 
 @cache_control(no_cache=True)

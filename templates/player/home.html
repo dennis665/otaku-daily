@@ -13,6 +13,7 @@
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="music" role="tab">🎵 音樂 <b>{{ audio_count }}</b></button>
   <button class="tab" data-tab="video" role="tab">🎬 影片 <b>{{ video_count }}</b></button>
+  <button class="tab" data-tab="events" role="tab">🎪 活動 <b id="e-count">…</b></button>
 </nav>
 
 {% if not playlist %}
@@ -81,6 +82,28 @@
   <ol class="list" id="v-list"></ol>
 </section>
 
+<section id="panel-events" class="panel">
+  <div class="finder">
+    <div class="finder-box">
+      <span class="finder-icon" aria-hidden="true">🔍</span>
+      <input id="e-search" type="search" placeholder="搜尋活動、作品、地點" autocomplete="off" enterkeyhint="search" aria-label="搜尋活動">
+      <button class="finder-clear" type="button" aria-label="清除搜尋" hidden>✕</button>
+    </div>
+  </div>
+  <div class="chips" id="e-when" role="group" aria-label="時間">
+    <button class="chip active" data-when="all">全部</button>
+    <button class="chip" data-when="now">進行中</button>
+    <button class="chip" data-when="weekend">這個週末</button>
+    <button class="chip" data-when="soon">即將開始</button>
+  </div>
+  <div class="chips" id="e-types" role="group" aria-label="類型"></div>
+  <p class="e-meta" id="e-meta"></p>
+  <div class="events" id="e-list"></div>
+</section>
+
 {{ playlist|json_script:"playlist-data" }}
 {% endblock %}
-{% block scripts %}<script src="{% static 'js/player.js' %}"></script>{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/player.js' %}"></script>
+<script src="{% static 'js/events.js' %}"></script>
+{% endblock %}

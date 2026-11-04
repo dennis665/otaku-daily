@@ -9,4 +9,5 @@ urlpatterns = [
     path("login/", views.AppLoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("register/", views.register, name="register"),
+    path("quick-login/", views.quick_login, name="quick_login"),   # 只在測試站有效
 ]

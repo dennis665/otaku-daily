@@ -1,6 +1,10 @@
 import logging
 
+from django.conf import settings
 from django.contrib.auth import login
+from django.contrib.auth.models import User
+from django.http import Http404
+from django.views.decorators.http import require_POST
 from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -42,3 +46,23 @@ def csrf_failure(request, reason=""):
         return redirect("player:home")
     target = reverse("accounts:register") if request.path == reverse("accounts:register") else reverse("accounts:login")
     return redirect(f"{target}?expired=1")
+
+
+# ---------- 測試站專用：一鍵登入 ----------
+# 只在 APP_ENV=staging（測試站）開放，正式站呼叫一律回 404。
+# 測試站的資料庫每次部署都會清空，所以每次都用 get_or_create 確保測試帳號存在；
+# 這個帳號沒有密碼（無法用帳密登入），只能透過這個按鈕進入。
+QUICK_LOGIN_USERNAME = "quick_tester"
+
+
+@require_POST
+def quick_login(request):
+    if settings.APP_ENV != "staging":
+        raise Http404
+    user, created = User.objects.get_or_create(username=QUICK_LOGIN_USERNAME, defaults={"email": "quick_tester@example.com"})
+    if created:
+        user.set_unusable_password()
+        user.save()
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    logger.info("測試站一鍵登入：%s", user.username)
+    return redirect("player:home")

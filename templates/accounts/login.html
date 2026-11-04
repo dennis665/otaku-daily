@@ -12,6 +12,13 @@
     <input type="hidden" name="next" value="{{ next }}">
     <button class="btn primary" type="submit" data-busy="登入中…">登入</button>
   </form>
+  {% if app_env == 'staging' %}
+  <form method="post" action="{% url 'accounts:quick_login' %}" class="quick-login">
+    {% csrf_token %}
+    <button class="btn quick" type="submit" data-busy="登入中…">⚡ 一鍵登入測試帳號</button>
+    <small>測試站專用，不用輸入帳密</small>
+  </form>
+  {% endif %}
   <p class="switch">還沒有帳號？<a href="{% url 'accounts:register' %}">註冊一個</a></p>
 </main>
 {% endblock %}

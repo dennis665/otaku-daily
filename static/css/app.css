@@ -40,7 +40,7 @@ body.auth { display: grid; place-items: center; max-width: none; background: rad
 .user { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .9rem; min-width: 0; }
 .user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user form { margin: 0; }
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg2); padding: 5px; border-radius: 14px; margin-bottom: 16px; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--bg2); padding: 5px; border-radius: 14px; margin-bottom: 16px; }
 .tab { border: 0; background: transparent; color: var(--muted); padding: 10px; border-radius: 10px; cursor: pointer; }
 .tab b { font-size: .75rem; background: var(--line); border-radius: 99px; padding: 1px 8px; margin-left: 4px; }
 .tab.active { background: var(--card); color: var(--text); box-shadow: 0 2px 10px rgba(0, 0, 0, .3); }
@@ -172,3 +172,36 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
   box-shadow: 0 12px 30px rgba(0, 0, 0, .5); }
 .finder-results mark { background: rgba(255, 111, 174, .35); color: #fff; border-radius: 3px; padding: 0 1px; }
 .finder-results .tag { flex: none; font-size: .72rem; color: var(--pink); border: 1px solid var(--pink); border-radius: 99px; padding: 1px 8px; }
+.tab { white-space: nowrap; padding: 10px 4px; }
+.tab b { margin-left: 2px; padding: 1px 6px; }
+
+/* ---------- 北部動漫活動 ---------- */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid var(--line); background: var(--bg2); color: var(--muted); border-radius: 99px; padding: 6px 14px; font-size: .85rem; cursor: pointer; }
+.chip.active { background: var(--grad); color: #fff; border-color: transparent; font-weight: 700; }
+.e-meta { color: var(--muted); font-size: .8rem; margin: 2px 4px 10px; }
+.e-meta .warn { color: #ffd34d; }
+.events { display: grid; gap: 12px; }
+.ev { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; overflow: hidden; }
+.ev::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--grad); }
+.ev-soon::before { background: linear-gradient(var(--cyan), #9b7bff); }
+.ev-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ev-type { font-size: .78rem; color: var(--muted); }
+.ev-badge { flex: none; font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: rgba(94, 231, 255, .14); color: var(--cyan); }
+.ev-now .ev-badge { background: rgba(255, 111, 174, .16); color: var(--pink); }
+.ev-badge.hot { background: var(--pink); color: #fff; }
+.ev-name { margin: 0; font-size: 1.02rem; line-height: 1.4; }
+.ev-ip { margin: 4px 0 0; color: var(--cyan); font-size: .82rem; }
+.ev-info { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: .86rem; }
+.ev-info a { color: var(--text); text-decoration: none; border-bottom: 1px dashed var(--muted); }
+.ev-sum { margin: 10px 0 0; color: var(--muted); font-size: .84rem; line-height: 1.6; }
+.ev-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.ev-tag { font-size: .72rem; padding: 2px 8px; border-radius: 6px; border: 1px solid #ffd34d; color: #ffd34d; cursor: help; }
+.ev-tag.new { border-color: transparent; background: #ffd34d; color: #1a1300; font-weight: 700; cursor: default; }
+.ev-src { margin-left: auto; font-size: .82rem; }
+
+/* ---------- 測試站一鍵登入 ---------- */
+.quick-login { margin-top: 12px; text-align: center; }
+.btn.quick { width: 100%; font-weight: 700; color: #1a1300; background: repeating-linear-gradient(45deg, #ffd34d 0 14px, #ffc107 14px 28px); }
+.quick-login small { display: block; margin-top: 6px; color: var(--muted); font-size: .75rem; }

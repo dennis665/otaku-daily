@@ -36,7 +36,9 @@
       document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
       document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${tab.dataset.tab}`));
       // 切換分頁時暫停另一邊，避免兩個同時發聲
-      if (tab.dataset.tab === 'music') video.pause(); else audio.pause();
+      // 切到「活動」分頁時音樂繼續播（邊聽歌邊看活動）
+      if (tab.dataset.tab === 'music') video.pause();
+      if (tab.dataset.tab === 'video') audio.pause();
       store.set('tab', tab.dataset.tab);
     });
   });
