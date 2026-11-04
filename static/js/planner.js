@@ -269,8 +269,9 @@
   $('p-groups-open').addEventListener('click', () => run(async () => { await renderGroups(); openSheet('p-groups'); }));
   $('p-group-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const name = $('p-group-name').value.trim();
-    if (!name) return;
+    const input = $('p-group-name');
+    const name = input.value.trim();
+    if (!name) { alert('請先輸入群組名稱，例如：週末出遊團'); input.focus(); return; }
     run(async () => { await api('/plan/api/groups/', { name }); $('p-group-name').value = ''; await renderGroups(); await reload(); });
   });
 

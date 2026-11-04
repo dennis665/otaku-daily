@@ -247,7 +247,7 @@ body.sheet-open { overflow: hidden; }
 .check { display: flex; align-items: center; gap: 8px; margin: -6px 0 14px; color: var(--muted); font-size: .9rem; }
 .with-btn { display: flex; gap: 8px; align-items: center; }
 .with-btn input { flex: 1; min-width: 0; }
-.with-btn .btn { flex: none; white-space: nowrap; }
+.with-btn .btn { flex: none; width: auto; margin-top: 0; white-space: nowrap; }
 .field > span.with-btn { display: flex; margin: 0; color: inherit; font-size: inherit; }
 .link-row { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 6px; margin-bottom: 6px; }
 .link-row input { padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font-size: .9rem; min-width: 0; }
