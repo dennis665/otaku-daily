@@ -21,7 +21,7 @@
     if (on) failsafe = setTimeout(reset, FAILSAFE_MS);
   }
 
-  function reset() { pending = 0; navigating = false; render(); }
+  function reset() { pending = 0; navigating = false; loader.classList.remove('is-immediate'); render(); }
 
   /** 開始一個載入，回傳 done()；done 重複呼叫也只算一次 */
   function start() {
@@ -44,6 +44,19 @@
 
   function navigate() { navigating = true; render(); }
 
+  // iPhone Safari 一開始換頁就停止更新舊頁面，遮罩來不及出現。
+  // 換頁、送出表單是使用者主動操作，本來就要等：立即顯示（不延遲），
+  // 等遮罩真的畫到畫面上（兩個畫面更新週期，約 0.03 秒）才開始換頁。
+  function navigateAfterPaint(go) {
+    loader.classList.add('is-immediate');
+    navigate();
+    let started = false;
+    const once = () => { if (!started) { started = true; go(); } };
+    requestAnimationFrame(() => requestAnimationFrame(once));
+    // 分頁在背景時畫面更新會暫停，保底 0.1 秒後一定換頁
+    setTimeout(once, 100);
+  }
+
   // ---------- fetch 自動顯示遮罩 ----------
   const nativeFetch = window.fetch.bind(window);
   window.fetch = (input, init = {}) => {
@@ -64,17 +77,21 @@
     const url = new URL(a.href, location.href);
     if (url.origin !== location.origin) return;
     if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
-    navigate();
+    e.preventDefault();
+    navigateAfterPaint(() => { location.href = url.href; });
   });
 
   // ---------- 送出表單：停用按鈕避免連按兩次造成「頁面已過期」，並顯示遮罩 ----------
   document.addEventListener('submit', (e) => {
     if (e.defaultPrevented) return;
-    e.target.querySelectorAll('button[type=submit]').forEach((btn) => {
+    const form = e.target;
+    e.preventDefault();
+    form.querySelectorAll('button[type=submit]').forEach((btn) => {
       btn.disabled = true;
       if (btn.dataset.busy) btn.textContent = btn.dataset.busy;
     });
-    navigate();
+    // form.submit() 不會再觸發 submit 事件，不會重複執行這段
+    navigateAfterPaint(() => form.submit());
   });
 
   // ---------- 從返回鍵或切回 App 顯示快取頁面：有表單就重新載入確保是最新的，否則解除遮罩 ----------
