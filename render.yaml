@@ -20,8 +20,8 @@ services:
         sync: false
 
   # 測試站：部署 staging 分支，新功能先在這裡測試再合併到 main
-  # 免費方案每個工作區只能有一個免費 PostgreSQL，測試站改用 SQLite，
-  # 重新部署或休眠後資料會清空，所以每次啟動時才建立資料表
+  # 資料庫用 Neon 同一個專案裡另建的 ukiyo_staging 資料庫（與正式站資料分開），帳號與資料會保留；
+  # 沒設定 DATABASE_URL 時會退回 SQLite（重新部署或休眠後資料會清空）。每次啟動時套用資料表變更
   - type: web
     name: otaku-daily-staging
     runtime: python
@@ -38,6 +38,9 @@ services:
         value: "False"
       - key: APP_ENV
         value: staging
+      # Neon 的 ukiyo_staging 資料庫連線網址，只在 Render 網頁的 Environment 手動填寫
+      - key: DATABASE_URL
+        sync: false
 
 databases:
   # 舊的 Render 免費 PostgreSQL（建立 30 天後到期），已改用 Neon；確認搬移完成後可移除這段並到 Render 刪除資料庫

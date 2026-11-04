@@ -18,6 +18,7 @@
 - `staging` 分支 → 測試站 https://otaku-daily-staging.onrender.com （SQLite，部署或休眠後資料清空，頂端有「測試站」橫幅）
 - `main` 分支 → 正式站 https://otaku-daily.onrender.com （資料庫在 Neon，`DATABASE_URL` 只在 Render 網頁設定）
 - 新功能先推 `staging` 驗證，經使用者同意後再快轉合併到 `main`。
+- 測試站資料庫：Neon 同專案的 `ukiyo_staging` 資料庫（Render 測試站的 DATABASE_URL），帳號與資料會保留；未設定時退回 SQLite（每次部署清空）。
 - 測試帳號放在 `dev_test_account.txt`（不進 Git），只用在本機與測試站，不在正式站建立或登入帳號。
 - 測試站登入頁有「⚡ 一鍵登入測試帳號」（`accounts.views.quick_login`，帳號 quick_tester、無密碼），只在 `APP_ENV=staging` 開放，正式站回 404。
 
