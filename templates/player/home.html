@@ -3,7 +3,7 @@
 {% block title %}影音播放｜酒寄彩葉{% endblock %}
 {% block content %}
 <header class="topbar">
-  <div class="brand-sm"><span class="logo">♪</span>酒寄彩葉</div>
+  <div class="brand-sm">{% include "partials/avatar_rotator.html" %}酒寄彩葉</div>
   <div class="user">
     <span>{{ user.username }}</span>
     <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn ghost sm" type="submit">登出</button></form>

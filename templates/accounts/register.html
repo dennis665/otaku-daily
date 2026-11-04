@@ -3,7 +3,7 @@
 {% block body_class %}auth{% endblock %}
 {% block content %}
 <main class="auth-card">
-  <div class="brand"><span class="logo">♪</span><h1>建立帳號</h1><p>註冊後即可使用影音播放</p></div>
+  <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>建立帳號</h1><p>註冊後即可使用影音播放</p></div>
   <form method="post" novalidate>
     {% csrf_token %}
     {% if request.GET.expired %}<div class="alert notice">頁面已過期，請重新填寫一次</div>{% endif %}
