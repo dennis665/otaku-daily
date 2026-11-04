@@ -31,47 +31,9 @@
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
     }
 
-    // ---------- 載入遮罩 ----------
-    const loader = document.getElementById('page-loader');
-    let loaderTimer = null;
-    function setLoading(on) {
-      loader.classList.toggle('is-active', on);
-      // inert 讓遮罩底下的內容不能點擊、也不能用鍵盤操作
-      [...document.body.children].forEach((el) => { if (el !== loader && el.tagName !== 'SCRIPT') el.inert = on; });
-      document.body.setAttribute('aria-busy', on ? 'true' : 'false');
-      clearTimeout(loaderTimer);
-      // 防呆：網路卡住 15 秒後解除鎖定，避免頁面永遠不能操作
-      if (on) loaderTimer = setTimeout(() => setLoading(false), 15000);
-    }
-    // 頁面內容準備好就移除一開始的遮罩（不等動圖等大檔案下載完）
-    document.addEventListener('DOMContentLoaded', () => setLoading(false));
-    // 點站內連結時顯示遮罩（新分頁、下載、頁內錨點、按住修飾鍵開新視窗除外）
-    document.addEventListener('click', (e) => {
-      const a = e.target.closest('a[href]');
-      if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-      if (a.target && a.target !== '_self') return;
-      if (a.hasAttribute('download')) return;
-      const url = new URL(a.href, location.href);
-      if (url.origin !== location.origin) return;
-      if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
-      setLoading(true);
-    });
-
-    // 送出表單後停用按鈕，避免連按兩次造成「頁面已過期」，同時顯示載入遮罩
-    document.addEventListener('submit', (e) => {
-      e.target.querySelectorAll('button[type=submit]').forEach((btn) => {
-        btn.disabled = true;
-        if (btn.dataset.busy) btn.textContent = btn.dataset.busy;
-      });
-      setLoading(true);
-    });
-    // 從返回鍵或切回 App 顯示快取頁面時：有表單就重新載入確保是最新的，否則解除遮罩
-    window.addEventListener('pageshow', (e) => {
-      if (!e.persisted) return;
-      if (document.querySelector('form input[name=csrfmiddlewaretoken]')) location.reload();
-      else setLoading(false);
-    });
   </script>
+  {# 全站載入遮罩，要在各頁面的程式之前載入，頁面程式才能使用 AppLoading #}
+  <script src="{% static 'js/loader.js' %}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -13,6 +13,19 @@
     set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 忽略 */ } },
   };
 
+  // 換歌或換影片時顯示載入遮罩，直到可以開始播放（或載入失敗）為止
+  // 播放中途的短暫緩衝不鎖畫面，否則連暫停、換歌都按不了
+  function trackMediaLoading(el) {
+    const done = window.AppLoading ? window.AppLoading.start() : () => {};
+    const finish = () => {
+      el.removeEventListener('canplay', finish);
+      el.removeEventListener('error', finish);
+      done();
+    };
+    el.addEventListener('canplay', finish);
+    el.addEventListener('error', finish);
+  }
+
   const LOOP_MODES = ['ALL', 'ONE', 'SHUFFLE'];
   const LOOP_LABEL = { ALL: ['🔁', '全部循環'], ONE: ['🔂', '單曲循環'], SHUFFLE: ['🔀', '隨機播放'] };
   const fmt = (t) => (isFinite(t) ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}` : '0:00');
@@ -84,6 +97,7 @@
     if (!songs.length) return;
     mIndex = i;
     const s = songs[i];
+    if (autoplay) trackMediaLoading(audio);
     audio.src = s.audio;
     $('m-title').textContent = s.title;
     $('m-dl').href = s.audio;
@@ -151,6 +165,7 @@
   function loadVideo(i, autoplay = true) {
     if (!videos.length) return;
     vIndex = i;
+    if (autoplay) trackMediaLoading(video);
     video.src = videos[i].video;
     $('v-title').textContent = videos[i].title;
     markActive(vList, i);
