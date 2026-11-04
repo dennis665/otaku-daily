@@ -33,6 +33,25 @@
     return Uint8Array.from(raw, (c) => c.charCodeAt(0));
   }
 
+  // 手機上的訂閱是用哪一把金鑰建立的；和網站目前的金鑰不同就必須重新訂閱
+  function sameKey(sub, key) {
+    const used = sub && sub.options && sub.options.applicationServerKey;
+    if (!used) return false;
+    const a = new Uint8Array(used);
+    const b = keyToBytes(key);
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+
+  // 取得與目前金鑰相符的訂閱（舊金鑰的先取消再重新訂閱），並登記到伺服器
+  async function subscribeFresh(key) {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && !sameKey(sub, key)) { await sub.unsubscribe(); sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(key) });
+    await api('/notify/api/subscribe/', sub.toJSON());
+    return sub;
+  }
+
   async function currentSubscription() {
     if (!supported) return null;
     const reg = await navigator.serviceWorker.ready;
@@ -49,7 +68,7 @@
       return;
     }
     const [status, sub] = await Promise.all([api('/notify/api/status/'), currentSubscription()]);
-    const onServer = sub && status.devices.some((d) => d.endpoint === sub.endpoint);
+    const onServer = sub && sameKey(sub, status.public_key) && status.devices.some((d) => d.endpoint === sub.endpoint);
     const perm = Notification.permission;
     if (perm === 'denied') {
       statusEl.textContent = '⛔ 通知權限被封鎖了，請到手機的「設定 → 通知 → Ukiyo」（或瀏覽器的網站設定）重新允許。';
@@ -72,10 +91,7 @@
       // 權限詢問一定要在按鈕的點擊裡直接呼叫（iPhone 的規定）
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') { await refresh(); return; }
-      const reg = await navigator.serviceWorker.ready;
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(btnEnable.dataset.key) });
-      await api('/notify/api/subscribe/', sub.toJSON());
+      await subscribeFresh(btnEnable.dataset.key);
       await refresh();
     } catch (err) {
       alert(`開啟通知失敗：${err.message}`);
@@ -103,6 +119,20 @@
       alert(err.message);
     }
   });
+
+  // 打開 App 時自動修復：已經允許通知，但伺服器沒有這台裝置（例如測試站資料被清空、金鑰換了）就在背景重新訂閱
+  async function autoRepair() {
+    if (!supported || Notification.permission !== 'granted') return;
+    try {
+      const res = await fetch('/notify/api/status/', { loading: false, credentials: 'same-origin' });
+      if (!res.ok) return;
+      const status = await res.json();
+      const sub = await currentSubscription();
+      const ok = sub && sameKey(sub, status.public_key) && status.devices.some((d) => d.endpoint === sub.endpoint);
+      if (!ok) await subscribeFresh(status.public_key);
+    } catch { /* 下次打開再試 */ }
+  }
+  autoRepair();
 
   $('n-open').addEventListener('click', async () => {
     sheet.hidden = false;

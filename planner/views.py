@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from notifications.push import send_to_users
 
+from .importer import ImportError_, import_line_export
 from .models import Group, GroupInvitation, GroupMember, Itinerary
 
 logger = logging.getLogger(__name__)
@@ -383,3 +384,21 @@ def share(request, token):
         "i_am_interested": it.interested.filter(pk=request.user.pk).exists(),
         "gcal_url": _gcal_url(it),
     })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def import_itineraries(request):
+    """上傳 LINE 版行程小幫手的匯出檔，匯入成 Ukiyo 的群組行程"""
+    context = {}
+    if request.method == "POST":
+        upload = request.FILES.get("file")
+        if not upload:
+            context["error"] = "請選擇要上傳的檔案"
+        else:
+            try:
+                group, imported, skipped = import_line_export(request.user, upload.read())
+                context.update(done=True, group=group, imported=imported, skipped=skipped)
+            except ImportError_ as exc:
+                context["error"] = str(exc)
+    return render(request, "planner/import.html", context)

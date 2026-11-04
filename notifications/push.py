@@ -63,7 +63,8 @@ def send_to_subscription(sub, payload, vapid):
         )
     except WebPushException as exc:
         status = getattr(exc.response, "status_code", None)
-        if status in (404, 410):
+        # 404/410：訂閱已失效；400/403：通常是金鑰不符（例如網站換了金鑰），這個訂閱再也送不到
+        if status in (400, 403, 404, 410):
             logger.info("推播訂閱已失效，刪除：user=%s", sub.user_id)
             sub.delete()
         else:

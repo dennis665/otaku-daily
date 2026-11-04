@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}匯入行程｜Ukiyo{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block content %}
+<main class="auth-card invite">
+  <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>{% include "partials/wordmark.html" %}</h1></div>
+  <h2 class="invite-title">📥 匯入 LINE 版行程</h2>
+  {% if done %}
+    <div class="alert notice">匯入完成：「{{ group.name }}」新增 {{ imported }} 筆行程{% if skipped %}，略過 {{ skipped }} 筆（重複或沒有標題）{% endif %}。</div>
+    <a class="btn primary" href="/?tab=plan" style="display:block;text-align:center;text-decoration:none">前往行程看板</a>
+  {% else %}
+    <p class="invite-sub">上傳在公司主機用匯出程式產生的 <b>itineraries_群組名稱.json</b>。會建立同名群組（你是建立者），所有行程（含歷史）都會放進去；重複上傳不會產生重複的行程。</p>
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <label class="field"><span>匯出檔（.json）</span><input type="file" name="file" accept=".json,application/json" required></label>
+      <button class="btn primary" type="submit" data-busy="匯入中…">開始匯入</button>
+    </form>
+    <p class="switch"><a href="/?tab=plan">回行程看板</a></p>
+  {% endif %}
+</main>
+{% endblock %}

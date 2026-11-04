@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/users/search/", views.search_users, name="search_users"),
     path("api/invitations/<int:pk>/accept/", views.invitation_accept, name="invitation_accept"),
     path("api/invitations/<int:pk>/decline/", views.invitation_decline, name="invitation_decline"),
+    path("import/", views.import_itineraries, name="import"),
     path("join/<str:code>/", views.join_group, name="join"),
     path("i/<str:token>/", views.share, name="share"),
 ]
