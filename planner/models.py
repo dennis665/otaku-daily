@@ -41,6 +41,18 @@ class GroupMember(models.Model):
         constraints = [models.UniqueConstraint(fields=["group", "user"], name="unique_group_member")]
 
 
+class GroupInvitation(models.Model):
+    """邀請已註冊的會員加入群組；對方按「加入」才會成為成員"""
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="invitations")
+    invitee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="group_invitations")
+    inviter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "群組邀請"
+        constraints = [models.UniqueConstraint(fields=["group", "invitee"], name="unique_group_invitation")]
+
+
 class Itinerary(models.Model):
     class Type(models.TextChoices):
         ANIME = "ANIME", "🎪 動漫活動"

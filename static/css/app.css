@@ -272,3 +272,15 @@ body.sheet-open { overflow: hidden; }
 .n-devices { color: var(--muted); font-size: .82rem; margin: 12px 0 0; }
 .n-hint { margin: 12px 0 0; font-size: .8rem; }
 .field > small { display: block; color: var(--muted); font-size: .75rem; margin-top: 6px; line-height: 1.5; }
+
+/* 群組邀請 */
+.invite-row { display: flex; align-items: center; gap: 8px; padding: 12px 14px; margin-bottom: 10px; border-radius: 14px;
+  background: linear-gradient(90deg, rgba(255, 111, 174, .18), rgba(94, 231, 255, .1)); border: 1px solid var(--pink); }
+.invite-row span { flex: 1; min-width: 0; font-size: .9rem; }
+.invite-row .btn { flex: none; width: auto; margin-top: 0; }
+.group-info .pending { color: #ffd34d; }
+.member-search { padding: 10px 0 14px; border-bottom: 1px solid var(--line); }
+.member-search input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--pink); background: var(--bg2); color: var(--text); font-size: 1rem; }
+.member-search > small { display: block; color: var(--muted); font-size: .75rem; margin-top: 8px; }
+.member-results .empty { margin: 8px 0 0; font-size: .85rem; }
+.member-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 2px; border-bottom: 1px dashed var(--line); }

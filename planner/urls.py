@@ -13,6 +13,10 @@ urlpatterns = [
     path("api/itineraries/<int:pk>/hide/", views.itinerary_hide, name="itinerary_hide"),
     path("api/groups/", views.groups, name="groups"),
     path("api/groups/<int:pk>/leave/", views.group_leave, name="group_leave"),
+    path("api/groups/<int:pk>/invite/", views.group_invite, name="group_invite"),
+    path("api/users/search/", views.search_users, name="search_users"),
+    path("api/invitations/<int:pk>/accept/", views.invitation_accept, name="invitation_accept"),
+    path("api/invitations/<int:pk>/decline/", views.invitation_decline, name="invitation_decline"),
     path("join/<str:code>/", views.join_group, name="join"),
     path("i/<str:token>/", views.share, name="share"),
 ]

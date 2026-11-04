@@ -88,13 +88,30 @@
     return c;
   }
 
+  // 收到的群組邀請：顯示在行程頁最上方
+  function renderInvites() {
+    const box = $('p-invites');
+    box.innerHTML = '';
+    (data.invitations || []).forEach((inv) => {
+      const row = el('div', 'invite-row');
+      row.append(el('span', null, `📨 ${inv.inviter} 邀請你加入「${inv.group}」`));
+      const yes = el('button', 'btn primary sm', '加入'); yes.type = 'button';
+      const no = el('button', 'btn ghost sm', '婉拒'); no.type = 'button';
+      yes.addEventListener('click', () => run(async () => { await api(`/plan/api/invitations/${inv.id}/accept/`, {}); await reload(); }));
+      no.addEventListener('click', () => run(async () => { await api(`/plan/api/invitations/${inv.id}/decline/`, {}); await reload(); }));
+      row.append(yes, no);
+      box.append(row);
+    });
+  }
+
   function render() {
+    renderInvites();
     const items = data[view] || [];
     $('p-tabs').querySelectorAll('.chip').forEach((chip) => {
       chip.classList.toggle('active', chip.dataset.view === view);
       chip.querySelector('b').textContent = (data[chip.dataset.view] || []).length || '';
     });
-    count.textContent = data.upcoming.length + data.tbd.length;
+    count.textContent = data.upcoming.length + data.tbd.length + (data.invitations || []).length;
     list.innerHTML = '';
     if (!items.length) {
       const msg = { upcoming: '還沒有即將到來的行程，按「＋ 新增行程」或到「活動」頁把有興趣的活動加進來', tbd: '沒有時間未定的行程', history: '還沒有歷史行程' }[view];
@@ -249,8 +266,14 @@
       const row = el('div', 'group-row');
       const info = el('div', 'group-info');
       info.append(el('strong', null, `👥 ${g.name}`), el('small', null, `${g.members.length} 人：${g.members.join('、')}`));
-      const invite = el('button', 'btn ghost sm', '📨 邀請');
+      if (g.pending.length) info.append(el('small', 'pending', `邀請中：${g.pending.join('、')}`));
+      const add = el('button', 'btn ghost sm', '➕ 邀請');
+      add.type = 'button';
+      add.addEventListener('click', () => toggleSearch(row, g));
+      const invite = el('button', 'btn ghost sm', '🔗');
       invite.type = 'button';
+      invite.title = '分享邀請連結（給還沒註冊的朋友）';
+      invite.setAttribute('aria-label', '分享邀請連結');
       invite.addEventListener('click', async () => {
         const text = `邀請你加入 Ukiyo 行程群組「${g.name}」`;
         if (navigator.share) { try { await navigator.share({ title: g.name, text, url: g.invite_url }); } catch { /* 取消 */ } return; }
@@ -262,8 +285,54 @@
         if (!confirm(`確定要離開「${g.name}」？${g.members.length === 1 ? '你是最後一位成員，群組會被刪除。' : ''}`)) return;
         run(async () => { await api(`/plan/api/groups/${g.id}/leave/`, {}); await renderGroups(); await reload(); });
       });
-      row.append(info, invite, leave);
+      row.append(info, add, invite, leave);
       box.append(row);
+    });
+  }
+
+  // 在群組底下展開搜尋框：輸入帳號名稱（至少 2 個字）→ 點「邀請」
+  function toggleSearch(row, g) {
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('member-search')) { next.remove(); return; }
+    document.querySelectorAll('.member-search').forEach((x) => x.remove());
+    const panel = el('div', 'member-search');
+    const input = el('input');
+    input.type = 'search';
+    input.placeholder = '輸入對方的帳號名稱（至少 2 個字）';
+    input.autocomplete = 'off';
+    const results = el('div', 'member-results');
+    const hint = el('small', null, '找不到人？用 🔗 分享邀請連結，對方註冊後點連結就能加入');
+    panel.append(input, results, hint);
+    row.after(panel);
+    input.focus();
+
+    let timer = null;
+    let seq = 0;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const q = input.value.trim();
+        const my = ++seq;
+        results.innerHTML = '';
+        if (q.length < 2) return;
+        const r = await fetch(`/plan/api/users/search/?group=${g.id}&q=${encodeURIComponent(q)}`, { loading: false, credentials: 'same-origin' }).then((x) => x.json()).catch(() => ({ users: [] }));
+        if (my !== seq) return;   // 已經有更新的搜尋
+        if (!r.users.length) { results.append(el('p', 'empty', '找不到符合的會員')); return; }
+        r.users.forEach((u) => {
+          const line = el('div', 'member-line');
+          line.append(el('span', null, `👤 ${u.username}`));
+          const b = el('button', 'btn ghost sm', u.invited ? '已邀請' : '邀請');
+          b.type = 'button';
+          b.disabled = u.invited;
+          b.addEventListener('click', () => run(async () => {
+            await api(`/plan/api/groups/${g.id}/invite/`, { username: u.username });
+            b.textContent = '已邀請 ✓';
+            b.disabled = true;
+          }));
+          line.append(b);
+          results.append(line);
+        });
+      }, 300);
     });
   }
   $('p-groups-open').addEventListener('click', () => run(async () => { await renderGroups(); openSheet('p-groups'); }));

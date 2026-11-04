@@ -1,11 +1,12 @@
 import json
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Group, GroupMember, Itinerary
+from .models import Group, GroupInvitation, GroupMember, Itinerary
 
 
 def local_str(dt):
@@ -118,3 +119,66 @@ class PlannerTests(TestCase):
     def test_requires_login(self):
         res = self.client.get("/plan/api/itineraries/", secure=True)
         self.assertEqual(res.status_code, 302)
+
+
+@mock.patch("planner.views.send_to_users")
+class InvitationTests(TestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user("alice", password="pw-alice-123")
+        self.bob = User.objects.create_user("bobby", password="pw-bob-123")
+        self.eve = User.objects.create_user("eve", password="pw-eve-123")
+        self.group = Group.objects.create(name="測試群", created_by=self.alice)
+        GroupMember.objects.create(group=self.group, user=self.alice, is_owner=True)
+
+    def post(self, user, url, body=None):
+        self.client.force_login(user)
+        return self.client.post(url, json.dumps(body or {}), content_type="application/json", secure=True)
+
+    def search(self, user, q):
+        self.client.force_login(user)
+        return [u["username"] for u in self.client.get(f"/plan/api/users/search/?group={self.group.id}&q={q}", secure=True).json()["users"]]
+
+    def test_search_rules(self, send):
+        self.assertEqual(self.search(self.alice, "b"), [])            # 至少 2 個字
+        self.assertEqual(self.search(self.alice, "bob"), ["bobby"])
+        self.assertEqual(self.search(self.alice, "ali"), [])          # 不會搜到自己
+        GroupMember.objects.create(group=self.group, user=self.bob)
+        self.assertEqual(self.search(self.alice, "bob"), [])          # 已在群組的不列出
+
+    def test_invite_accept_flow_with_notifications(self, send):
+        res = self.post(self.alice, f"/plan/api/groups/{self.group.id}/invite/", {"username": "bobby"})
+        self.assertEqual(res.status_code, 200)
+        users, title, body = send.call_args.args
+        self.assertEqual(users, [self.bob])
+        self.assertIn("alice 邀請你加入「測試群」", body)
+        # 重複邀請
+        self.assertEqual(self.post(self.alice, f"/plan/api/groups/{self.group.id}/invite/", {"username": "bobby"}).status_code, 400)
+        # bob 看到邀請、接受
+        self.client.force_login(self.bob)
+        invs = self.client.get("/plan/api/itineraries/", secure=True).json()["invitations"]
+        self.assertEqual([(i["group"], i["inviter"]) for i in invs], [("測試群", "alice")])
+        self.post(self.bob, f"/plan/api/invitations/{invs[0]['id']}/accept/")
+        self.assertTrue(GroupMember.objects.filter(group=self.group, user=self.bob).exists())
+        self.assertFalse(GroupInvitation.objects.exists())
+        self.assertEqual(send.call_args.args[0], [self.alice])   # 通知邀請人
+
+    def test_decline_and_permissions(self, send):
+        self.post(self.alice, f"/plan/api/groups/{self.group.id}/invite/", {"username": "bobby"})
+        inv = GroupInvitation.objects.get()
+        # 別人不能代替接受
+        self.assertEqual(self.post(self.eve, f"/plan/api/invitations/{inv.id}/accept/").status_code, 404)
+        self.post(self.bob, f"/plan/api/invitations/{inv.id}/decline/")
+        self.assertFalse(GroupMember.objects.filter(user=self.bob).exists())
+        # 非成員不能邀請別人進群組
+        self.assertEqual(self.post(self.eve, f"/plan/api/groups/{self.group.id}/invite/", {"username": "bobby"}).status_code, 404)
+        self.assertEqual(self.post(self.alice, f"/plan/api/groups/{self.group.id}/invite/", {"username": "nobody"}).status_code, 400)
+
+    def test_new_group_itinerary_notifies_other_members(self, send):
+        GroupMember.objects.create(group=self.group, user=self.bob)
+        self.post(self.alice, "/plan/api/itineraries/", {"title": "唱歌", "date_time": "", "group_id": self.group.id})
+        users, title, body = send.call_args.args
+        self.assertEqual(users, [self.bob])
+        self.assertIn("唱歌", body)
+        send.reset_mock()
+        self.post(self.alice, "/plan/api/itineraries/", {"title": "個人", "date_time": ""})
+        send.assert_not_called()

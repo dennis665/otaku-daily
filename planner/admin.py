@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Group, GroupMember, Itinerary
+from .models import Group, GroupInvitation, GroupMember, Itinerary
 
 
 class MemberInline(admin.TabularInline):
@@ -19,3 +19,8 @@ class ItineraryAdmin(admin.ModelAdmin):
     list_display = ("title", "activity_type", "date_time", "group", "creator")
     list_filter = ("activity_type", "group")
     search_fields = ("title", "location")
+
+
+@admin.register(GroupInvitation)
+class GroupInvitationAdmin(admin.ModelAdmin):
+    list_display = ("group", "invitee", "inviter", "created_at")

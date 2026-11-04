@@ -1,8 +1,10 @@
 """行程小幫手 API（JSON）與邀請 / 分享頁面"""
 import json
+import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
@@ -11,10 +13,26 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from .models import Group, GroupMember, Itinerary
+from notifications.push import send_to_users
+
+from .models import Group, GroupInvitation, GroupMember, Itinerary
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 HISTORY_LIMIT = 100
 MAX_LINKS = 10
+
+
+def notify(users, title, body, tag):
+    """發推播；失敗只記錄，不影響原本的操作"""
+    users = [u for u in users if u]
+    if not users:
+        return
+    try:
+        send_to_users(users, title, body, url="/?tab=plan", tag=tag)
+    except Exception:
+        logger.exception("推播通知失敗：%s", title)
 
 
 class InvalidInput(Exception):
@@ -140,6 +158,12 @@ def itineraries(request):
         with transaction.atomic():
             it.save()
             it.interested.add(user)   # 建立者預設有興趣（參加）
+        if it.group_id:
+            others = [m.user for m in it.group.members.select_related("user").exclude(user=user)]
+            local = timezone.localtime(it.date_time) if it.date_time else None
+            when = f"{local.month}/{local.day} {local:%H:%M}" if local else "時間未定"
+            notify(others, f"👥 {it.group.name} 有新行程", f"{user.username} 新增了「{it.title}」（{when}），快去看看要不要參加",
+                   f"group-itinerary-{it.pk}")
         return JsonResponse({"ok": True, "item": serialize(it, user, request)})
 
     now = timezone.now()
@@ -148,7 +172,9 @@ def itineraries(request):
     tbd = qs.filter(date_time__isnull=True).order_by("-created_at")
     history = qs.filter(date_time__lt=now).order_by("-date_time")[:HISTORY_LIMIT]
     groups = Group.objects.filter(members__user=user).order_by("name")
+    invitations = GroupInvitation.objects.filter(invitee=user).select_related("group", "inviter").order_by("-created_at")
     return JsonResponse({
+        "invitations": [{"id": i.id, "group": i.group.name, "inviter": i.inviter.username if i.inviter else "有人"} for i in invitations],
         "upcoming": [serialize(i, user, request) for i in upcoming],
         "tbd": [serialize(i, user, request) for i in tbd],
         "history": [serialize(i, user, request) for i in history],
@@ -232,6 +258,7 @@ def _group_json(g, user, request):
         "id": g.id,
         "name": g.name,
         "members": [m.user.username for m in members],
+        "pending": [i.invitee.username for i in g.invitations.select_related("invitee")],
         "is_owner": any(m.user_id == user.id and m.is_owner for m in members),
         "invite_url": request.build_absolute_uri(reverse("planner:join", args=[g.invite_code])),
     }
@@ -267,6 +294,64 @@ def group_leave(request, pk):
     return JsonResponse({"ok": True})
 
 
+# ---------- 邀請已註冊的會員 ----------
+SEARCH_LIMIT = 10
+
+
+@login_required
+@require_GET
+def search_users(request):
+    """用帳號名稱搜尋會員（至少 2 個字，最多 10 筆），邀請進群組用"""
+    q = (request.GET.get("q") or "").strip()
+    group_id = request.GET.get("group")
+    if len(q) < 2:
+        return JsonResponse({"users": []})
+    qs = User.objects.filter(username__icontains=q, is_active=True).exclude(pk=request.user.pk)
+    if group_id:
+        qs = qs.exclude(plan_groups__group_id=group_id)
+    pending = set(GroupInvitation.objects.filter(group_id=group_id).values_list("invitee_id", flat=True)) if group_id else set()
+    users = list(qs.order_by("username")[:SEARCH_LIMIT])
+    return JsonResponse({"users": [{"username": u.username, "invited": u.pk in pending} for u in users]})
+
+
+@login_required
+@require_POST
+def group_invite(request, pk):
+    group = get_object_or_404(Group, pk=pk, members__user=request.user)
+    try:
+        username = (_json_body(request).get("username") or "").strip()
+    except InvalidInput as exc:
+        return _error(str(exc))
+    invitee = User.objects.filter(username=username, is_active=True).first()
+    if not invitee:
+        return _error("找不到這個會員")
+    if group.members.filter(user=invitee).exists():
+        return _error(f"{invitee.username} 已經在群組裡了")
+    _, created = GroupInvitation.objects.get_or_create(group=group, invitee=invitee, defaults={"inviter": request.user})
+    if not created:
+        return _error(f"已經邀請過 {invitee.username}，等對方回覆")
+    notify([invitee], "📨 群組邀請", f"{request.user.username} 邀請你加入「{group.name}」，打開 Ukiyo 的行程頁回覆", f"invite-{group.pk}")
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def invitation_accept(request, pk):
+    inv = get_object_or_404(GroupInvitation.objects.select_related("group", "inviter"), pk=pk, invitee=request.user)
+    GroupMember.objects.get_or_create(group=inv.group, user=request.user)
+    inviter, group = inv.inviter, inv.group
+    inv.delete()
+    notify([inviter], f"✅ {request.user.username} 加入了群組", f"{request.user.username} 接受邀請，加入「{group.name}」", f"joined-{group.pk}")
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def invitation_decline(request, pk):
+    get_object_or_404(GroupInvitation, pk=pk, invitee=request.user).delete()
+    return JsonResponse({"ok": True})
+
+
 # ---------- 邀請連結與分享頁（一般頁面） ----------
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -276,6 +361,7 @@ def join_group(request, code):
     if request.method == "POST":
         if not is_member:
             GroupMember.objects.get_or_create(group=group, user=request.user)
+        GroupInvitation.objects.filter(group=group, invitee=request.user).delete()
         return redirect(f"{reverse('player:home')}?tab=plan")
     return render(request, "planner/join.html", {
         "group": group, "is_member": is_member,
