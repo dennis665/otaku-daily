@@ -95,5 +95,9 @@ video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 16px
 .controls.sm { gap: 8px; flex: none; }
 .controls.sm .icon { width: 40px; height: 40px; font-size: 1rem; }
 
+/* ---------- 測試站橫幅 ---------- */
+.env-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 10; padding: calc(env(safe-area-inset-top) + 6px) 12px 6px; text-align: center; font-size: .82rem; font-weight: 700; color: #1a1300; background: repeating-linear-gradient(45deg, #ffd34d 0 14px, #ffc107 14px 28px); }
+body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
+
 /* iPhone / iPad 不允許網頁調整音量，隱藏音量列 */
 @supports (-webkit-touch-callout: none) { .vol-only-desktop { display: none; } }

@@ -1,10 +1,12 @@
 # Render 部署設定：在 Render 選 New > Blueprint 並指定這個 GitHub 儲存庫，會自動建立網站與資料庫
 services:
+  # 正式站：部署 main 分支
   - type: web
     name: otaku-daily
     runtime: python
     plan: free
     region: singapore
+    branch: main
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
     startCommand: gunicorn config.wsgi:application --workers 2 --timeout 60
     healthCheckPath: /accounts/login/
@@ -17,6 +19,26 @@ services:
         fromDatabase:
           name: otaku-daily-db
           property: connectionString
+
+  # 測試站：部署 staging 分支，新功能先在這裡測試再合併到 main
+  # 免費方案每個工作區只能有一個免費 PostgreSQL，測試站改用 SQLite，
+  # 重新部署或休眠後資料會清空，所以每次啟動時才建立資料表
+  - type: web
+    name: otaku-daily-staging
+    runtime: python
+    plan: free
+    region: singapore
+    branch: staging
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --workers 1 --timeout 60
+    healthCheckPath: /accounts/login/
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: APP_ENV
+        value: staging
 
 databases:
   # 免費 PostgreSQL 有使用期限（到期前 Render 會寄信通知），正式使用時再改付費方案或換其他資料庫

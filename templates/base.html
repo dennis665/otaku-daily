@@ -14,7 +14,8 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   {% block head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}{% if app_env == 'staging' %} is-staging{% endif %}">
+  {% if app_env == "staging" %}<div class="env-banner">🧪 測試站：資料會不定期清空，請勿存放重要資料</div>{% endif %}
   {% block content %}{% endblock %}
   <script>
     // 註冊 service worker，讓網站可以「加入主畫面」安裝成 App

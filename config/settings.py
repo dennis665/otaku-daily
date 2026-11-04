@@ -27,6 +27,8 @@ _load_env(BASE_DIR / ".env")
 
 SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = os.environ.get("DEBUG", "False") == "True"
+# 執行環境：production（正式站）/ staging（測試站，頁面頂端會顯示橫幅）
+APP_ENV = os.environ.get("APP_ENV", "production")
 
 # 本機、Cloudflare 臨時網址 (*.trycloudflare.com) 與 Render 免費主機 (*.onrender.com)
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".trycloudflare.com", ".onrender.com"]
@@ -69,6 +71,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "config.context_processors.app_env",
             ],
         },
     },
