@@ -26,8 +26,8 @@ def service_worker(request):
 
 def manifest(request):
     return JsonResponse({
-        "name": "宅日常",
-        "short_name": "宅日常",
+        "name": "酒寄彩葉",
+        "short_name": "酒寄彩葉",
         "description": "追番、手遊、音樂的個人助手",
         "start_url": "/",
         "scope": "/",
