@@ -1,0 +1,27 @@
+# Render 部署設定：在 Render 選 New > Blueprint 並指定這個 GitHub 儲存庫，會自動建立網站與資料庫
+services:
+  - type: web
+    name: otaku-daily
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
+    startCommand: gunicorn config.wsgi:application --workers 2 --timeout 60
+    healthCheckPath: /accounts/login/
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: otaku-daily-db
+          property: connectionString
+
+databases:
+  # 免費 PostgreSQL 有使用期限（到期前 Render 會寄信通知），正式使用時再改付費方案或換其他資料庫
+  - name: otaku-daily-db
+    plan: free
+    region: singapore
+    databaseName: otaku_daily
+    user: otaku

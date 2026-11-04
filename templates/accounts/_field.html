@@ -1,0 +1,5 @@
+<label class="field">
+  <span>{{ field.label }}</span>
+  {{ field }}
+  {% if field.errors %}<em class="err">{{ field.errors|join:"、" }}</em>{% elif field.help_text %}<small>{{ field.help_text|safe }}</small>{% endif %}
+</label>

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}影音播放｜宅日常{% endblock %}
+{% block content %}
+<header class="topbar">
+  <div class="brand-sm"><span class="logo">♪</span>宅日常</div>
+  <div class="user">
+    <span>{{ user.username }}</span>
+    <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn ghost sm" type="submit">登出</button></form>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="music" role="tab">🎵 音樂 <b>{{ audio_count }}</b></button>
+  <button class="tab" data-tab="video" role="tab">🎬 影片 <b>{{ video_count }}</b></button>
+</nav>
+
+{% if not playlist %}
+<p class="empty">目前讀不到影音清單，可能是 GitHub 暫時無法連線，請稍後重新整理。</p>
+{% endif %}
+
+<section id="panel-music" class="panel active">
+  <div class="now">
+    <div class="disc" id="disc"><div class="disc-center"></div></div>
+    <div class="now-info">
+      <h2 id="m-title">選一首歌開始播放</h2>
+      <p class="sub">動漫原聲</p>
+      <div class="eq" id="eq"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+  <div class="progress">
+    <span id="m-cur">0:00</span>
+    <input type="range" id="m-seek" min="0" max="1000" value="0" aria-label="播放進度">
+    <span id="m-dur">0:00</span>
+  </div>
+  <div class="controls">
+    <button class="icon" id="m-loop" title="循環模式">🔁</button>
+    <button class="icon" id="m-prev" title="上一首">⏮</button>
+    <button class="icon big" id="m-play" title="播放">▶</button>
+    <button class="icon" id="m-next" title="下一首">⏭</button>
+    <a class="icon" id="m-dl" title="下載" download>⬇</a>
+  </div>
+  <div class="volume vol-only-desktop">
+    <button class="icon sm" id="m-mute" title="靜音">🔊</button>
+    <input type="range" id="m-vol" min="0" max="100" value="100" aria-label="音量">
+  </div>
+  <p class="loop-text" id="m-loop-text">全部循環</p>
+  <input class="search" id="m-search" type="search" placeholder="搜尋歌名">
+  <ol class="list" id="m-list"></ol>
+  <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
+</section>
+
+<section id="panel-video" class="panel">
+  <video id="video" controls playsinline preload="metadata" crossorigin="anonymous"></video>
+  <div class="video-bar">
+    <h2 id="v-title">選一部影片開始播放</h2>
+    <div class="controls sm">
+      <button class="icon" id="v-prev" title="上一部">⏮</button>
+      <button class="icon" id="v-next" title="下一部">⏭</button>
+      <button class="icon" id="v-loop" title="循環模式">🔁</button>
+    </div>
+  </div>
+  <p class="loop-text" id="v-loop-text">全部循環</p>
+  <input class="search" id="v-search" type="search" placeholder="搜尋影片">
+  <ol class="list" id="v-list"></ol>
+</section>
+
+{{ playlist|json_script:"playlist-data" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/player.js' %}"></script>{% endblock %}
