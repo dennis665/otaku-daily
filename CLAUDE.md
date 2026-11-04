@@ -18,8 +18,10 @@
 - `main` 分支 → 正式站 https://otaku-daily.onrender.com （資料庫在 Neon，`DATABASE_URL` 只在 Render 網頁設定）
 - 新功能先推 `staging` 驗證，經使用者同意後再快轉合併到 `main`。
 - 測試帳號放在 `dev_test_account.txt`（不進 Git），只用在本機與測試站，不在正式站建立或登入帳號。
+- 測試站登入頁有「⚡ 一鍵登入測試帳號」（`accounts.views.quick_login`，帳號 quick_tester、無密碼），只在 `APP_ENV=staging` 開放，正式站回 404。
 
 ## 其他
 
 - 介面文字一律繁體中文（台灣）。
+- 北部動漫活動：讀取 Google 試算表（雲端排程每天台灣時間 08:00 更新），網站每天 08:30 後重新讀一次，見 `player/events.py`；備份用 `python manage.py update_events_snapshot` 更新。
 - 影音清單來源與快照：見 `player/playlist.py`；影音儲存庫新增檔案後執行 `python manage.py update_media_snapshot` 更新快照。
