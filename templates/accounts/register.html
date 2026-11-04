@@ -6,8 +6,9 @@
   <div class="brand"><span class="logo">♪</span><h1>建立帳號</h1><p>註冊後即可使用影音播放</p></div>
   <form method="post" novalidate>
     {% csrf_token %}
+    {% if request.GET.expired %}<div class="alert notice">頁面已過期，請重新填寫一次</div>{% endif %}
     {% for field in form %}{% include "accounts/_field.html" %}{% endfor %}
-    <button class="btn primary" type="submit">註冊並登入</button>
+    <button class="btn primary" type="submit" data-busy="註冊中…">註冊並登入</button>
   </form>
   <p class="switch">已經有帳號了？<a href="{% url 'accounts:login' %}">登入</a></p>
 </main>

@@ -120,3 +120,5 @@ SESSION_COOKIE_HTTPONLY = True
 # 對外一律走 HTTPS；瀏覽器把 localhost 視為安全來源，本機 http 測試也能正常登入
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# 表單過期時導回最新頁面，而不是顯示 403 錯誤頁
+CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"

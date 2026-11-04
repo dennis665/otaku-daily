@@ -22,6 +22,17 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
     }
+    // 送出表單後停用按鈕，避免連按兩次造成「頁面已過期」
+    document.addEventListener('submit', (e) => {
+      e.target.querySelectorAll('button[type=submit]').forEach((btn) => {
+        btn.disabled = true;
+        if (btn.dataset.busy) btn.textContent = btn.dataset.busy;
+      });
+    });
+    // 從返回鍵或切回 App 顯示快取頁面時重新載入，確保表單是最新的
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted && document.querySelector('form input[name=csrfmiddlewaretoken]')) location.reload();
+    });
   </script>
   {% block scripts %}{% endblock %}
 </body>
