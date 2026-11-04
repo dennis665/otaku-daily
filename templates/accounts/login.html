@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}登入｜酒寄彩葉{% endblock %}
+{% block title %}登入｜Ukiyo{% endblock %}
 {% block body_class %}auth{% endblock %}
 {% block content %}
 <main class="auth-card">
-  <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>酒寄彩葉</h1><p>追番、音樂，一個 App 搞定</p></div>
+  <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>{% include "partials/wordmark.html" %}</h1><p>追番、音樂，盡在此刻</p></div>
   <form method="post" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="alert">帳號或密碼錯誤，請再試一次</div>

@@ -184,7 +184,7 @@
     navigator.mediaSession.metadata = new MediaMetadata({
       title: s.title,
       artist: '動漫原聲',
-      album: '酒寄彩葉',
+      album: 'Ukiyo',
       artwork: [{ src: '/static/icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
     });
   }

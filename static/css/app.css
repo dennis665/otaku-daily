@@ -147,3 +147,13 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
   .avatar-rotator::before, .avatar-rotator img { animation: none; }
   .avatar-rotator img:first-child { opacity: 1; }
 }
+
+/* ---------- Ukiyo 浮世繪字標 ---------- */
+.brand h1 { line-height: 0; }
+.wordmark { display: block; width: min(280px, 82%); height: auto; margin: 2px auto 6px; overflow: visible;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .35)) drop-shadow(0 0 14px rgba(94, 231, 255, .18)); }
+.brand-sm .wordmark { width: auto; height: 30px; margin: 0; }
+/* 櫻花輕輕搖曳 */
+.wm-sakura > g { transform-box: fill-box; transform-origin: center; animation: sakura-sway 4s ease-in-out infinite; }
+@keyframes sakura-sway { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) { .wm-sakura > g { animation: none; } }

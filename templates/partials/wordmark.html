@@ -1,0 +1,79 @@
+<svg class="wordmark" viewBox="0 0 352 134" role="img" aria-label="Ukiyo">
+  <title>Ukiyo</title>
+  <defs>
+    <!-- 木刻版畫的粗糙邊緣 -->
+    <filter id="wm-rough" x="-5%" y="-10%" width="110%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2"/>
+    </filter>
+    <!-- 普魯士藍暈染（ぼかし）：浮世繪天空與海浪的經典上色法 -->
+    <linearGradient id="wm-bokashi" gradientUnits="userSpaceOnUse" x1="0" y1="18" x2="0" y2="112">
+      <stop offset="0" stop-color="#5ea3e6"/>
+      <stop offset=".45" stop-color="#2a5fb0"/>
+      <stop offset="1" stop-color="#0e2756"/>
+    </linearGradient>
+    <!-- 青海波（浮世繪常見的波浪紋） -->
+    <pattern id="wm-seigaiha" width="14" height="7" patternUnits="userSpaceOnUse">
+      <rect width="14" height="7" fill="#1d3f7a"/>
+      <g fill="#1d3f7a" stroke="#f3e6c8" stroke-width="1">
+        <circle cx="0" cy="7" r="6.5"/><circle cx="0" cy="7" r="4"/><circle cx="0" cy="7" r="1.6"/>
+        <circle cx="14" cy="7" r="6.5"/><circle cx="14" cy="7" r="4"/><circle cx="14" cy="7" r="1.6"/>
+        <circle cx="7" cy="10.5" r="6.5"/><circle cx="7" cy="10.5" r="4"/><circle cx="7" cy="10.5" r="1.6"/>
+      </g>
+    </pattern>
+    <clipPath id="wm-sun"><circle cx="306" cy="68" r="25"/></clipPath>
+    <!-- 字母骨架：U 右上捲成神奈川沖浪的浪頭、K 劍與浪尾、I 毛筆豎、Y 松枝、O 日輪 -->
+    <g id="wm-letters">
+      <path d="M24 32 V80 Q24 108 50 108 Q76 108 76 80 V46 Q76 19 97 19 Q112 21 109 36 Q106 47 95 43 Q89 40 92 33"/>
+      <path d="M132 28 V108"/>
+      <path d="M136 70 Q154 54 172 28"/>
+      <path d="M142 64 Q156 82 158 96 Q161 110 178 104"/>
+      <path d="M202 46 V108"/>
+      <path d="M222 30 Q234 52 246 66"/>
+      <path d="M272 30 Q260 50 248 66"/>
+      <path d="M248 66 V108"/>
+      <circle cx="306" cy="68" r="34"/>
+    </g>
+  </defs>
+
+  <g filter="url(#wm-rough)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <use href="#wm-letters" stroke="#f3e6c8" stroke-width="25"/>
+    <use href="#wm-letters" stroke="#0b1733" stroke-width="20"/>
+    <use href="#wm-letters" stroke="url(#wm-bokashi)" stroke-width="14"/>
+    <!-- 刻線 -->
+    <g stroke="#f3e6c8" stroke-width="1.5" stroke-dasharray="6 5" opacity=".8">
+      <path d="M22 36 V80 Q22 104 46 106"/>
+      <path d="M130 34 V102"/>
+      <path d="M200 52 V102"/>
+      <path d="M246 72 V102"/>
+    </g>
+    <!-- 浪頭的浪花爪 -->
+    <g stroke="#0b1733" stroke-width="7">
+      <path d="M93 11 l1 -7"/><path d="M104 12 l5 -6"/><path d="M113 19 l7 -4"/>
+    </g>
+    <g stroke="#f3e6c8" stroke-width="3.5">
+      <path d="M93 11 l1 -7"/><path d="M104 12 l5 -6"/><path d="M113 19 l7 -4"/>
+    </g>
+  </g>
+
+  <!-- O 的內部：上半紅日、下半青海波 -->
+  <g clip-path="url(#wm-sun)">
+    <rect x="278" y="40" width="56" height="56" fill="#e2482f"/>
+    <circle cx="306" cy="62" r="11" fill="#f7c948"/>
+    <path d="M278 72 Q288 64 298 72 T318 72 T338 72 V98 H278 Z" fill="url(#wm-seigaiha)"/>
+    <path d="M278 72 Q288 64 298 72 T318 72 T338 72" fill="none" stroke="#f3e6c8" stroke-width="2"/>
+  </g>
+
+  <!-- I 上方的櫻花 -->
+  <g class="wm-sakura" transform="translate(202 25)">
+    <g fill="#ff8fb3" stroke="#0b1733" stroke-width="1.4">
+      <ellipse cx="0" cy="-7" rx="4.8" ry="7.2"/>
+      <ellipse cx="0" cy="-7" rx="4.8" ry="7.2" transform="rotate(72)"/>
+      <ellipse cx="0" cy="-7" rx="4.8" ry="7.2" transform="rotate(144)"/>
+      <ellipse cx="0" cy="-7" rx="4.8" ry="7.2" transform="rotate(216)"/>
+      <ellipse cx="0" cy="-7" rx="4.8" ry="7.2" transform="rotate(288)"/>
+    </g>
+    <circle r="3" fill="#f7c948"/>
+  </g>
+
+</svg>
