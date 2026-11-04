@@ -5,9 +5,11 @@
 //   - 其他非同步工作：AppLoading.track(promise) 或 AppLoading.start() / 回傳的 done()
 (() => {
   const loader = document.getElementById('page-loader');
-  const FAILSAFE_MS = 15000;
+  const FAILSAFE_MS = 15000;      // 一般載入卡住多久後解除鎖定
+  const SERVER_WAIT_MS = 60000;   // 換頁、送出表單：免費主機休眠喚醒要 30～60 秒
   let pending = 0;          // 進行中的載入數量，全部完成才解除
   let navigating = false;   // 正在換頁：頁面即將被取代，不再解除
+  let deadline = 0;         // 防呆解除鎖定的時間點
   let failsafe = null;
 
   function render() {
@@ -17,15 +19,21 @@
     [...document.body.children].forEach((el) => { if (el !== loader && el.tagName !== 'SCRIPT') el.inert = on; });
     document.body.setAttribute('aria-busy', on ? 'true' : 'false');
     clearTimeout(failsafe);
-    // 防呆：卡住超過 15 秒就解除鎖定，避免頁面永遠不能操作
-    if (on) failsafe = setTimeout(reset, FAILSAFE_MS);
+    // 防呆：卡住超過時限就解除鎖定，避免頁面永遠不能操作
+    if (on) {
+      deadline = Math.max(deadline, Date.now() + FAILSAFE_MS);
+      failsafe = setTimeout(reset, deadline - Date.now());
+    } else {
+      deadline = 0;
+    }
   }
 
-  function reset() { pending = 0; navigating = false; loader.classList.remove('is-immediate'); render(); }
+  function reset() { pending = 0; navigating = false; deadline = 0; loader.classList.remove('is-immediate'); render(); }
 
-  /** 開始一個載入，回傳 done()；done 重複呼叫也只算一次 */
-  function start() {
+  /** 開始一個載入，回傳 done()；done 重複呼叫也只算一次。maxMs：最多鎖定多久 */
+  function start(maxMs = FAILSAFE_MS) {
     pending += 1;
+    deadline = Math.max(deadline, Date.now() + maxMs);
     render();
     let finished = false;
     return () => {
@@ -44,9 +52,8 @@
 
   function navigate() { navigating = true; render(); }
 
-  // iPhone Safari 一開始換頁就停止更新舊頁面，遮罩來不及出現。
-  // 換頁、送出表單是使用者主動操作，本來就要等：立即顯示（不延遲），
-  // 等遮罩真的畫到畫面上（兩個畫面更新週期，約 0.03 秒）才開始換頁。
+  // 換頁前先立即顯示遮罩（不延遲），等遮罩畫到畫面上（兩個畫面更新週期，約 0.03 秒）才換頁。
+  // 用在無法改成背景處理的情況（例如背景請求失敗時的退路）。
   function navigateAfterPaint(go) {
     loader.classList.add('is-immediate');
     navigate();
@@ -78,20 +85,70 @@
     if (url.origin !== location.origin) return;
     if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
     e.preventDefault();
-    navigateAfterPaint(() => { location.href = url.href; });
+    // iPhone Safari 一開始換頁就凍結舊頁面（動圖停住）。先在背景確認新頁面準備好
+    // （主機休眠時等它喚醒），這段時間動圖會持續播放，準備好才真正換頁。
+    loader.classList.add('is-immediate');
+    const done = start(SERVER_WAIT_MS);
+    nativeFetch(url.href, { credentials: 'same-origin' })
+      .catch(() => {})
+      .then(() => { navigate(); done(); location.href = url.href; });
   });
 
-  // ---------- 送出表單：停用按鈕避免連按兩次造成「頁面已過期」，並顯示遮罩 ----------
-  document.addEventListener('submit', (e) => {
+  // ---------- 送出表單：在背景送出，伺服器處理期間動圖持續播放 ----------
+  // 成功（伺服器導向下一頁）才換頁；失敗（例如密碼錯誤）直接把錯誤訊息換到目前頁面，不用換頁。
+  // 也會停用按鈕，避免連按兩次造成「頁面已過期」。
+  document.addEventListener('submit', async (e) => {
     if (e.defaultPrevented) return;
     const form = e.target;
     e.preventDefault();
+    const body = new FormData(form);
     form.querySelectorAll('button[type=submit]').forEach((btn) => {
       btn.disabled = true;
       if (btn.dataset.busy) btn.textContent = btn.dataset.busy;
     });
     // form.submit() 不會再觸發 submit 事件，不會重複執行這段
-    navigateAfterPaint(() => form.submit());
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') {
+      navigateAfterPaint(() => form.submit());
+      return;
+    }
+
+    loader.classList.add('is-immediate');
+    const done = start(SERVER_WAIT_MS);
+    let res;
+    try {
+      res = await nativeFetch(form.action || location.href, { method: 'POST', body, credentials: 'same-origin' });
+    } catch {
+      done();
+      navigateAfterPaint(() => form.submit());   // 背景送出失敗：改用一般方式送出
+      return;
+    }
+    if (res.redirected) {
+      navigate();
+      done();
+      location.replace(res.url);
+      return;
+    }
+    // 沒有導向：伺服器重新顯示了表單（含錯誤訊息），換掉目前頁面的主要內容
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const newMain = doc.querySelector('main');
+    const oldMain = document.querySelector('main');
+    if (newMain && oldMain) {
+      document.title = doc.title;
+      oldMain.replaceWith(document.importNode(newMain, true));
+      done();
+      loader.classList.remove('is-immediate');
+      const firstError = document.querySelector('main .err, main .alert');
+      const field = firstError && firstError.closest('.field') ? firstError.closest('.field').querySelector('input') : document.querySelector('main input:not([type=hidden])');
+      if (field) field.focus();
+    } else {
+      // 其他格式的回應：整頁換成伺服器的回應
+      navigate();
+      done();
+      document.open();
+      document.write(html);
+      document.close();
+    }
   });
 
   // ---------- 從返回鍵或切回 App 顯示快取頁面：有表單就重新載入確保是最新的，否則解除遮罩 ----------
