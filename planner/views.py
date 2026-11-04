@@ -25,13 +25,13 @@ HISTORY_LIMIT = 100
 MAX_LINKS = 10
 
 
-def notify(users, title, body, tag):
+def notify(users, title, body, tag, url="/?tab=plan"):
     """發推播；失敗只記錄，不影響原本的操作"""
     users = [u for u in users if u]
     if not users:
         return
     try:
-        send_to_users(users, title, body, url="/?tab=plan", tag=tag)
+        send_to_users(users, title, body, url=url, tag=tag)
     except Exception:
         logger.exception("推播通知失敗：%s", title)
 
@@ -328,10 +328,11 @@ def group_invite(request, pk):
         return _error("找不到這個會員")
     if group.members.filter(user=invitee).exists():
         return _error(f"{invitee.username} 已經在群組裡了")
-    _, created = GroupInvitation.objects.get_or_create(group=group, invitee=invitee, defaults={"inviter": request.user})
+    inv, created = GroupInvitation.objects.get_or_create(group=group, invitee=invitee, defaults={"inviter": request.user})
     if not created:
         return _error(f"已經邀請過 {invitee.username}，等對方回覆")
-    notify([invitee], "📨 群組邀請", f"{request.user.username} 邀請你加入「{group.name}」，打開 Ukiyo 的行程頁回覆", f"invite-{group.pk}")
+    notify([invitee], "📨 群組邀請", f"{request.user.username} 邀請你加入「{group.name}」，點這裡回覆", f"invite-{group.pk}",
+           url=f"/?tab=plan&invite={inv.pk}")
     return JsonResponse({"ok": True})
 
 

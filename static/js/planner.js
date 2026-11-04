@@ -124,6 +124,32 @@
     render();
   }
 
+  // 背景重新讀取（不顯示載入遮罩），切回 App 時用
+  async function quietReload() {
+    try {
+      const r = await fetch('/plan/api/itineraries/', { loading: false, credentials: 'same-origin' });
+      if (r.ok) { data = await r.json(); render(); }
+    } catch { /* 下次再試 */ }
+  }
+
+  // 從邀請通知進來：直接問要不要加入
+  function promptInvite(id) {
+    const inv = (data.invitations || []).find((i) => String(i.id) === String(id));
+    if (!inv) return;   // 已經處理過了
+    view = 'upcoming';
+    render();
+    setTimeout(() => {
+      if (!confirm(`📨 ${inv.inviter} 邀請你加入「${inv.group}」
+
+要加入這個群組嗎？（取消的話邀請會保留在行程頁上方）`)) return;
+      run(async () => {
+        await api(`/plan/api/invitations/${inv.id}/accept/`, {});
+        await reload();
+        alert(`已加入「${inv.group}」！群組的行程會出現在這裡。`);
+      });
+    }, 300);
+  }
+
   // ---------- 操作 ----------
   async function run(fn) {
     try { await fn(); } catch (err) { alert(err.message); }
@@ -357,6 +383,23 @@
   const waitIfNeeded = () => { if (!loaded && window.AppLoading) window.AppLoading.track(loading); };
   tab.addEventListener('click', waitIfNeeded);
   if (tab.classList.contains('active')) waitIfNeeded();
+
+  // 開 App 時網址帶 ?invite=（點邀請通知開啟）
+  const launchInvite = window.appLaunchParams && window.appLaunchParams.get('invite');
+  if (launchInvite) loading.then(() => promptInvite(launchInvite));
+
+  // App 已開著時點通知：重新讀取後處理邀請
+  window.addEventListener('app-link', async (e) => {
+    await loading;
+    await quietReload();
+    const id = e.detail.get('invite');
+    if (id) promptInvite(id);
+  });
+
+  // 切回 App 時背景更新行程與邀請
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && loaded) quietReload();
+  });
 
   // 給「活動」頁用：把活動帶入新增行程
   window.Planner = {

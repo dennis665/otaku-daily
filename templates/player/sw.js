@@ -60,11 +60,12 @@ self.addEventListener('notificationclick', (event) => {
   const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const w of wins) {
-      if (new URL(w.url).origin === self.location.origin) {
-        await w.focus();
-        try { return await w.navigate(url); } catch { /* 該視窗不受控制時改開新視窗 */ }
-      }
+    const win = wins.find((w) => new URL(w.url).origin === self.location.origin);
+    if (win) {
+      // App 已經開著（iPhone 點通知只會把 App 叫到前景）：通知頁面自己切換到對應的地方
+      win.postMessage({ type: 'notification-click', url });
+      try { await win.focus(); } catch { /* 部分瀏覽器不允許 */ }
+      return undefined;
     }
     return self.clients.openWindow(url);
   })());

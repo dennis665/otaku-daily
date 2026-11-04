@@ -282,8 +282,17 @@
   if (lastVideo >= 0 && lastVideo < videos.length) loadVideo(lastVideo, false);
   // 指定分頁：網址 ?tab=plan（例如從邀請頁回來）優先，否則還原上次的分頁
   const params = new URLSearchParams(location.search);
+  window.appLaunchParams = params;   // 給行程頁讀取 ?invite= 等參數（網址列稍後會清掉）
   const wantTab = params.get('tab') || store.get('tab', 'music');
   if (params.has('tab')) history.replaceState(null, '', location.pathname);
   const tabBtn = document.querySelector(`.tab[data-tab="${wantTab}"]`);
   if (tabBtn && wantTab !== 'music') tabBtn.click();
+
+  // 點通知時 App 已經開著：切到指定分頁，並交給該分頁處理其他參數（例如群組邀請）
+  window.handleAppLink = (url) => {
+    const p = new URL(url, location.origin).searchParams;
+    const btn = document.querySelector(`.tab[data-tab="${p.get('tab')}"]`);
+    if (btn) btn.click();
+    window.dispatchEvent(new CustomEvent('app-link', { detail: p }));
+  };
 })();

@@ -45,6 +45,15 @@
     checking = false;
   }
 
+  // 點推播通知時（App 原本就開著）：首頁直接切到對應分頁，其他頁面就前往通知的網址
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (!e.data || e.data.type !== 'notification-click') return;
+      if (typeof window.handleAppLink === 'function' && location.pathname === '/') window.handleAppLink(e.data.url);
+      else location.href = e.data.url;
+    });
+  }
+
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
   window.addEventListener('pageshow', (e) => { if (e.persisted) check(true); });
   setInterval(() => { if (document.visibilityState === 'visible') check(true); }, INTERVAL_MS);
