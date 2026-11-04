@@ -11,5 +11,6 @@ urlpatterns = [
     path("manifest.webmanifest", player_views.manifest, name="manifest"),
     path("version.json", player_views.version, name="version"),
     path("plan/", include("planner.urls")),
+    path("notify/", include("notifications.urls")),
     path("", include("player.urls")),
 ]

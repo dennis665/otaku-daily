@@ -39,3 +39,33 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+// ---------- 推播通知 ----------
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
+  const title = data.title || 'Ukiyo';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: data.icon || '/static/icons/icon-192.png',
+    badge: data.icon || '/static/icons/icon-192.png',
+    tag: data.tag || undefined,
+    data: { url: data.url || '/' },
+  }));
+});
+
+// 點通知：已經開著 App 就切過去並換到對應頁面，否則開新視窗
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of wins) {
+      if (new URL(w.url).origin === self.location.origin) {
+        await w.focus();
+        try { return await w.navigate(url); } catch { /* 該視窗不受控制時改開新視窗 */ }
+      }
+    }
+    return self.clients.openWindow(url);
+  })());
+});

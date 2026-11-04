@@ -5,6 +5,8 @@ from django.shortcuts import render
 from django.templatetags.static import static
 from django.views.decorators.cache import cache_control, never_cache
 
+from notifications.reminders import SCHEDULE_HINT
+
 from .events import get_events
 from .playlist import get_playlist
 
@@ -16,6 +18,7 @@ def home(request):
         "playlist": playlist,
         "audio_count": sum(1 for s in playlist if s["audio"]),
         "video_count": sum(1 for s in playlist if s["video"]),
+        "reminder_hint": SCHEDULE_HINT,
     })
 
 

@@ -5,6 +5,7 @@
 <header class="topbar">
   <div class="brand-sm">{% include "partials/avatar_rotator.html" %}{% include "partials/wordmark.html" %}</div>
   <div class="user">
+    <button class="icon sm bell" id="n-open" type="button" title="通知設定" aria-label="通知設定">🔔</button>
     <span>{{ user.username }}</span>
     <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn ghost sm" type="submit">登出</button></form>
   </div>
@@ -130,7 +131,7 @@
       <span class="with-btn"><input name="location" maxlength="200" placeholder="地址或店名"><button class="btn ghost sm" type="button" id="p-locate">📍 目前位置</button></span>
     </label>
     <div class="field"><span>相關連結</span><div id="p-links"></div><button class="btn ghost sm" type="button" id="p-add-link">＋ 加一個連結</button></div>
-    <label class="field"><span>提前提醒（推播功能完成後生效）</span><select name="notify_minutes_before" id="p-notify"></select></label>
+    <label class="field"><span>提前提醒（要先在右上角 🔔 開啟通知）</span><select name="notify_minutes_before" id="p-notify"></select><small>{{ reminder_hint }}</small></label>
     <label class="field"><span>備註</span><textarea name="notes" rows="3" maxlength="2000"></textarea></label>
     <p class="alert" id="p-form-error" hidden></p>
     <div class="sheet-foot"><button class="btn ghost" type="button" data-close>取消</button><button class="btn primary" type="submit">儲存</button></div>
@@ -161,10 +162,27 @@
   </div>
 </div>
 
+{# 通知設定 #}
+<div class="sheet-backdrop" id="n-sheet" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><h3>🔔 推播通知</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <p class="n-status" id="n-status">檢查中…</p>
+    <p class="alert notice" id="n-ios" hidden>iPhone 要先在 Safari 按「分享 →『加入主畫面』」，再從主畫面打開 Ukiyo，才能開啟通知（需要 iOS 16.4 以上）。</p>
+    <div class="n-actions">
+      <button class="btn primary" id="n-enable" type="button" hidden>開啟這台裝置的通知</button>
+      <button class="btn ghost" id="n-test" type="button" hidden>📨 傳送測試通知</button>
+      <button class="btn ghost" id="n-disable" type="button" hidden>關閉這台裝置的通知</button>
+    </div>
+    <p class="n-devices" id="n-devices"></p>
+    <p class="sheet-sub n-hint">⏰ {{ reminder_hint }}。</p>
+  </div>
+</div>
+
 {{ playlist|json_script:"playlist-data" }}
 {% endblock %}
 {% block scripts %}
 <script src="{% static 'js/player.js' %}"></script>
 <script src="{% static 'js/events.js' %}"></script>
 <script src="{% static 'js/planner.js' %}"></script>
+<script src="{% static 'js/notify.js' %}"></script>
 {% endblock %}
