@@ -205,3 +205,9 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
 .quick-login { margin-top: 12px; text-align: center; }
 .btn.quick { width: 100%; font-weight: 700; color: #1a1300; background: repeating-linear-gradient(45deg, #ffd34d 0 14px, #ffc107 14px 28px); }
 .quick-login small { display: block; margin-top: 6px; color: var(--muted); font-size: .75rem; }
+
+/* ---------- 有新版本提示 ---------- */
+.update-toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 18px); z-index: 900; transform: translateX(-50%);
+  border: 0; border-radius: 99px; padding: 12px 22px; background: var(--grad); color: #fff; font-weight: 700; font-size: .95rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45); cursor: pointer; animation: toast-in .35s ease-out both; white-space: nowrap; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }

@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.templatetags.static import static
-from django.views.decorators.cache import cache_control
+from django.views.decorators.cache import cache_control, never_cache
 
 from .events import get_events
 from .playlist import get_playlist
@@ -24,6 +25,12 @@ def events_api(request):
     events, fresh = get_events()
     checked = max((e["checked"] for e in events if e["checked"]), default="")
     return JsonResponse({"events": events, "updated": checked, "fresh": fresh}, json_dumps_params={"ensure_ascii": False})
+
+
+@never_cache
+def version(request):
+    """目前部署的版本，App 切回前景時用來檢查有沒有新版本"""
+    return JsonResponse({"version": settings.APP_VERSION})
 
 
 @cache_control(no_cache=True)

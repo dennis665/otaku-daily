@@ -29,6 +29,8 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 # 執行環境：production（正式站）/ staging（測試站，頁面頂端會顯示橫幅）
 APP_ENV = os.environ.get("APP_ENV", "production")
+# 目前部署的版本：Render 部署時會提供這次的 Git commit；App 用它判斷有沒有新版本可以更新
+APP_VERSION = os.environ.get("RENDER_GIT_COMMIT") or "dev"
 
 # 本機、Cloudflare 臨時網址 (*.trycloudflare.com) 與 Render 免費主機 (*.onrender.com)
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".trycloudflare.com", ".onrender.com"]

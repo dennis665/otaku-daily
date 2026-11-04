@@ -1,4 +1,4 @@
-// 宅日常 service worker：快取網站外殼 (CSS / JS / 圖示)，影音檔不快取以免塞爆手機空間
+// Ukiyo service worker：快取網站外殼 (CSS / JS / 圖示)，影音檔不快取以免塞爆手機空間
 const CACHE = 'otaku-daily-v1';
 
 self.addEventListener('install', (event) => {

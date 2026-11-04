@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Ukiyo{% endblock %}</title>
   <meta name="theme-color" content="#14122b">
+  <meta name="app-version" content="{{ app_version }}">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="48x48" href="{% static 'icons/favicon-48.png' %}">
   <link rel="apple-touch-icon" sizes="180x180" href="{% static 'icons/apple-touch-icon.png' %}">
@@ -45,6 +46,7 @@
   </script>
   {# 全站載入遮罩，要在各頁面的程式之前載入，頁面程式才能使用 AppLoading #}
   <script src="{% static 'js/loader.js' %}"></script>
+  <script src="{% static 'js/updater.js' %}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
