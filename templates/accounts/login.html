@@ -3,7 +3,7 @@
 {% block body_class %}auth{% endblock %}
 {% block content %}
 <main class="auth-card">
-  <div class="brand"><span class="logo">♪</span><h1>酒寄彩葉</h1><p>追番、手遊、音樂，一個 App 搞定</p></div>
+  <div class="brand"><span class="logo">♪</span><h1>酒寄彩葉</h1><p>追番、音樂，一個 App 搞定</p></div>
   <form method="post" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="alert">帳號或密碼錯誤，請再試一次</div>

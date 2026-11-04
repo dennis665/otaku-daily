@@ -28,7 +28,7 @@ def manifest(request):
     return JsonResponse({
         "name": "酒寄彩葉",
         "short_name": "酒寄彩葉",
-        "description": "追番、手遊、音樂的個人助手",
+        "description": "追番、音樂的個人助手",
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
