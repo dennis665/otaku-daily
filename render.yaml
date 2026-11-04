@@ -15,10 +15,9 @@ services:
         generateValue: true
       - key: DEBUG
         value: "False"
+      # 資料庫放在 Neon（免費且不會到期），連線網址含密碼，只在 Render 網頁的 Environment 手動填寫
       - key: DATABASE_URL
-        fromDatabase:
-          name: otaku-daily-db
-          property: connectionString
+        sync: false
 
   # 測試站：部署 staging 分支，新功能先在這裡測試再合併到 main
   # 免費方案每個工作區只能有一個免費 PostgreSQL，測試站改用 SQLite，
@@ -41,7 +40,7 @@ services:
         value: staging
 
 databases:
-  # 免費 PostgreSQL 有使用期限（到期前 Render 會寄信通知），正式使用時再改付費方案或換其他資料庫
+  # 舊的 Render 免費 PostgreSQL（建立 30 天後到期），已改用 Neon；確認搬移完成後可移除這段並到 Render 刪除資料庫
   - name: otaku-daily-db
     plan: free
     region: singapore
