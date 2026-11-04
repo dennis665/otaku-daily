@@ -101,5 +101,19 @@ video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 16px
 .env-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 10; padding: calc(env(safe-area-inset-top) + 6px) 12px 6px; text-align: center; font-size: .82rem; font-weight: 700; color: #1a1300; background: repeating-linear-gradient(45deg, #ffd34d 0 14px, #ffc107 14px 28px); }
 body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
 
+/* ---------- 載入遮罩 ---------- */
+.page-loader { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center;
+  background: rgba(10, 9, 24, .62); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  opacity: 0; visibility: hidden; pointer-events: none; }
+/* 延遲 0.25 秒才淡入：載入很快時不會閃一下 */
+.page-loader.is-active { pointer-events: auto; animation: loader-in .2s ease-out .25s both; }
+@keyframes loader-in { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
+.loader-card { display: grid; justify-items: center; gap: 6px; }
+.loader-card img { width: 160px; height: 160px; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .45)); }
+.loader-card p { margin: 0; color: var(--text); font-weight: 700; letter-spacing: .1em; text-shadow: 0 2px 8px rgba(0, 0, 0, .6); }
+.loader-card .dots::after { content: ""; display: inline-block; width: 1.5em; text-align: left; animation: dots 1.2s steps(4, end) infinite; }
+@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75%, 100% { content: "..."; } }
+@media (prefers-reduced-motion: reduce) { .page-loader.is-active { animation-duration: .01s; } }
+
 /* iPhone / iPad 不允許網頁調整音量，隱藏音量列 */
 @supports (-webkit-touch-callout: none) { .vol-only-desktop { display: none; } }

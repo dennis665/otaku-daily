@@ -12,9 +12,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="宅日常">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="preload" as="image" href="{% static 'img/loading-frieren.webp' %}">
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}{% if app_env == 'staging' %} is-staging{% endif %}">
+  {# 頁面載入遮罩：一開始就顯示，頁面載入完才移除；切換頁面、送出表單時再顯示並鎖住操作 #}
+  <div id="page-loader" class="page-loader is-active" role="status" aria-live="polite">
+    <div class="loader-card">
+      <img src="{% static 'img/loading-frieren.webp' %}" width="160" height="160" alt="">
+      <p>載入中<span class="dots"></span></p>
+    </div>
+  </div>
   {% if app_env == "staging" %}<div class="env-banner">🧪 測試站：資料會不定期清空，請勿存放重要資料</div>{% endif %}
   {% block content %}{% endblock %}
   <script>
@@ -22,16 +30,46 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
     }
-    // 送出表單後停用按鈕，避免連按兩次造成「頁面已過期」
+
+    // ---------- 載入遮罩 ----------
+    const loader = document.getElementById('page-loader');
+    let loaderTimer = null;
+    function setLoading(on) {
+      loader.classList.toggle('is-active', on);
+      // inert 讓遮罩底下的內容不能點擊、也不能用鍵盤操作
+      [...document.body.children].forEach((el) => { if (el !== loader && el.tagName !== 'SCRIPT') el.inert = on; });
+      document.body.setAttribute('aria-busy', on ? 'true' : 'false');
+      clearTimeout(loaderTimer);
+      // 防呆：網路卡住 15 秒後解除鎖定，避免頁面永遠不能操作
+      if (on) loaderTimer = setTimeout(() => setLoading(false), 15000);
+    }
+    // 頁面內容準備好就移除一開始的遮罩（不等動圖等大檔案下載完）
+    document.addEventListener('DOMContentLoaded', () => setLoading(false));
+    // 點站內連結時顯示遮罩（新分頁、下載、頁內錨點、按住修飾鍵開新視窗除外）
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href]');
+      if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      if (a.target && a.target !== '_self') return;
+      if (a.hasAttribute('download')) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin) return;
+      if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+      setLoading(true);
+    });
+
+    // 送出表單後停用按鈕，避免連按兩次造成「頁面已過期」，同時顯示載入遮罩
     document.addEventListener('submit', (e) => {
       e.target.querySelectorAll('button[type=submit]').forEach((btn) => {
         btn.disabled = true;
         if (btn.dataset.busy) btn.textContent = btn.dataset.busy;
       });
+      setLoading(true);
     });
-    // 從返回鍵或切回 App 顯示快取頁面時重新載入，確保表單是最新的
+    // 從返回鍵或切回 App 顯示快取頁面時：有表單就重新載入確保是最新的，否則解除遮罩
     window.addEventListener('pageshow', (e) => {
-      if (e.persisted && document.querySelector('form input[name=csrfmiddlewaretoken]')) location.reload();
+      if (!e.persisted) return;
+      if (document.querySelector('form input[name=csrfmiddlewaretoken]')) location.reload();
+      else setLoading(false);
     });
   </script>
   {% block scripts %}{% endblock %}
