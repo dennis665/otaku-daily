@@ -1,0 +1,18 @@
+from django.urls import path
+
+from . import views
+
+app_name = "planner"
+
+urlpatterns = [
+    path("api/itineraries/", views.itineraries, name="itineraries"),
+    path("api/itineraries/<int:pk>/", views.itinerary_update, name="itinerary_update"),
+    path("api/itineraries/<int:pk>/delete/", views.itinerary_delete, name="itinerary_delete"),
+    path("api/itineraries/<int:pk>/interest/", views.itinerary_interest, name="itinerary_interest"),
+    path("api/itineraries/<int:pk>/finalize/", views.itinerary_finalize, name="itinerary_finalize"),
+    path("api/itineraries/<int:pk>/hide/", views.itinerary_hide, name="itinerary_hide"),
+    path("api/groups/", views.groups, name="groups"),
+    path("api/groups/<int:pk>/leave/", views.group_leave, name="group_leave"),
+    path("join/<str:code>/", views.join_group, name="join"),
+    path("i/<str:token>/", views.share, name="share"),
+]

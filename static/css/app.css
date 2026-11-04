@@ -40,7 +40,7 @@ body.auth { display: grid; place-items: center; max-width: none; background: rad
 .user { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .9rem; min-width: 0; }
 .user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user form { margin: 0; }
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--bg2); padding: 5px; border-radius: 14px; margin-bottom: 16px; }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: var(--bg2); padding: 5px; border-radius: 14px; margin-bottom: 16px; }
 .tab { border: 0; background: transparent; color: var(--muted); padding: 10px; border-radius: 10px; cursor: pointer; }
 .tab b { font-size: .75rem; background: var(--line); border-radius: 99px; padding: 1px 8px; margin-left: 4px; }
 .tab.active { background: var(--card); color: var(--text); box-shadow: 0 2px 10px rgba(0, 0, 0, .3); }
@@ -211,3 +211,55 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
   border: 0; border-radius: 99px; padding: 12px 22px; background: var(--grad); color: #fff; font-weight: 700; font-size: .95rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .45); cursor: pointer; animation: toast-in .35s ease-out both; white-space: nowrap; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---------- 四個分頁：圖示在上、文字在下 ---------- */
+.tab { display: grid; justify-items: center; gap: 2px; padding: 8px 2px; font-size: .85rem; }
+.tab i { font-style: normal; font-size: 1.15rem; line-height: 1; }
+.tab b { font-size: .68rem; padding: 0 5px; margin-left: 1px; }
+
+/* ---------- 行程小幫手 ---------- */
+.plan-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 12px; }
+.plan-actions .btn.primary { margin-top: 0; }
+.chip b { font-weight: 700; margin-left: 2px; }
+.chip b:empty { display: none; }
+.ev-badge.done { background: var(--line); color: var(--muted); }
+.ev-info .muted { color: var(--muted); }
+.plan-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.act { border: 1px solid var(--line); background: var(--bg2); color: var(--text); border-radius: 99px; padding: 6px 12px; font-size: .8rem; cursor: pointer; text-decoration: none; }
+.act.on { border-color: var(--pink); color: var(--pink); }
+.act.danger { margin-left: auto; color: var(--err); }
+
+/* 下方滑出的表單視窗（z-index 低於載入遮罩，儲存時遮罩蓋得住） */
+body.sheet-open { overflow: hidden; }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 500; background: rgba(5, 4, 15, .6); display: flex; align-items: flex-end; justify-content: center; }
+.sheet-backdrop[hidden] { display: none; }
+.sheet { width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-bottom: 0;
+  border-radius: 20px 20px 0 0; padding: 16px 18px calc(env(safe-area-inset-bottom) + 16px); animation: sheet-up .25s ease-out; }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sheet-head h3 { margin: 0; font-size: 1.1rem; }
+.sheet-sub { color: var(--muted); font-size: .85rem; margin: -4px 0 12px; }
+.sheet-foot { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-top: 8px; position: sticky; bottom: -16px; background: var(--card); padding: 8px 0; }
+.sheet-foot .btn.primary { margin-top: 0; }
+.field select, .field textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font-size: 1rem; font-family: inherit; }
+.field input:disabled { opacity: .4; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.check { display: flex; align-items: center; gap: 8px; margin: -6px 0 14px; color: var(--muted); font-size: .9rem; }
+.with-btn { display: flex; gap: 8px; align-items: center; }
+.with-btn input { flex: 1; min-width: 0; }
+.with-btn .btn { flex: none; white-space: nowrap; }
+.field > span.with-btn { display: flex; margin: 0; color: inherit; font-size: inherit; }
+.link-row { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 6px; margin-bottom: 6px; }
+.link-row input { padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font-size: .9rem; min-width: 0; }
+#p-group-form { margin-top: 12px; }
+#p-group-form input { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font-size: 1rem; }
+.group-row { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.group-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.group-info small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 邀請 / 分享頁 */
+.invite-kicker { text-align: center; color: var(--muted); margin: 0; font-size: .9rem; }
+.invite-title { text-align: center; margin: 6px 0 4px; font-size: 1.3rem; }
+.invite-sub { text-align: center; color: var(--muted); font-size: .85rem; margin: 0 0 16px; }
+.invite-info { margin: 8px 0 18px; }
+.ev-add { font-size: .8rem; }

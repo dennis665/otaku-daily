@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}加入群組｜Ukiyo{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block content %}
+<main class="auth-card invite">
+  <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>{% include "partials/wordmark.html" %}</h1></div>
+  <p class="invite-kicker">行程群組邀請</p>
+  <h2 class="invite-title">👥 {{ group.name }}</h2>
+  <p class="invite-sub">目前成員：{% for m in members %}{{ m.user.username }}{% if not forloop.last %}、{% endif %}{% endfor %}</p>
+  {% if is_member %}
+    <div class="alert notice">你已經是這個群組的成員了</div>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <button class="btn primary" type="submit" data-busy="加入中…">{% if is_member %}前往行程看板{% else %}加入群組{% endif %}</button>
+  </form>
+  <p class="switch"><a href="{% url 'player:home' %}">先不要，回首頁</a></p>
+</main>
+{% endblock %}

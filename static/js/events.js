@@ -93,6 +93,20 @@
       t.title = '這筆資料還沒在原始網頁核實，出發前請再確認';
       foot.append(t);
     }
+    // 加入行程小幫手：帶入活動名稱、地點、期間與來源，時間先設為未定讓使用者自己選
+    if (window.Planner) {
+      const add = el('button', 'act ev-add', '＋ 加入行程');
+      add.type = 'button';
+      add.addEventListener('click', () => window.Planner.addFromEvent({
+        title: e.name,
+        type: e.type === '電影' ? 'MOVIE' : e.type === '展覽' ? 'EXHIBIT' : 'ANIME',
+        location: /各大戲院|未查到/.test(e.place) ? '' : e.place,
+        links: e.url ? [{ title: '活動資訊', url: e.url }] : [],
+        notes: [`活動期間：${dateText(e)}`, e.summary].filter(Boolean).join('\n'),
+        tbd: true,
+      }));
+      foot.append(add);
+    }
     if (e.url) foot.append(extLink('ev-src', '查看來源 ↗', e.url));
     c.append(foot);
     return c;

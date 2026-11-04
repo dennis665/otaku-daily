@@ -24,5 +24,6 @@
 ## 其他
 
 - 介面文字一律繁體中文（台灣）。
+- 行程小幫手：`planner` 模組（從 csi_server LINE 版移植）。群組用邀請連結加入；權限是建立者或群組成員才能編輯／刪除／定案；提前提醒欄位已存，推播完成後才實際發送。測試：`python manage.py test planner`。
 - 北部動漫活動：讀取 Google 試算表（雲端排程每天台灣時間 08:00 更新），網站每天 08:30 後重新讀一次，見 `player/events.py`；備份用 `python manage.py update_events_snapshot` 更新。
 - 影音清單來源與快照：見 `player/playlist.py`；影音儲存庫新增檔案後執行 `python manage.py update_media_snapshot` 更新快照。

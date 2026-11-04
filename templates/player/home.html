@@ -11,9 +11,10 @@
 </header>
 
 <nav class="tabs" role="tablist">
-  <button class="tab active" data-tab="music" role="tab">🎵 音樂 <b>{{ audio_count }}</b></button>
-  <button class="tab" data-tab="video" role="tab">🎬 影片 <b>{{ video_count }}</b></button>
-  <button class="tab" data-tab="events" role="tab">🎪 活動 <b id="e-count">…</b></button>
+  <button class="tab active" data-tab="music" role="tab"><i>🎵</i><span>音樂 <b>{{ audio_count }}</b></span></button>
+  <button class="tab" data-tab="video" role="tab"><i>🎬</i><span>影片 <b>{{ video_count }}</b></span></button>
+  <button class="tab" data-tab="events" role="tab"><i>🎪</i><span>活動 <b id="e-count">…</b></span></button>
+  <button class="tab" data-tab="plan" role="tab"><i>📅</i><span>行程 <b id="p-count">…</b></span></button>
 </nav>
 
 {% if not playlist %}
@@ -101,9 +102,69 @@
   <div class="events" id="e-list"></div>
 </section>
 
+<section id="panel-plan" class="panel">
+  <div class="plan-actions">
+    <button class="btn primary" id="p-new" type="button">＋ 新增行程</button>
+    <button class="btn ghost" id="p-groups-open" type="button">👥 群組</button>
+  </div>
+  <div class="chips" id="p-tabs" role="group" aria-label="行程分類">
+    <button class="chip active" data-view="upcoming" type="button">即將到來 <b></b></button>
+    <button class="chip" data-view="tbd" type="button">時間未定 <b></b></button>
+    <button class="chip" data-view="history" type="button">歷史 <b></b></button>
+  </div>
+  <div class="events" id="p-list"></div>
+</section>
+
+{# 新增 / 編輯行程 #}
+<div class="sheet-backdrop" id="p-sheet" hidden>
+  <form class="sheet" id="p-form" novalidate>
+    <div class="sheet-head"><h3 id="p-form-title">新增行程</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <label class="field"><span>標題 *</span><input name="title" maxlength="100" required placeholder="例如：吉伊卡哇快閃店"></label>
+    <div class="field-row">
+      <label class="field"><span>類型</span><select name="type" id="p-type"></select></label>
+      <label class="field"><span>給誰看</span><select name="group_id" id="p-group"></select></label>
+    </div>
+    <label class="field"><span>時間</span><input type="datetime-local" name="date_time" id="p-dt"></label>
+    <label class="check"><input type="checkbox" id="p-tbd"> 時間還沒決定</label>
+    <label class="field"><span>地點</span>
+      <span class="with-btn"><input name="location" maxlength="200" placeholder="地址或店名"><button class="btn ghost sm" type="button" id="p-locate">📍 目前位置</button></span>
+    </label>
+    <div class="field"><span>相關連結</span><div id="p-links"></div><button class="btn ghost sm" type="button" id="p-add-link">＋ 加一個連結</button></div>
+    <label class="field"><span>提前提醒（推播功能完成後生效）</span><select name="notify_minutes_before" id="p-notify"></select></label>
+    <label class="field"><span>備註</span><textarea name="notes" rows="3" maxlength="2000"></textarea></label>
+    <p class="alert" id="p-form-error" hidden></p>
+    <div class="sheet-foot"><button class="btn ghost" type="button" data-close>取消</button><button class="btn primary" type="submit">儲存</button></div>
+  </form>
+</div>
+
+{# 決定時間 #}
+<div class="sheet-backdrop" id="p-final" hidden>
+  <form class="sheet small" id="p-final-form" novalidate>
+    <div class="sheet-head"><h3>🗓 決定時間</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <p class="sheet-sub" id="p-final-name"></p>
+    <label class="field"><span>時間</span><input type="datetime-local" id="p-final-dt" required></label>
+    <p class="alert" id="p-final-error" hidden></p>
+    <div class="sheet-foot"><button class="btn ghost" type="button" data-close>取消</button><button class="btn primary" type="submit">定案</button></div>
+  </form>
+</div>
+
+{# 群組管理 #}
+<div class="sheet-backdrop" id="p-groups" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><h3>👥 我的群組</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <p class="sheet-sub">建立群組後把邀請連結傳給朋友，加入的人都看得到群組行程。</p>
+    <div id="p-group-list"></div>
+    <form class="field with-btn" id="p-group-form" novalidate>
+      <input id="p-group-name" maxlength="40" placeholder="新群組名稱，例如：週末出遊團" aria-label="新群組名稱">
+      <button class="btn primary sm" type="submit">建立</button>
+    </form>
+  </div>
+</div>
+
 {{ playlist|json_script:"playlist-data" }}
 {% endblock %}
 {% block scripts %}
 <script src="{% static 'js/player.js' %}"></script>
 <script src="{% static 'js/events.js' %}"></script>
+<script src="{% static 'js/planner.js' %}"></script>
 {% endblock %}

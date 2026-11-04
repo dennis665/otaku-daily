@@ -280,5 +280,10 @@
   if (lastSong >= 0 && lastSong < songs.length) loadSong(lastSong, false);
   const lastVideo = store.get('videoIndex', -1);
   if (lastVideo >= 0 && lastVideo < videos.length) loadVideo(lastVideo, false);
-  if (store.get('tab', 'music') === 'video') document.querySelector('.tab[data-tab="video"]').click();
+  // 指定分頁：網址 ?tab=plan（例如從邀請頁回來）優先，否則還原上次的分頁
+  const params = new URLSearchParams(location.search);
+  const wantTab = params.get('tab') || store.get('tab', 'music');
+  if (params.has('tab')) history.replaceState(null, '', location.pathname);
+  const tabBtn = document.querySelector(`.tab[data-tab="${wantTab}"]`);
+  if (tabBtn && wantTab !== 'music') tabBtn.click();
 })();
