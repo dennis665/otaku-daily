@@ -157,3 +157,18 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
 .wm-sakura > g { transform-box: fill-box; transform-origin: center; animation: sakura-sway 4s ease-in-out infinite; }
 @keyframes sakura-sway { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(14deg); } }
 @media (prefers-reduced-motion: reduce) { .wm-sakura > g { animation: none; } }
+
+/* ---------- 搜尋列：在分頁最上方，結果浮在下面，點一下就播放 ---------- */
+.finder { position: relative; margin-bottom: 12px; }
+.finder-box { display: flex; align-items: center; gap: 8px; padding: 0 6px 0 14px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--bg2); transition: border-color .15s, box-shadow .15s; }
+.finder-box:focus-within { border-color: var(--pink); box-shadow: 0 0 0 3px rgba(255, 111, 174, .18); }
+.finder-icon { font-size: .95rem; opacity: .8; }
+.finder-box input { flex: 1; min-width: 0; padding: 12px 0; border: 0; background: transparent; color: var(--text); font-size: 1rem; outline: none; }
+.finder-box input::-webkit-search-cancel-button { display: none; }
+.finder-clear { flex: none; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--line); color: var(--text); cursor: pointer; }
+.finder-status { margin: 6px 4px 0; color: var(--muted); font-size: .8rem; min-height: 1.2em; }
+.finder-results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; max-height: 55vh; background: var(--card);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .5); }
+.finder-results mark { background: rgba(255, 111, 174, .35); color: #fff; border-radius: 3px; padding: 0 1px; }
+.finder-results .tag { flex: none; font-size: .72rem; color: var(--pink); border: 1px solid var(--pink); border-radius: 99px; padding: 1px 8px; }

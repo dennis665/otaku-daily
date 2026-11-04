@@ -20,6 +20,15 @@
 {% endif %}
 
 <section id="panel-music" class="panel active">
+  <div class="finder" id="m-finder">
+    <div class="finder-box">
+      <span class="finder-icon" aria-hidden="true">🔍</span>
+      <input id="m-search" type="search" placeholder="搜尋歌名，看看清單裡有沒有" autocomplete="off" enterkeyhint="search" aria-label="搜尋歌名，看看清單裡有沒有">
+      <button class="finder-clear" type="button" aria-label="清除搜尋" hidden>✕</button>
+    </div>
+    <p class="finder-status" aria-live="polite"></p>
+    <ol class="list finder-results" role="listbox" hidden></ol>
+  </div>
   <div class="now">
     <div class="disc" id="disc"><div class="disc-center"></div></div>
     <div class="now-info">
@@ -45,12 +54,20 @@
     <input type="range" id="m-vol" min="0" max="100" value="100" aria-label="音量">
   </div>
   <p class="loop-text" id="m-loop-text">全部循環</p>
-  <input class="search" id="m-search" type="search" placeholder="搜尋歌名">
   <ol class="list" id="m-list"></ol>
   <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 </section>
 
 <section id="panel-video" class="panel">
+  <div class="finder" id="v-finder">
+    <div class="finder-box">
+      <span class="finder-icon" aria-hidden="true">🔍</span>
+      <input id="v-search" type="search" placeholder="搜尋影片名稱" autocomplete="off" enterkeyhint="search" aria-label="搜尋影片名稱">
+      <button class="finder-clear" type="button" aria-label="清除搜尋" hidden>✕</button>
+    </div>
+    <p class="finder-status" aria-live="polite"></p>
+    <ol class="list finder-results" role="listbox" hidden></ol>
+  </div>
   <video id="video" controls playsinline preload="metadata" crossorigin="anonymous"></video>
   <div class="video-bar">
     <h2 id="v-title">選一部影片開始播放</h2>
@@ -61,7 +78,6 @@
     </div>
   </div>
   <p class="loop-text" id="v-loop-text">全部循環</p>
-  <input class="search" id="v-search" type="search" placeholder="搜尋影片">
   <ol class="list" id="v-list"></ol>
 </section>
 
