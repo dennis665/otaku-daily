@@ -4,6 +4,7 @@ const CACHE = 'otaku-daily-v1';
 // 等待畫面：頁面每次部署都更新（很小）；影片只有換片時才重新下載（網址含檔案指紋）
 const WAKE_URL = '/wake/';
 const WAKE_VIDEO = '{% static "video/wake.mp4" %}';
+const WAKE_POSTER = '{% static "video/wake-poster.jpg" %}';
 const WAKE_PAGE_CACHE = 'ukiyo-wake-page-{{ app_version }}';
 const WAKE_VIDEO_CACHE = `ukiyo-wake-video-${WAKE_VIDEO.split('/').pop()}`;
 const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE];
@@ -11,6 +12,7 @@ const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE];
 async function storeWake() {
   const page = await caches.open(WAKE_PAGE_CACHE);
   if (!(await page.match(WAKE_URL))) await page.add(WAKE_URL);
+  if (!(await page.match(WAKE_POSTER))) await page.add(WAKE_POSTER);   // 封面圖很小，跟頁面放一起
   const video = await caches.open(WAKE_VIDEO_CACHE);
   if (!(await video.match(WAKE_VIDEO))) await video.add(WAKE_VIDEO);
 }
