@@ -21,6 +21,8 @@
   .bar { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .12); overflow: hidden; max-width: 320px; margin: 0 auto; }
   .bar i { display: block; height: 100%; width: 40%; border-radius: 4px; background: linear-gradient(90deg, #ff6fae, #5ee7ff); animation: slide 1.6s ease-in-out infinite; }
   @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  .dl { margin: 10px 0 0; font-size: .78rem; color: #5ee7ff; min-height: 1.2em; transition: opacity .6s; }
+  .dl.fade { opacity: 0; }
   .preview { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 14px); left: 12px; right: 12px; display: none; justify-content: space-between; align-items: center; }
   .preview span { font-size: .8rem; font-weight: 700; color: #1a1300; background: #ffd34d; border-radius: 99px; padding: 6px 12px; }
   .preview a { color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .3); border-radius: 99px; padding: 6px 14px; text-decoration: none; font-size: .85rem; }
@@ -35,6 +37,7 @@
   <p class="title"><b>Ukiyo</b> 主機喚醒中… <span id="sec">0</span> 秒</p>
   <p class="sub" id="hint">免費主機休息後要 30～60 秒才會醒來，醒了會自動進入</p>
   <div class="bar"><i></i></div>
+  <p class="dl" id="dl"></p>
 </div>
 <script>
 (() => {
@@ -46,7 +49,28 @@
   // 影片：手機裡已經存好 → 讀成 blob 播放（iPhone 不支援從快取分段讀影片）；
   // 還沒存好 → 直接從網路串流（邊下載邊播，不用等整支下載完）。播放失敗就改用網路串流。
   v.muted = true;
-  const playFrom = (src) => { v.src = src; v.load(); v.play().catch(() => {}); };
+  const dl = document.getElementById('dl');
+  const say = (text, fadeLater) => {
+    dl.textContent = text;
+    dl.classList.remove('fade');
+    if (fadeLater) setTimeout(() => dl.classList.add('fade'), 3000);
+  };
+  // 從網路串流時顯示已下載的百分比（依影片已緩衝到的長度計算）
+  let done = false;
+  function showProgress() {
+    if (done || v.src.startsWith('blob:') || !v.duration || !isFinite(v.duration)) return;
+    const b = v.buffered;
+    const loaded = b.length ? b.end(b.length - 1) : 0;
+    const pct = Math.min(100, Math.floor((loaded / v.duration) * 100));
+    if (pct >= 99) { done = true; say('🎬 影片已下載完成', true); } else say(`🎬 影片下載中 ${pct}%（邊下載邊播放）`);
+  }
+  ['progress', 'loadedmetadata', 'canplaythrough', 'timeupdate'].forEach((ev) => v.addEventListener(ev, showProgress));
+  const playFrom = (src) => {
+    v.src = src;
+    v.load();
+    v.play().catch(() => {});
+    if (!src.startsWith('blob:')) say('🎬 影片下載中 0%（邊下載邊播放）');
+  };
   v.addEventListener('error', () => { if (v.src.startsWith('blob:')) playFrom(VIDEO); });
   (async () => {
     try {
@@ -54,6 +78,7 @@
       if (cached) {
         const blob = await cached.blob();
         playFrom(URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: 'video/mp4' })));
+        say('🎬 影片已存在手機', true);
         return;
       }
     } catch { /* 改用網路 */ }
