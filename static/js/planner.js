@@ -127,7 +127,7 @@
       node.classList.toggle('active', String(groupFilter) === String(key));
       node.setAttribute('role', 'button');
       node.tabIndex = 0;
-      node.addEventListener('click', () => { groupFilter = key; render(); });
+      node.addEventListener('click', () => { groupFilter = key; render('reset'); });
       box.append(node);
     };
     add('all', el('span', 'g-chip all', '全部'));
@@ -137,7 +137,12 @@
   const matchGroup = (it) => groupFilter === 'all'
     || (groupFilter === 'personal' ? !it.groups.length : it.groups.some((g) => String(g.id) === String(groupFilter)));
 
-  function render() {
+  // 分頁：清單上下各一組頁碼，只畫出目前這一頁
+  const pager = window.Pager.create({ key: 'plan', top: $('p-pager-top'), bottom: $('p-pager-bottom'), defaultSize: 10, onChange: () => render() });
+
+  // 切換分類或群組篩選才回到第一頁；刪除、隱藏等操作後停在原本那一頁
+  function render(resetPage) {
+    if (resetPage === 'reset') pager.reset();
     renderInvites();
     renderGroupFilter();
     const items = (data[view] || []).filter(matchGroup);
@@ -150,7 +155,8 @@
     if (!items.length) {
       const msg = groupFilter !== 'all' ? '這個分類沒有行程' : { upcoming: '還沒有即將到來的行程，按「＋ 新增行程」或到「活動」頁把有興趣的活動加進來', tbd: '沒有時間未定的行程', history: '還沒有歷史行程' }[view];
       list.append(el('p', 'empty', msg));
-    } else items.forEach((it) => list.append(card(it)));
+    } else pager.slice(items).forEach((it) => list.append(card(it)));
+    if (!items.length) pager.slice([]);
   }
 
   async function reload() {
@@ -412,7 +418,7 @@
   });
 
   // ---------- 分頁與載入 ----------
-  $('p-tabs').querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', () => { view = chip.dataset.view; render(); }));
+  $('p-tabs').querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', () => { view = chip.dataset.view; render('reset'); }));
   $('p-new').addEventListener('click', () => openForm());
 
   let loaded = false;

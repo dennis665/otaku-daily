@@ -78,7 +78,15 @@ class ApiTests(TestCase):
 
     def test_filters(self):
         f = self.get("/dramas/api/filters/")
-        self.assertEqual([s["label"] for s in f["seasons"]], ["2026年10月新番", "2023年7月新番", "2017年7月新番"])
+        self.assertEqual([d["decade"] for d in f["tv"]], [2020, 2010])
+        self.assertEqual([i["label"] for y in f["tv"][0]["years"] for i in y["items"]], ["2026年10月新番", "2023年7月新番"])
+        self.client.post(f"/dramas/api/works/{Work.objects.get(source_id=2).id}/follow/", secure=True)
+        mine = self.get("/dramas/api/filters/?scope=mine")
+        self.assertEqual((mine["total"], [d["decade"] for d in mine["tv"]]), (1, [2010]))
+
+    def test_paging(self):
+        r = self.get("/dramas/api/works/?size=5&page=1")
+        self.assertEqual((r["count"], r["pages"], len(r["items"])), (3, 1, 3))
 
     def test_requires_login(self):
         self.client.logout()

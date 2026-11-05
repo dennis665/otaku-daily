@@ -44,23 +44,50 @@
   });
 
   // ---------- 共用：清單繪製與循環模式 ----------
+  // 清單分頁：只畫出目前這一頁（清單資料很小，主要是讓畫面不用一次畫出上百列）
+  // lists[listEl.id] = { items, onPick, pager, active }
+  const lists = {};
   function renderList(listEl, items, onPick) {
+    const key = listEl.id;
+    const state = lists[key] || (lists[key] = { items, onPick, active: -1 });
+    state.items = items;
+    state.onPick = onPick;
+    if (!state.pager) {
+      state.pager = window.Pager.create({
+        key, top: $(`${key}-pager-top`), bottom: $(`${key}-pager-bottom`),
+        onChange: () => paintList(listEl),
+      });
+    }
+    paintList(listEl);
+  }
+  function paintList(listEl) {
+    const state = lists[listEl.id];
+    const pageItems = state.pager.slice(state.items);
+    const offset = (state.pager.page - 1) * state.pager.size;
     listEl.innerHTML = '';
-    items.forEach((item, i) => {
+    pageItems.forEach((item, k) => {
+      const i = offset + k;
       const li = document.createElement('li');
       li.dataset.index = i;
+      li.classList.toggle('active', i === state.active);
       li.innerHTML = '<span class="no"></span><span class="name"></span><span class="playing">▶</span>';
       li.querySelector('.no').textContent = i + 1;
       li.querySelector('.name').textContent = item.title;
-      li.addEventListener('click', () => onPick(i));
+      li.addEventListener('click', () => state.onPick(i));
       listEl.appendChild(li);
     });
   }
   function markActive(listEl, index) {
+    const state = lists[listEl.id];
+    if (state) {
+      state.active = index;
+      state.pager.showIndex(index, state.items.length);   // 換歌時自動翻到正在播的那一頁
+    }
     listEl.querySelectorAll('li').forEach((li) => li.classList.toggle('active', Number(li.dataset.index) === index));
     const cur = listEl.querySelector('li.active');
     if (cur) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
+
   // ---------- 搜尋：打字即時列出符合的項目，點一下直接播放 ----------
   // 比對時忽略大小寫、全形半形、空白與標點；多個關鍵字用空白分開，全部都要符合
   const norm = (s) => s.normalize('NFKC').toLowerCase().replace(/[\s\-_.・·•:：!！?？'"「」『』()（）[\]【】~～,，、。]/g, '');

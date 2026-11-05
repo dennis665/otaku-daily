@@ -330,3 +330,37 @@ body.sheet-open { overflow: hidden; }
 .d-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .d-acts .act { padding: 5px 10px; font-size: .76rem; }
 .d-more { width: 100%; margin-top: 12px; }
+
+/* ---------- 共用分頁（清單上下各一組） ---------- */
+.pager { display: grid; gap: 8px; background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 10px 0; }
+.pager[hidden] { display: none; }
+.pager select { padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: .82rem; }
+.pg-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: .82rem; }
+.pg-count { margin-left: auto; color: var(--text); font-size: .85rem; }
+.pg-nav { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 6px; }
+.pg-nav .btn { width: auto; margin-top: 0; white-space: nowrap; }
+.pg-nav .btn[disabled] { opacity: .35; cursor: default; }
+.pg-jump-label { color: var(--muted); font-size: .8rem; text-align: right; }
+
+/* 追劇分類導覽（可折疊） */
+.d-nav { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 4px; }
+.d-nav-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 14px; border: 0; background: transparent; color: var(--text); font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.d-current { flex: 1; min-width: 0; color: var(--muted); font-weight: 400; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.d-current b { color: var(--cyan); }
+.d-arrow { transition: transform .2s; }
+.d-nav-head[aria-expanded="true"] .d-arrow { transform: rotate(180deg); }
+.d-nav-body { padding: 0 12px 12px; display: grid; gap: 10px; max-height: 65vh; overflow-y: auto; }
+.d-nav-body[hidden] { display: none; }
+.d-sec h4 { margin: 8px 0 6px; font-size: .9rem; color: var(--cyan); }
+.chips.wrap { flex-wrap: wrap; overflow: visible; padding-bottom: 4px; }
+.d-tree { display: grid; gap: 6px; }
+.d-decade, .d-year { border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); }
+.d-year { margin: 6px 8px; background: var(--card); }
+.d-decade > summary, .d-year > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; list-style: none; font-weight: 700; }
+.d-decade > summary::-webkit-details-marker, .d-year > summary::-webkit-details-marker { display: none; }
+.d-decade > summary::after, .d-year > summary::after { content: "▾"; margin-left: auto; color: var(--muted); transition: transform .2s; }
+.d-decade[open] > summary::after, .d-year[open] > summary::after { transform: rotate(180deg); }
+.d-n { font-size: .72rem; padding: 1px 8px; border-radius: 99px; background: var(--grad); color: #fff; }
+.d-year .chips { padding: 0 10px 8px; }
+/* 有分頁的清單不再需要自己的捲動區 */
+#m-list, #v-list { max-height: none; }

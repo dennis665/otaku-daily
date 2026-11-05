@@ -137,7 +137,11 @@
 
   const norm = (s) => s.normalize('NFKC').toLowerCase().replace(/[\s《》「」『』()（）×・·]/g, '');
 
-  function render() {
+  // 分頁：清單上下各一組頁碼，只畫出目前這一頁
+  const pager = window.Pager.create({ key: 'events', top: $('e-pager-top'), bottom: $('e-pager-bottom'), defaultSize: 10, onChange: () => render(true) });
+
+  function render(keepPage) {
+    if (keepPage !== true) pager.reset();
     const words = search.value.trim().split(/\s+/).map(norm).filter(Boolean);
     clearBtn.hidden = !search.value;
     const shown = events.filter((e) => {
@@ -149,7 +153,8 @@
     });
     list.innerHTML = '';
     if (!shown.length) list.append(el('p', 'empty', events.length ? '沒有符合條件的活動，換個篩選條件試試' : '目前沒有活動資料'));
-    else [...shown].sort(sorters[sortKey]).forEach((e) => list.append(card(e)));
+    else pager.slice([...shown].sort(sorters[sortKey])).forEach((e) => list.append(card(e)));
+    if (!shown.length) pager.slice([]);
     $('e-shown').textContent = `顯示 ${shown.length} / ${events.length} 筆`;
   }
 

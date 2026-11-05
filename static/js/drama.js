@@ -1,20 +1,21 @@
 // Ukiyo 追劇小幫手：我的追劇、探索劇庫（只記「有在追」，不記集數）
-// 劇庫以 youranimes 作品編號為準，同一部作品只有一筆；名稱相同的不同作品會在名稱後面加年份
+// - 伺服器分頁：每次只讀取目前這一頁（劇庫 5000 多部，不會一次全部下載）
+// - 分類導覽：季番（十年 → 年 → 季度）、動畫電影（十年 → 年 → 日版／台版），可折疊
 (() => {
   const $ = (id) => document.getElementById(id);
   const tab = document.querySelector('.tab[data-tab="drama"]');
   const list = $('d-list');
-  const meta = $('d-meta');
   const search = $('d-search');
   const clearBtn = search.closest('.finder').querySelector('.finder-clear');
-  const more = $('d-more');
+  const navBody = $('d-nav-body');
+  const navToggle = $('d-nav-toggle');
   const csrf = () => (document.querySelector('input[name=csrfmiddlewaretoken]') || {}).value || '';
 
   let view = 'mine';
-  let page = 1;
   let onlyNew = false;
-  let filtersLoaded = false;
   let mineTotal = 0;
+  const label = { mine: '', explore: null };   // explore 第一次會預設為本季
+  const navCache = {};
 
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -29,6 +30,8 @@
     if (!r.ok) throw new Error('讀取失敗，請稍後再試');
     return r.json();
   }
+
+  const pager = window.Pager.create({ key: 'drama', top: $('d-pager-top'), bottom: $('d-pager-bottom'), onChange: () => load() });
 
   // ---------- 卡片 ----------
   function card(w) {
@@ -77,8 +80,8 @@
       btn.textContent = r.followed ? '✓ 追劇中' : '＋ 追劇';
       btn.classList.toggle('on', r.followed);
       mineTotal += r.followed ? 1 : -1;
+      delete navCache.mine;   // 我的追劇分類數量變了
       paintCount();
-      if (view === 'mine' && !r.followed) btn.closest('.d-card').remove();
     } catch (err) { alert(err.message); }
   }
 
@@ -87,79 +90,128 @@
     $('d-views').querySelector('[data-view="mine"] b').textContent = mineTotal || '';
   }
 
-  // ---------- 載入 ----------
-  async function loadMine() {
-    const q = search.value.trim();
-    const data = await getJSON(`/dramas/api/mine/?q=${encodeURIComponent(q)}`);
-    mineTotal = data.total;
-    paintCount();
-    list.innerHTML = '';
-    meta.textContent = q ? `找到 ${data.items.length} 部（共追 ${data.total} 部）` : `共追 ${data.total} 部，依最新播出排序`;
-    if (!data.items.length) list.append(el('p', 'empty', q ? '沒有符合的作品' : '還沒有追任何作品，到「🌐 探索劇庫」加入吧'));
-    data.items.forEach((w) => list.append(card(w)));
-    more.hidden = true;
+  // ---------- 分類導覽 ----------
+  async function getNav() {
+    if (!navCache[view]) navCache[view] = await getJSON(`/dramas/api/filters/${view === 'mine' ? '?scope=mine' : ''}`);
+    return navCache[view];
   }
 
-  async function loadFilters() {
-    if (filtersLoaded) return;
-    const f = await getJSON('/dramas/api/filters/');
-    const sel = $('d-label');
-    sel.innerHTML = '';
-    sel.append(new Option(`全部作品（${f.total}）`, ''));
-    const group = (name, rows) => {
-      if (!rows.length) return;
-      const g = document.createElement('optgroup');
-      g.label = name;
-      rows.forEach((r) => g.append(new Option(`${r.label}（${r.n}）`, r.label)));
-      sel.append(g);
-    };
-    group('動畫化／製作決定', f.others);
-    group('新番季度', f.seasons);
-    group('動畫電影', f.movies);
-    // 預設本季（有資料的話）
-    sel.value = f.seasons.some((r) => r.label === f.current) ? f.current : '';
-    filtersLoaded = true;
+  function chip(text, value, n) {
+    const b = el('button', `chip${label[view] === value ? ' active' : ''}`);
+    b.type = 'button';
+    b.append(document.createTextNode(text));
+    if (n != null) b.append(el('b', null, n));
+    b.addEventListener('click', () => {
+      label[view] = value;
+      navBody.hidden = true;
+      navToggle.setAttribute('aria-expanded', 'false');
+      pager.reset();
+      load();
+    });
+    return b;
   }
 
-  async function loadExplore(append = false) {
-    await loadFilters();
-    if (!append) page = 1;
-    const params = new URLSearchParams({ page, q: search.value.trim(), label: $('d-label').value, media: $('d-media').value });
-    if (onlyNew) params.set('only', 'new');
-    const data = await getJSON(`/dramas/api/works/?${params}`);
-    if (!append) list.innerHTML = '';
-    meta.textContent = `共 ${data.count} 部・第 ${data.page} / ${data.pages || 1} 頁`;
-    if (!data.items.length && !append) list.append(el('p', 'empty', '沒有符合條件的作品'));
-    data.items.forEach((w) => list.append(card(w)));
-    more.hidden = data.page >= data.pages;
+  // 十年 → 年 → 項目，用可折疊的區塊（含目前篩選的那一層會自動展開）
+  function tree(decades, shortName) {
+    const wrap = el('div', 'd-tree');
+    decades.forEach((d) => {
+      const dd = el('details', 'd-decade');
+      const hasCurrent = d.years.some((y) => y.items.some((i) => i.label === label[view]));
+      dd.open = hasCurrent;
+      const ds = el('summary');
+      ds.append(el('span', null, `${d.decade} 年代`), el('b', 'd-n', `${d.n} 筆`));
+      dd.append(ds);
+      d.years.forEach((y) => {
+        const yd = el('details', 'd-year');
+        yd.open = y.items.some((i) => i.label === label[view]);
+        const ys = el('summary');
+        ys.append(el('span', null, `${y.year} 年`), el('b', 'd-n', `${y.n} 筆`));
+        const chips = el('div', 'chips wrap');
+        y.items.forEach((i) => chips.append(chip(shortName(i.label), i.label, i.n)));
+        yd.append(ys, chips);
+        dd.append(yd);
+      });
+      wrap.append(dd);
+    });
+    return wrap;
   }
 
-  const reload = () => (view === 'mine' ? loadMine() : loadExplore()).catch((err) => { list.innerHTML = ''; list.append(el('p', 'empty', err.message)); });
+  async function renderNav() {
+    const nav = await getNav();
+    if (view === 'explore' && label.explore === null) {
+      const hasCurrent = nav.tv.some((d) => d.years.some((y) => y.items.some((i) => i.label === nav.current)));
+      label.explore = hasCurrent ? nav.current : '';
+    }
+    $('d-current').textContent = label[view] || '全部劇集';
+    navBody.innerHTML = '';
+    navBody.append(el('div', 'chips wrap', null));
+    navBody.lastChild.append(chip(`🌐 全部劇集`, '', nav.total));
+
+    const tvSec = el('section', 'd-sec');
+    tvSec.append(el('h4', null, '📺 季番動畫（依十年與年份）'));
+    if (nav.announced) { const row = el('div', 'chips wrap'); row.append(chip('動畫化決定', nav.announced.label, nav.announced.n)); tvSec.append(row); }
+    tvSec.append(tree(nav.tv, (l) => l.replace(/^\d{4}年/, '')));
+    const mvSec = el('section', 'd-sec');
+    mvSec.append(el('h4', null, '🎬 動畫電影／劇場版（依十年與年份）'));
+    if (nav.movie_announced) { const row = el('div', 'chips wrap'); row.append(chip('電影製作決定', nav.movie_announced.label, nav.movie_announced.n)); mvSec.append(row); }
+    mvSec.append(tree(nav.movie, (l) => (l.includes('日版') ? '🇯🇵 日版上映' : '🇹🇼 台版上映')));
+    navBody.append(tvSec, mvSec);
+  }
+
+  navToggle.addEventListener('click', () => {
+    navBody.hidden = !navBody.hidden;
+    navToggle.setAttribute('aria-expanded', String(!navBody.hidden));
+  });
+
+  // ---------- 載入目前這一頁 ----------
+  async function load() {
+    try {
+      await renderNav();
+      const params = new URLSearchParams({ page: pager.page, size: pager.size, q: search.value.trim(), label: label[view] || '' });
+      if (view === 'explore') {
+        params.set('media', $('d-media').value);
+        if (onlyNew) params.set('only', 'new');
+      }
+      const data = await getJSON(`/dramas/api/${view === 'mine' ? 'mine' : 'works'}/?${params}`);
+      if (view === 'mine') { mineTotal = data.total; paintCount(); }
+      pager.update({ page: data.page, total: data.count });
+      list.innerHTML = '';
+      if (!data.items.length) {
+        const empty = view === 'mine' && !search.value && !label.mine ? '還沒有追任何作品，到「🌐 探索劇庫」加入吧' : '沒有符合條件的作品';
+        list.append(el('p', 'empty', empty));
+      }
+      data.items.forEach((w) => list.append(card(w)));
+    } catch (err) {
+      list.innerHTML = '';
+      list.append(el('p', 'empty', err.message));
+    }
+  }
+
+  const restart = () => { pager.reset(); load(); };
 
   // ---------- 操作 ----------
-  $('d-views').querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', () => {
-    view = chip.dataset.view;
-    $('d-views').querySelectorAll('.chip').forEach((x) => x.classList.toggle('active', x === chip));
+  $('d-views').querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
+    view = c.dataset.view;
+    $('d-views').querySelectorAll('.chip').forEach((x) => x.classList.toggle('active', x === c));
     $('d-tools').hidden = view !== 'explore';
     search.placeholder = view === 'mine' ? '在我的追劇裡搜尋' : '搜尋整個劇庫（中文、日文、別名都可以）';
-    reload();
+    navBody.hidden = true;
+    restart();
   }));
   let timer = null;
   search.addEventListener('input', () => {
     clearBtn.hidden = !search.value;
     clearTimeout(timer);
-    timer = setTimeout(reload, 350);
+    timer = setTimeout(restart, 350);
   });
-  clearBtn.addEventListener('click', () => { search.value = ''; clearBtn.hidden = true; reload(); });
-  $('d-label').addEventListener('change', () => loadExplore());
-  $('d-media').addEventListener('change', () => loadExplore());
-  $('d-new').addEventListener('click', () => { onlyNew = !onlyNew; $('d-new').classList.toggle('active', onlyNew); loadExplore(); });
-  more.addEventListener('click', () => { page += 1; loadExplore(true); });
+  clearBtn.addEventListener('click', () => { search.value = ''; clearBtn.hidden = true; restart(); });
+  $('d-media').addEventListener('change', restart);
+  $('d-new').addEventListener('click', () => { onlyNew = !onlyNew; $('d-new').classList.toggle('active', onlyNew); restart(); });
 
   // 首次切到追劇分頁才載入；分頁標籤上的數字在背景先讀
   let started = false;
-  const start = () => { if (!started) { started = true; reload(); } };
+  const start = () => { if (!started) { started = true; load(); } };
   tab.addEventListener('click', start);
   if (tab.classList.contains('active')) start();
-  getJSON('/dramas/api/mine/?q=', { loading: false }).then((d) => { mineTotal = d.total; paintCount(); }).catch(() => { $('d-count').textContent = '!'; });
+  getJSON('/dramas/api/mine/?size=5', { loading: false }).then((d) => { mineTotal = d.total; paintCount(); }).catch(() => { $('d-count').textContent = '!'; });
 })();

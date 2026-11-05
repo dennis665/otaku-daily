@@ -58,7 +58,9 @@
     <input type="range" id="m-vol" min="0" max="100" value="100" aria-label="音量">
   </div>
   <p class="loop-text" id="m-loop-text">全部循環</p>
+  <div id="m-list-pager-top"></div>
   <ol class="list" id="m-list"></ol>
+  <div id="m-list-pager-bottom"></div>
   <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 </section>
 
@@ -82,7 +84,9 @@
     </div>
   </div>
   <p class="loop-text" id="v-loop-text">全部循環</p>
+  <div id="v-list-pager-top"></div>
   <ol class="list" id="v-list"></ol>
+  <div id="v-list-pager-bottom"></div>
 </section>
 
 <section id="panel-events" class="panel">
@@ -104,7 +108,9 @@
     <p class="e-meta" id="e-meta"></p>
     <label class="e-sort"><span aria-hidden="true">↕</span><select id="e-sort" aria-label="排序方式"></select></label>
   </div>
+  <div id="e-pager-top"></div>
   <div class="events" id="e-list"></div>
+  <div id="e-pager-bottom"></div>
 </section>
 
 <section id="panel-plan" class="panel">
@@ -119,7 +125,9 @@
     <button class="chip" data-view="history" type="button">歷史 <b></b></button>
   </div>
   <div class="chips g-filter" id="p-gfilter" role="group" aria-label="依群組篩選" hidden></div>
+  <div id="p-pager-top"></div>
   <div class="events" id="p-list"></div>
+  <div id="p-pager-bottom"></div>
 </section>
 
 <section id="panel-drama" class="panel">
@@ -135,15 +143,20 @@
     </div>
   </div>
   <div class="d-tools" id="d-tools" hidden>
-    <select id="d-label" aria-label="播出季度／上映年份"></select>
     <select id="d-media" aria-label="類型">
       <option value="">全部類型</option><option value="TV">TV</option><option value="MOVIE">劇場版</option><option value="OVA">OVA／特別篇</option><option value="RECAP">總集篇</option>
     </select>
     <button class="chip" id="d-new" type="button">🆕 只看 NEW</button>
   </div>
-  <p class="e-meta" id="d-meta"></p>
+  <div class="d-nav" id="d-nav">
+    <button class="d-nav-head" id="d-nav-toggle" type="button" aria-expanded="false">
+      <span>📂 分類導覽</span><span class="d-current">當前篩選：<b id="d-current">全部劇集</b></span><span class="d-arrow">▾</span>
+    </button>
+    <div class="d-nav-body" id="d-nav-body" hidden></div>
+  </div>
+  <div id="d-pager-top"></div>
   <div class="d-list" id="d-list"></div>
-  <button class="btn ghost d-more" id="d-more" type="button" hidden>載入更多</button>
+  <div id="d-pager-bottom"></div>
 </section>
 
 {# 新增 / 編輯行程 #}
