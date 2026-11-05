@@ -211,4 +211,7 @@ def one_time_migrate(request):
         followed[username] = Follow.objects.filter(user=user).count()
     _dup_cache["at"] = _filter_cache["at"] = 0
     stats.pop("need_images", None)
-    return JsonResponse({"ok": True, **stats, "follows": followed, "total_works": Work.objects.count()}, json_dumps_params={"ensure_ascii": False})
+    from planner.models import Group   # 暫時：確認正式站的測試資料已清除（入口移除時一起拿掉）
+    left = {"quick_tester": User.objects.filter(username="quick_tester").exists(), "claude_group": Group.objects.filter(name="Claude 測試群").exists(),
+            "dennis": User.objects.filter(username="dennis").exists(), "fengyou_group": Group.objects.filter(name="瘋遊群").exists()}
+    return JsonResponse({"ok": True, **stats, "follows": followed, "total_works": Work.objects.count(), "check": left}, json_dumps_params={"ensure_ascii": False})
