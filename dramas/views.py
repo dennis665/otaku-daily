@@ -1,7 +1,4 @@
 """追劇小幫手 API"""
-import hashlib
-import hmac
-import json
 import time
 from datetime import date, timedelta
 
@@ -9,13 +6,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.http import Http404, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import Airing, Follow, Work, normalize
-from .sync import upsert_works
 
 User = get_user_model()
 PAGE_SIZE = 20
@@ -186,32 +181,3 @@ def follow(request, pk):
     if not created:
         obj.delete()
     return JsonResponse({"ok": True, "followed": created})
-
-
-# ---------- 一次性：舊劇庫搬家（使用者要求，2026-11-05；搬完移除） ----------
-MIGRATE_TOKEN_SHA256 = "abe01a7661dabf8b11a880ed429a0847d358df31e885ca15360928be39409a22"
-
-
-@csrf_exempt
-@require_POST
-def one_time_migrate(request):
-    token = request.headers.get("X-Import-Token", "")
-    if not hmac.compare_digest(hashlib.sha256(token.encode()).hexdigest(), MIGRATE_TOKEN_SHA256):
-        raise Http404
-    data = json.loads(request.body)
-    stats = upsert_works(data.get("works", []), mode="migrate")
-    followed = {}
-    for username, sids in (data.get("follows") or {}).items():
-        user = User.objects.filter(username=username).first()
-        if not user:
-            followed[username] = "找不到帳號"
-            continue
-        wids = Work.objects.filter(source_id__in=sids).values_list("id", flat=True)
-        Follow.objects.bulk_create([Follow(user=user, work_id=i) for i in wids], ignore_conflicts=True)
-        followed[username] = Follow.objects.filter(user=user).count()
-    _dup_cache["at"] = _filter_cache["at"] = 0
-    stats.pop("need_images", None)
-    from planner.models import Group   # 暫時：確認正式站的測試資料已清除（入口移除時一起拿掉）
-    left = {"quick_tester": User.objects.filter(username="quick_tester").exists(), "claude_group": Group.objects.filter(name="Claude 測試群").exists(),
-            "dennis": User.objects.filter(username="dennis").exists(), "fengyou_group": Group.objects.filter(name="瘋遊群").exists()}
-    return JsonResponse({"ok": True, **stats, "follows": followed, "total_works": Work.objects.count(), "check": left}, json_dumps_params={"ensure_ascii": False})
