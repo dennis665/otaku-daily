@@ -7,10 +7,11 @@ from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from notifications.push import send_to_users
@@ -402,3 +403,30 @@ def import_itineraries(request):
             except ImportError_ as exc:
                 context["error"] = str(exc)
     return render(request, "planner/import.html", context)
+
+
+# ---------- 一次性：把 LINE 版「行程助手」匯入 dennis 的「瘋遊群」（使用者要求，2026-11-05） ----------
+# 匯入完成後會連同匯入功能一起移除。程式裡只放一次性密碼的指紋，密碼本身只在開發電腦上。
+ONE_TIME_IMPORT_TOKEN_SHA256 = "0629f0b320cbae13b8abadd0511fc2d2c0236758aabb831f807aa9077429d452"
+
+
+@csrf_exempt
+@require_POST
+def one_time_import(request):
+    import hashlib
+    import hmac
+
+    token = request.headers.get("X-Import-Token", "")
+    if not hmac.compare_digest(hashlib.sha256(token.encode()).hexdigest(), ONE_TIME_IMPORT_TOKEN_SHA256):
+        raise Http404
+    owner = User.objects.filter(username="dennis").first()
+    if owner is None:
+        return _error("找不到 dennis 帳號", 404)
+    try:
+        group, imported, skipped = import_line_export(owner, request.body)
+    except ImportError_ as exc:
+        return _error(str(exc))
+    owner_ok = group.members.filter(user=owner, is_owner=True).exists()
+    return JsonResponse({"ok": True, "group": group.name, "owner": owner.username, "owner_is_creator": owner_ok,
+                         "imported": imported, "skipped": skipped, "total": group.shared_itineraries.count()},
+                        json_dumps_params={"ensure_ascii": False})
