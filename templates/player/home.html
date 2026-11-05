@@ -16,6 +16,7 @@
   <button class="tab" data-tab="video" role="tab"><i>🎬</i><span>影片 <b>{{ video_count }}</b></span></button>
   <button class="tab" data-tab="events" role="tab"><i>🎪</i><span>活動 <b id="e-count">…</b></span></button>
   <button class="tab" data-tab="plan" role="tab"><i>📅</i><span>行程 <b id="p-count">…</b></span></button>
+  <button class="tab" data-tab="drama" role="tab"><i>📺</i><span>追劇 <b id="d-count">…</b></span></button>
 </nav>
 
 {% if not playlist %}
@@ -121,6 +122,30 @@
   <div class="events" id="p-list"></div>
 </section>
 
+<section id="panel-drama" class="panel">
+  <div class="chips" id="d-views" role="group" aria-label="追劇分類">
+    <button class="chip active" data-view="mine" type="button">⭐ 我的追劇 <b></b></button>
+    <button class="chip" data-view="explore" type="button">🌐 探索劇庫</button>
+  </div>
+  <div class="finder">
+    <div class="finder-box">
+      <span class="finder-icon" aria-hidden="true">🔍</span>
+      <input id="d-search" type="search" placeholder="搜尋作品名稱（中文、日文、別名都可以）" autocomplete="off" enterkeyhint="search" aria-label="搜尋作品">
+      <button class="finder-clear" type="button" aria-label="清除搜尋" hidden>✕</button>
+    </div>
+  </div>
+  <div class="d-tools" id="d-tools" hidden>
+    <select id="d-label" aria-label="播出季度／上映年份"></select>
+    <select id="d-media" aria-label="類型">
+      <option value="">全部類型</option><option value="TV">TV</option><option value="MOVIE">劇場版</option><option value="OVA">OVA／特別篇</option><option value="RECAP">總集篇</option>
+    </select>
+    <button class="chip" id="d-new" type="button">🆕 只看 NEW</button>
+  </div>
+  <p class="e-meta" id="d-meta"></p>
+  <div class="d-list" id="d-list"></div>
+  <button class="btn ghost d-more" id="d-more" type="button" hidden>載入更多</button>
+</section>
+
 {# 新增 / 編輯行程 #}
 <div class="sheet-backdrop" id="p-sheet" hidden>
   <form class="sheet" id="p-form" novalidate>
@@ -188,4 +213,5 @@
 <script src="{% static 'js/events.js' %}"></script>
 <script src="{% static 'js/planner.js' %}"></script>
 <script src="{% static 'js/notify.js' %}"></script>
+<script src="{% static 'js/drama.js' %}"></script>
 {% endblock %}

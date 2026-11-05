@@ -13,5 +13,6 @@ urlpatterns = [
     path("wake/", player_views.wake, name="wake"),
     path("plan/", include("planner.urls")),
     path("notify/", include("notifications.urls")),
+    path("dramas/", include("dramas.urls")),
     path("", include("player.urls")),
 ]

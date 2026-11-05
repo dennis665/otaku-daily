@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "player",
     "planner",
     "notifications",
+    "dramas",
 ]
 
 MIDDLEWARE = [
