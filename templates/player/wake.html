@@ -46,8 +46,6 @@
   if (preview) document.body.classList.add('is-preview');
   const v = document.getElementById('v');
 
-  // 影片：手機裡已經存好 → 讀成 blob 播放（iPhone 不支援從快取分段讀影片）；
-  // 還沒存好 → 直接從網路串流（邊下載邊播，不用等整支下載完）。播放失敗就改用網路串流。
   v.muted = true;
   const dl = document.getElementById('dl');
   const say = (text, fadeLater) => {
@@ -58,31 +56,26 @@
   // 從網路串流時顯示已下載的百分比（依影片已緩衝到的長度計算）
   let done = false;
   function showProgress() {
-    if (done || v.src.startsWith('blob:') || !v.duration || !isFinite(v.duration)) return;
+    if (done || !v.duration || !isFinite(v.duration)) return;
     const b = v.buffered;
     const loaded = b.length ? b.end(b.length - 1) : 0;
     const pct = Math.min(100, Math.floor((loaded / v.duration) * 100));
     if (pct >= 99) { done = true; say('🎬 影片已下載完成', true); } else say(`🎬 影片下載中 ${pct}%（邊下載邊播放）`);
   }
   ['progress', 'loadedmetadata', 'canplaythrough', 'timeupdate'].forEach((ev) => v.addEventListener(ev, showProgress));
-  const playFrom = (src) => {
-    v.src = src;
-    v.load();
-    v.play().catch(() => {});
-    if (!src.startsWith('blob:')) say('🎬 影片下載中 0%（邊下載邊播放）');
-  };
-  v.addEventListener('error', () => { if (v.src.startsWith('blob:')) playFrom(VIDEO); });
+  // 影片一律用同一個網址：手機裡有存好，背景小程式會直接從手機提供（支援 iPhone 的分段讀取）；沒有就從網路串流
+  const playIt = () => v.play().catch(() => {});
+  v.src = VIDEO;
+  v.load();
+  playIt();
+  // iPhone 偶爾會擋自動播放：點一下畫面任何地方就播放
+  document.addEventListener('click', playIt);
+  document.addEventListener('touchstart', playIt, { passive: true });
+  v.addEventListener('playing', () => document.body.classList.add('is-playing'));
   (async () => {
-    try {
-      const cached = 'caches' in window ? await caches.match(VIDEO) : null;
-      if (cached) {
-        const blob = await cached.blob();
-        playFrom(URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: 'video/mp4' })));
-        say('🎬 影片已存在手機', true);
-        return;
-      }
-    } catch { /* 改用網路 */ }
-    playFrom(VIDEO);
+    let cached = null;
+    try { cached = 'caches' in window ? await caches.match(VIDEO) : null; } catch { /* 忽略 */ }
+    if (cached) { done = true; say('🎬 影片已存在手機', true); } else say('🎬 影片下載中 0%（邊下載邊播放）');
   })();
 
   const start = Date.now();

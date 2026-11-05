@@ -1,11 +1,11 @@
 {% load static %}// Ukiyo service worker：快取網站外殼 (CSS / JS / 圖示)、主機喚醒等待畫面、推播通知
 // 影音清單的歌曲與影片不快取，以免塞爆手機空間（等待畫面的短片例外，約 4.5MB）
 const CACHE = 'otaku-daily-v1';
-// 等待畫面：頁面每次部署都更新（很小）；影片只有換片時才重新下載（網址含檔案指紋）
+// 等待畫面：頁面內容有改才重新存（快取名稱含頁面指紋）；影片只有換片時才重新下載（網址含檔案指紋）
 const WAKE_URL = '/wake/';
 const WAKE_VIDEO = '{% static "video/wake.mp4" %}';
 const WAKE_POSTER = '{% static "video/wake-poster.jpg" %}';
-const WAKE_PAGE_CACHE = 'ukiyo-wake-page-{{ app_version }}';
+const WAKE_PAGE_CACHE = 'ukiyo-wake-page-{{ wake_hash }}';
 const WAKE_VIDEO_CACHE = `ukiyo-wake-video-${WAKE_VIDEO.split('/').pop()}`;
 const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE];
 
@@ -68,10 +68,38 @@ async function serverAwake() {
   }
 }
 
+// 等待影片：手機裡有存就從存好的檔案提供，並支援分段讀取（iPhone 播影片一定會分段要資料，回 206）
+let videoBuf = null;
+async function serveVideo(req) {
+  if (!videoBuf) {
+    const cached = await caches.match(WAKE_VIDEO);
+    if (!cached) return fetch(req);
+    videoBuf = await cached.arrayBuffer();
+  }
+  const size = videoBuf.byteLength;
+  const headers = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes' };
+  const m = /bytes=(\d*)-(\d*)/.exec(req.headers.get('range') || '');
+  if (!m) return new Response(videoBuf, { status: 200, headers: { ...headers, 'Content-Length': String(size) } });
+  let start = m[1] === '' ? size - Number(m[2]) : Number(m[1]);
+  let end = m[1] !== '' && m[2] !== '' ? Number(m[2]) : size - 1;
+  start = Math.max(0, start);
+  end = Math.min(end, size - 1);
+  if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+  return new Response(videoBuf.slice(start, end + 1), {
+    status: 206,
+    headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': String(end - start + 1) },
+  });
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  if (url.pathname === WAKE_VIDEO) {
+    event.respondWith(serveVideo(req));
+    return;
+  }
 
   // 靜態檔案：先用快取，背景更新（分段讀取的影片請求直接走網路）
   if (url.pathname.startsWith('/static/') && !req.headers.has('range')) {

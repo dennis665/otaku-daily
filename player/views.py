@@ -1,7 +1,10 @@
+import hashlib
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.views.decorators.cache import cache_control, never_cache
 
@@ -44,7 +47,9 @@ def wake(request):
 @cache_control(no_cache=True)
 def service_worker(request):
     """service worker 必須從網站根目錄提供，作用範圍才能涵蓋整個網站"""
-    js = render(request, "player/sw.js").content
+    # 等待畫面內容的指紋：頁面有改才讓手機重新存一份
+    wake_hash = hashlib.md5(render_to_string("player/wake.html", request=request).encode()).hexdigest()[:10]
+    js = render(request, "player/sw.js", {"wake_hash": wake_hash}).content
     return HttpResponse(js, content_type="application/javascript")
 
 
