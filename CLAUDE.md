@@ -15,7 +15,7 @@
 
 ## 部署流程
 
-- `staging` 分支 → 測試站 https://otaku-daily-staging.onrender.com （SQLite，部署或休眠後資料清空，頂端有「測試站」橫幅）
+- `staging` 分支 → 測試站 https://otaku-daily-staging.onrender.com （資料庫在 Neon 的 `ukiyo_staging`，資料會保留，頂端有「測試站」橫幅）
 - `main` 分支 → 正式站 https://otaku-daily.onrender.com （資料庫在 Neon，`DATABASE_URL` 只在 Render 網頁設定）
 - 新功能先推 `staging` 驗證，經使用者同意後再快轉合併到 `main`。
 - 測試站資料庫：Neon 同專案的 `ukiyo_staging` 資料庫（Render 測試站的 DATABASE_URL，不開 pooling），帳號與資料會保留；未設定時退回 SQLite（每次部署清空）。
