@@ -306,3 +306,4 @@ body.sheet-open { overflow: hidden; }
 .e-bar .e-meta { margin: 0 4px; min-width: 0; }
 .e-sort { flex: none; display: inline-flex; align-items: center; gap: 4px; background: var(--bg2); border: 1px solid var(--line); border-radius: 99px; padding: 2px 4px 2px 12px; color: var(--muted); }
 .e-sort select { background: transparent; color: var(--text); border: 0; padding: 6px 4px; font: inherit; font-size: .82rem; max-width: 150px; }
+.env-banner a { color: #1a1300; text-decoration: underline; }

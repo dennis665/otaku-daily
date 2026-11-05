@@ -1,0 +1,75 @@
+{% load static %}<!doctype html>
+{# 主機喚醒等待畫面：service worker 安裝時就存進手機，主機休眠時由 service worker 直接顯示（不經過伺服器）。 #}
+{# 所以這頁不能用到伺服器上的其他檔案（除了同樣事先存好的影片），樣式與程式都寫在這裡。 #}
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a1a">
+<title>Ukiyo 喚醒中…</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0a1a; color: #f2f0ff; font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif; overflow: hidden; }
+  video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #0b0a1a; }
+  /* 影片上方是純背景，狀態文字放在上面，不會擋到角色和名字 */
+  .panel { position: fixed; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 18px) 20px 34px; text-align: center;
+    background: linear-gradient(rgba(6, 5, 18, .85) 55%, transparent); }
+  .title { font-size: 1.05rem; font-weight: 700; letter-spacing: .08em; margin: 0; }
+  .title b { background: linear-gradient(135deg, #ff6fae, #9b7bff 55%, #5ee7ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { margin: 6px 0 12px; font-size: .8rem; color: #a9a3d6; }
+  .bar { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .12); overflow: hidden; max-width: 320px; margin: 0 auto; }
+  .bar i { display: block; height: 100%; width: 40%; border-radius: 4px; background: linear-gradient(90deg, #ff6fae, #5ee7ff); animation: slide 1.6s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  .preview { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 14px); left: 12px; right: 12px; display: none; justify-content: space-between; align-items: center; }
+  .preview span { font-size: .8rem; font-weight: 700; color: #1a1300; background: #ffd34d; border-radius: 99px; padding: 6px 12px; }
+  .preview a { color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .3); border-radius: 99px; padding: 6px 14px; text-decoration: none; font-size: .85rem; }
+  body.is-preview .preview { display: flex; }
+</style>
+</head>
+<body>
+<video id="v" muted playsinline autoplay loop preload="auto" aria-hidden="true"></video>
+<div class="preview"><span>🎬 預覽模式（主機其實已醒著）</span><a href="/">✕ 返回</a></div>
+<div class="panel" role="status" aria-live="polite">
+  <p class="title"><b>Ukiyo</b> 主機喚醒中… <span id="sec">0</span> 秒</p>
+  <p class="sub" id="hint">免費主機休息後要 30～60 秒才會醒來，醒了會自動進入</p>
+  <div class="bar"><i></i></div>
+</div>
+<script>
+(() => {
+  const VIDEO = '{% static "video/wake.mp4" %}';
+  const preview = new URLSearchParams(location.search).has('preview');
+  if (preview) document.body.classList.add('is-preview');
+  const v = document.getElementById('v');
+
+  // 影片從手機裡的快取讀成 blob 播放（iPhone 不支援從快取以分段方式讀影片，用 blob 最穩）
+  (async () => {
+    try {
+      let res = 'caches' in window ? await caches.match(VIDEO) : null;
+      if (!res) res = await fetch(VIDEO);
+      v.src = URL.createObjectURL(await res.blob());
+      v.play().catch(() => {});
+    } catch { /* 沒有影片就只顯示文字 */ }
+  })();
+
+  const start = Date.now();
+  const secEl = document.getElementById('sec');
+  setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000);
+    secEl.textContent = s;
+    if (s === 45) document.getElementById('hint').textContent = '快好了，再等一下下…';
+    if (s === 90) document.getElementById('hint').textContent = '比平常久，可能是網路不穩，也可以稍後再開';
+  }, 1000);
+  if (preview) return;   // 預覽模式不自動跳轉
+
+  // 每 2 秒問一次主機醒了沒，醒了就重新載入原本要開的頁面
+  async function poll() {
+    try {
+      const r = await fetch('/version.json', { cache: 'no-store' });
+      if (r.ok && (r.headers.get('content-type') || '').includes('json')) { location.reload(); return; }
+    } catch { /* 還沒醒或沒網路 */ }
+    setTimeout(poll, 2000);
+  }
+  setTimeout(poll, 1500);
+})();
+</script>
+</body>
+</html>

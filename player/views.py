@@ -36,6 +36,11 @@ def version(request):
     return JsonResponse({"version": settings.APP_VERSION})
 
 
+def wake(request):
+    """主機喚醒等待畫面（service worker 會事先存起來，主機休眠時直接顯示）；?preview=1 為預覽模式"""
+    return render(request, "player/wake.html")
+
+
 @cache_control(no_cache=True)
 def service_worker(request):
     """service worker 必須從網站根目錄提供，作用範圍才能涵蓋整個網站"""
