@@ -1,8 +1,9 @@
 """
 行程小幫手：從 csi_server 的 LINE 版移植過來，改用 Ukiyo 自己的帳號與群組。
 
-- 個人行程：group 為空，只有建立者看得到（以及按過「我有興趣」的人）
-- 群組行程：群組成員都看得到；用邀請連結加入群組（取代原本的 LINE 群組）
+- 個人行程：沒有選任何群組，只有建立者看得到（以及透過分享連結加入的人）
+- 群組行程：可以同時分享到多個群組，這些群組的成員都看得到
+- 提醒：時間到自動通知所有相關的人（建立者、群組成員、透過分享連結加入的人），不用另外按「有興趣」
 - 時間可以先不定（date_time 為空），之後再「決定時間」定案
 - 權限：建立者或群組成員可以編輯、刪除、定案（修正舊版任何人都能刪的問題）
 """
@@ -71,7 +72,7 @@ class Itinerary(models.Model):
     ]
 
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="itineraries")
-    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, related_name="itineraries")
+    groups = models.ManyToManyField(Group, blank=True, related_name="shared_itineraries", verbose_name="群組")
     title = models.CharField("標題", max_length=100)
     activity_type = models.CharField("類型", max_length=10, choices=Type.choices, default=Type.OTHER)
     date_time = models.DateTimeField("時間", null=True, blank=True)   # 空白 = 時間未定
@@ -81,6 +82,7 @@ class Itinerary(models.Model):
     notify_minutes_before = models.PositiveIntegerField("提前提醒（分鐘）", default=1440)
     is_notified = models.BooleanField("已提醒", default=False)
     share_token = models.CharField("分享碼", max_length=20, unique=True, default=new_token)
+    # 透過分享連結加入的人（不在群組裡的朋友）：看得到這個行程，也會收到提醒
     interested = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="interested_itineraries")
     hidden_by = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="hidden_itineraries")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -95,13 +97,21 @@ class Itinerary(models.Model):
 
     @classmethod
     def visible_to(cls, user):
-        """看得到的行程：自己建立的、所屬群組的、按過「我有興趣」的"""
+        """看得到的行程：自己建立的、分享到我所屬群組的、透過分享連結加入的"""
         return cls.objects.filter(
-            Q(creator=user) | Q(group__members__user=user) | Q(interested=user)
+            Q(creator=user) | Q(groups__members__user=user) | Q(interested=user)
         ).distinct()
 
     def can_manage(self, user):
-        """可以編輯、刪除、定案：建立者，或群組行程的群組成員"""
+        """可以編輯、刪除、定案：建立者，或任一個分享群組的成員"""
         if self.creator_id == user.id:
             return True
-        return bool(self.group_id) and self.group.members.filter(user=user).exists()
+        return self.groups.filter(members__user=user).exists()
+
+    def recipients(self):
+        """提醒要通知的人：建立者、所有分享群組的成員、透過分享連結加入的人（不重複）"""
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        return User.objects.filter(
+            Q(pk=self.creator_id) | Q(plan_groups__group__in=self.groups.all()) | Q(interested_itineraries=self)
+        ).distinct()

@@ -25,7 +25,7 @@
 ## 其他
 
 - 介面文字一律繁體中文（台灣）。
-- 行程小幫手：`planner` 模組（從 csi_server LINE 版移植）。群組用邀請連結加入；權限是建立者或群組成員才能編輯／刪除／定案；提前提醒欄位已存，推播完成後才實際發送。測試：`python manage.py test planner`。
+- 行程小幫手：`planner` 模組（從 csi_server LINE 版移植）。一個行程可分享到多個群組；群組用搜尋會員邀請或邀請連結加入；權限是建立者或任一分享群組的成員才能編輯／刪除／定案；提醒自動發給建立者、所有群組成員與透過分享連結加入的人（沒有「我有興趣」）。測試：`python manage.py test planner`。
 - 推播通知：`notifications` 模組（Web Push，VAPID 金鑰首次使用時自動產生存 DB）。右上角 🔔 開啟；iPhone 需加入主畫面（iOS 16.4+）。行程提醒由 `/notify/tick/` 發送，GitHub Actions（`.github/workflows/notify-tick.yml`）在台灣 08:00～22:00 每 30 分鐘叫醒正式站，22:00 會先發出到隔天 08:00 前的提醒（節省 Render／Neon 免費額度）。測試：`python manage.py test notifications`。
 - 北部動漫活動：讀取 Google 試算表（雲端排程每天台灣時間 08:00 更新），網站每天 08:30 後重新讀一次，見 `player/events.py`；備份用 `python manage.py update_events_snapshot` 更新。
 - 影音清單來源與快照：見 `player/playlist.py`；影音儲存庫新增檔案後執行 `python manage.py update_media_snapshot` 更新快照。

@@ -99,7 +99,10 @@
     <button class="chip" data-when="soon">即將開始</button>
   </div>
   <div class="chips" id="e-types" role="group" aria-label="類型"></div>
-  <p class="e-meta" id="e-meta"></p>
+  <div class="e-bar">
+    <p class="e-meta" id="e-meta"></p>
+    <label class="e-sort"><span aria-hidden="true">↕</span><select id="e-sort" aria-label="排序方式"></select></label>
+  </div>
   <div class="events" id="e-list"></div>
 </section>
 
@@ -114,6 +117,7 @@
     <button class="chip" data-view="tbd" type="button">時間未定 <b></b></button>
     <button class="chip" data-view="history" type="button">歷史 <b></b></button>
   </div>
+  <div class="chips g-filter" id="p-gfilter" role="group" aria-label="依群組篩選" hidden></div>
   <div class="events" id="p-list"></div>
 </section>
 
@@ -122,10 +126,8 @@
   <form class="sheet" id="p-form" novalidate>
     <div class="sheet-head"><h3 id="p-form-title">新增行程</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
     <label class="field"><span>標題 *</span><input name="title" maxlength="100" required placeholder="例如：吉伊卡哇快閃店"></label>
-    <div class="field-row">
-      <label class="field"><span>類型</span><select name="type" id="p-type"></select></label>
-      <label class="field"><span>給誰看</span><select name="group_id" id="p-group"></select></label>
-    </div>
+    <label class="field"><span>類型</span><select name="type" id="p-type"></select></label>
+    <div class="field"><span>分享給群組（可複選；都不勾＝只有我看得到）</span><div class="group-pick" id="p-group-pick"></div></div>
     <label class="field"><span>時間</span><input type="datetime-local" name="date_time" id="p-dt"></label>
     <label class="check"><input type="checkbox" id="p-tbd"> 時間還沒決定</label>
     <label class="field"><span>地點</span>

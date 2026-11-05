@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from pywebpush import WebPushException
 
-from planner.models import Itinerary
+from planner.models import Group, GroupMember, Itinerary
 
 from .models import PushSubscription, VapidKey
 from .reminders import send_due_reminders, send_until
@@ -44,10 +44,13 @@ class NotifyTests(TestCase):
 
     # ---------- 行程提醒 ----------
     @mock.patch("notifications.push.webpush")
-    def test_reminder_sent_once_to_interested_users(self, webpush):
+    def test_reminder_sent_once_to_group_members_without_interest(self, webpush):
         now = tpe(2026, 11, 5, 10, 0)
         it = Itinerary.objects.create(creator=self.alice, title="吃拉麵", date_time=now + timedelta(minutes=70), notify_minutes_before=60, location="西門")
-        it.interested.add(self.alice, self.bob)
+        g = Group.objects.create(name="群", created_by=self.alice)
+        GroupMember.objects.create(group=g, user=self.alice)
+        GroupMember.objects.create(group=g, user=self.bob)
+        it.groups.add(g)   # bob 沒按任何按鈕，只是群組成員
         self.subscribe(self.alice)
         self.subscribe(self.bob)
         self.assertEqual(send_due_reminders(now), 1)
@@ -70,7 +73,6 @@ class NotifyTests(TestCase):
     @mock.patch("notifications.push.webpush")
     def test_night_reminder_sent_at_22(self, webpush):
         it = Itinerary.objects.create(creator=self.alice, title="早上展覽", date_time=tpe(2026, 11, 6, 9, 0), notify_minutes_before=60)
-        it.interested.add(self.alice)
         self.subscribe(self.alice)
         self.assertEqual(send_due_reminders(tpe(2026, 11, 5, 22, 0)), 1)   # 提醒時間 08:00 → 22:00 先發
 
@@ -79,7 +81,6 @@ class NotifyTests(TestCase):
         webpush.side_effect = WebPushException("gone", response=FakeResponse(410))
         now = tpe(2026, 11, 5, 10, 0)
         it = Itinerary.objects.create(creator=self.alice, title="x", date_time=now + timedelta(minutes=5), notify_minutes_before=10)
-        it.interested.add(self.alice)
         self.subscribe(self.alice)
         send_due_reminders(now)
         self.assertFalse(PushSubscription.objects.exists())

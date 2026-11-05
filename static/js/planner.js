@@ -1,4 +1,4 @@
-// Ukiyo 行程小幫手：行程看板（即將到來 / 時間未定 / 歷史）、新增編輯、我有興趣、決定時間、群組
+// Ukiyo 行程小幫手：行程看板（即將到來 / 時間未定 / 歷史）、新增編輯、決定時間、群組（一個行程可分享到多個群組）
 // 從 LINE 版移植：LINE 群組改成 Ukiyo 群組（邀請連結加入），分享改用手機分享選單或複製連結
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -12,6 +12,7 @@
 
   let data = { upcoming: [], tbd: [], history: [], groups: [], notify_choices: [], types: [] };
   let view = 'upcoming';
+  let groupFilter = 'all';   // all / personal / 群組 id
   let editing = null;      // 正在編輯的行程（null = 新增）
   let finalizing = null;   // 正在決定時間的行程
 
@@ -53,13 +54,25 @@
     return { text: `${diff} 天後`, cls: diff <= 7 ? 'hot' : '' };
   }
 
+  // 每個群組固定一個顏色（依群組編號），卡片和篩選用同一色
+  const hue = (id) => (Number(id) * 67) % 360;
+  function groupChip(g, cls = 'g-chip') {
+    const c = el('span', cls, `👥 ${g.name}`);
+    c.style.setProperty('--h', hue(g.id));
+    return c;
+  }
+
   // ---------- 卡片 ----------
   function card(it) {
     const c = el('article', `ev plan-card${view === 'tbd' ? ' ev-soon' : ''}`);
     const head = el('div', 'ev-head');
     const b = badge(it);
-    head.append(el('span', 'ev-type', `${it.type_label}・${it.group ? `👥 ${it.group.name}` : '🔒 個人'}`), el('span', `ev-badge ${b.cls}`, b.text));
-    c.append(head, el('h3', 'ev-name', it.title));
+    head.append(el('span', 'ev-type', it.type_label), el('span', `ev-badge ${b.cls}`, b.text));
+    // 群組標籤放在標題上方，一眼看出是哪個群組的行程
+    const chips = el('div', 'g-chips');
+    if (it.groups.length) it.groups.forEach((g) => chips.append(groupChip(g)));
+    else chips.append(el('span', 'g-chip personal', '🔒 個人'));
+    c.append(head, chips, el('h3', 'ev-name', it.title));
 
     const info = el('ul', 'ev-info');
     info.append(el('li', null, `📅 ${whenText(it)}`));
@@ -69,7 +82,6 @@
       info.append(li);
     }
     it.links.forEach((l) => { const li = el('li'); li.append(extLink(null, `🔗 ${l.title || l.url}`, l.url)); info.append(li); });
-    info.append(el('li', 'muted', `🙋 有興趣：${it.interested.length ? it.interested.join('、') : '還沒有人'}`));
     if (it.date_time && view !== 'history') info.append(el('li', 'muted', `⏰ 提醒：${it.notify_label}・建立者 ${it.creator}`));
     c.append(info);
     if (it.notes) c.append(el('p', 'ev-sum', it.notes));
@@ -77,7 +89,6 @@
     // 操作按鈕
     const acts = el('div', 'plan-acts');
     const btn = (text, fn, cls = '') => { const x = el('button', `act ${cls}`, text); x.type = 'button'; x.addEventListener('click', fn); acts.append(x); };
-    if (view !== 'history') btn(it.i_am_interested ? '✅ 有興趣' : '🙋 我有興趣', () => toggleInterest(it), it.i_am_interested ? 'on' : '');
     if (view === 'tbd' && it.can_manage) btn('🗓 決定時間', () => openFinalize(it));
     if (view !== 'history' && it.can_manage) btn('✏️ 編輯', () => openForm(it));
     btn('📤 分享', () => shareIt(it));
@@ -104,17 +115,40 @@
     });
   }
 
+  // 群組篩選列：全部 / 個人 / 各群組（有群組時才顯示）
+  function renderGroupFilter() {
+    const box = $('p-gfilter');
+    box.innerHTML = '';
+    if (!data.groups.length) { box.hidden = true; groupFilter = 'all'; return; }
+    box.hidden = false;
+    if (groupFilter !== 'all' && groupFilter !== 'personal' && !data.groups.some((g) => String(g.id) === String(groupFilter))) groupFilter = 'all';
+    const add = (key, node) => {
+      node.classList.add('gf');
+      node.classList.toggle('active', String(groupFilter) === String(key));
+      node.setAttribute('role', 'button');
+      node.tabIndex = 0;
+      node.addEventListener('click', () => { groupFilter = key; render(); });
+      box.append(node);
+    };
+    add('all', el('span', 'g-chip all', '全部'));
+    add('personal', el('span', 'g-chip personal', '🔒 個人'));
+    data.groups.forEach((g) => add(g.id, groupChip(g)));
+  }
+  const matchGroup = (it) => groupFilter === 'all'
+    || (groupFilter === 'personal' ? !it.groups.length : it.groups.some((g) => String(g.id) === String(groupFilter)));
+
   function render() {
     renderInvites();
-    const items = data[view] || [];
+    renderGroupFilter();
+    const items = (data[view] || []).filter(matchGroup);
     $('p-tabs').querySelectorAll('.chip').forEach((chip) => {
       chip.classList.toggle('active', chip.dataset.view === view);
-      chip.querySelector('b').textContent = (data[chip.dataset.view] || []).length || '';
+      chip.querySelector('b').textContent = (data[chip.dataset.view] || []).filter(matchGroup).length || '';
     });
     count.textContent = data.upcoming.length + data.tbd.length + (data.invitations || []).length;
     list.innerHTML = '';
     if (!items.length) {
-      const msg = { upcoming: '還沒有即將到來的行程，按「＋ 新增行程」或到「活動」頁把有興趣的活動加進來', tbd: '沒有時間未定的行程', history: '還沒有歷史行程' }[view];
+      const msg = groupFilter !== 'all' ? '這個分類沒有行程' : { upcoming: '還沒有即將到來的行程，按「＋ 新增行程」或到「活動」頁把有興趣的活動加進來', tbd: '沒有時間未定的行程', history: '還沒有歷史行程' }[view];
       list.append(el('p', 'empty', msg));
     } else items.forEach((it) => list.append(card(it)));
   }
@@ -154,10 +188,9 @@
   async function run(fn) {
     try { await fn(); } catch (err) { alert(err.message); }
   }
-  const toggleInterest = (it) => run(async () => { await api(`/plan/api/itineraries/${it.id}/interest/`, {}); await reload(); });
   const hideIt = (it) => run(async () => { await api(`/plan/api/itineraries/${it.id}/hide/`, {}); await reload(); });
   const deleteIt = (it) => {
-    if (!confirm(`確定要刪除「${it.title}」？${it.group ? '群組成員都會看不到。' : ''}`)) return;
+    if (!confirm(`確定要刪除「${it.title}」？${it.groups.length ? '群組成員都會看不到。' : ''}`)) return;
     run(async () => { await api(`/plan/api/itineraries/${it.id}/delete/`, {}); await reload(); });
   };
   async function shareIt(it) {
@@ -182,9 +215,16 @@
   function fillSelects() {
     $('p-type').innerHTML = '';
     data.types.forEach(([v, label]) => $('p-type').append(new Option(label, v)));
-    $('p-group').innerHTML = '';
-    $('p-group').append(new Option('🔒 只有我（個人行程）', ''));
-    data.groups.forEach((g) => $('p-group').append(new Option(`👥 ${g.name}`, g.id)));
+    const pick = $('p-group-pick');
+    pick.innerHTML = '';
+    if (!data.groups.length) pick.append(el('small', 'muted', '還沒有群組，這會是個人行程（可以到「👥 群組」建立）'));
+    data.groups.forEach((g) => {
+      const lab = el('label', 'g-pick');
+      const box = el('input'); box.type = 'checkbox'; box.value = g.id;
+      lab.style.setProperty('--h', hue(g.id));
+      lab.append(box, document.createTextNode(` 👥 ${g.name}`));
+      pick.append(lab);
+    });
     $('p-notify').innerHTML = '';
     data.notify_choices.forEach(([v, label]) => $('p-notify').append(new Option(label, v)));
   }
@@ -203,11 +243,12 @@
   function openForm(it = null, preset = {}) {
     editing = it;
     fillSelects();
-    const v = it || { title: '', type: 'OTHER', group: null, date_time: '', location: '', notes: '', links: [], notify_minutes_before: 1440, ...preset };
+    const v = it || { title: '', type: 'OTHER', groups: [], date_time: '', location: '', notes: '', links: [], notify_minutes_before: 1440, ...preset };
     $('p-form-title').textContent = it ? '編輯行程' : '新增行程';
     form.elements.title.value = v.title;
     form.elements.type.value = v.type;
-    form.elements.group_id.value = v.group ? v.group.id : (preset.group_id || '');
+    const chosen = new Set((it ? it.groups.map((g) => g.id) : (preset.group_ids || [])).map(String));
+    $('p-group-pick').querySelectorAll('input').forEach((b) => { b.checked = chosen.has(b.value); });
     form.elements.date_time.value = v.date_time || '';
     $('p-tbd').checked = !v.date_time && (it ? true : Boolean(preset.tbd));
     syncTbd();
@@ -227,7 +268,7 @@
     const body = {
       title: form.elements.title.value,
       type: form.elements.type.value,
-      group_id: form.elements.group_id.value || null,
+      group_ids: [...$('p-group-pick').querySelectorAll('input:checked')].map((b) => Number(b.value)),
       date_time: $('p-tbd').checked ? '' : form.elements.date_time.value,
       location: form.elements.location.value,
       notes: form.elements.notes.value,

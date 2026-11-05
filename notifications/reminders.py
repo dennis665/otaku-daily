@@ -63,7 +63,7 @@ def send_due_reminders(now=None):
     until = send_until(now)
     candidates = (Itinerary.objects
                   .filter(is_notified=False, date_time__isnull=False, date_time__gt=now - GRACE, date_time__lte=until + MAX_AHEAD)
-                  .select_related("creator").prefetch_related("interested"))
+                  .select_related("creator"))
     count = 0
     for it in candidates:
         if it.date_time - timedelta(minutes=it.notify_minutes_before) > until:
@@ -71,7 +71,7 @@ def send_due_reminders(now=None):
         # 先標記再發送，避免同時兩次檢查重複提醒
         if not Itinerary.objects.filter(pk=it.pk, is_notified=False).update(is_notified=True):
             continue
-        users = list(it.interested.all()) or [it.creator]
+        users = list(it.recipients())   # 建立者、所有分享群組的成員、透過分享連結加入的人
         body = _when(it.date_time, now) + (f"・📍 {it.location}" if it.location else "")
         ok, failed = send_to_users(users, f"⏰ {it.title}", body, url="/?tab=plan", tag=f"itinerary-{it.pk}")
         logger.info("行程提醒 #%s：成功 %s、失敗 %s", it.pk, ok, failed)

@@ -82,7 +82,6 @@ def _gcal_url(it):
 
 
 def serialize(it, user, request):
-    interested = list(it.interested.all())
     return {
         "id": it.id,
         "title": it.title,
@@ -94,12 +93,10 @@ def serialize(it, user, request):
         "links": it.links,
         "notify_minutes_before": it.notify_minutes_before,
         "notify_label": dict(Itinerary.NOTIFY_CHOICES).get(it.notify_minutes_before, f"{it.notify_minutes_before} 分鐘前"),
-        "group": {"id": it.group_id, "name": it.group.name} if it.group_id else None,
+        "groups": [{"id": g.id, "name": g.name} for g in it.groups.all()],
         "creator": it.creator.username,
         "is_mine": it.creator_id == user.id,
         "can_manage": it.can_manage(user),
-        "interested": [u.username for u in interested],
-        "i_am_interested": any(u.id == user.id for u in interested),
         "share_url": request.build_absolute_uri(reverse("planner:share", args=[it.share_token])),
         "gcal_url": _gcal_url(it),
     }
@@ -126,18 +123,23 @@ def _apply_fields(it, data, user):
     except (TypeError, ValueError):
         minutes = 1440
     it.notify_minutes_before = minutes if minutes in dict(Itinerary.NOTIFY_CHOICES) else 1440
-    # 群組：只能放到自己有加入的群組
-    group_id = data.get("group_id")
-    if group_id:
-        if not GroupMember.objects.filter(group_id=group_id, user=user).exists():
-            raise InvalidInput("你不是這個群組的成員")
-        it.group_id = int(group_id)
-    else:
-        it.group = None
+
+
+def _pick_groups(it, data, user):
+    """要分享的群組（可多選）。只能選自己有加入的群組；編輯時，自己沒加入的群組維持原樣"""
+    try:
+        wanted = {int(g) for g in (data.get("group_ids") or [])}
+    except (TypeError, ValueError) as exc:
+        raise InvalidInput("群組資料錯誤") from exc
+    mine = set(GroupMember.objects.filter(user=user).values_list("group_id", flat=True))
+    if wanted - mine:
+        raise InvalidInput("你不是這個群組的成員")
+    keep_others = set(it.groups.exclude(pk__in=mine).values_list("pk", flat=True)) if it.pk else set()
+    return wanted | keep_others
 
 
 def _visible_qs(user):
-    return Itinerary.visible_to(user).select_related("group", "creator").prefetch_related("interested")
+    return Itinerary.visible_to(user).select_related("creator").prefetch_related("groups")
 
 
 def _get_visible(request, pk):
@@ -154,17 +156,19 @@ def itineraries(request):
             data = _json_body(request)
             it = Itinerary(creator=user)
             _apply_fields(it, data, user)
+            group_ids = _pick_groups(it, data, user)
         except InvalidInput as exc:
             return _error(str(exc))
         with transaction.atomic():
             it.save()
-            it.interested.add(user)   # 建立者預設有興趣（參加）
-        if it.group_id:
-            others = [m.user for m in it.group.members.select_related("user").exclude(user=user)]
+            it.groups.set(group_ids)
+        if group_ids:
+            groups = list(it.groups.all())
+            others = list(it.recipients().exclude(pk=user.pk))
             local = timezone.localtime(it.date_time) if it.date_time else None
             when = f"{local.month}/{local.day} {local:%H:%M}" if local else "時間未定"
-            notify(others, f"👥 {it.group.name} 有新行程", f"{user.username} 新增了「{it.title}」（{when}），快去看看要不要參加",
-                   f"group-itinerary-{it.pk}")
+            names = "、".join(g.name for g in groups)
+            notify(others, f"👥 {names} 有新行程", f"{user.username} 新增了「{it.title}」（{when}）", f"group-itinerary-{it.pk}")
         return JsonResponse({"ok": True, "item": serialize(it, user, request)})
 
     now = timezone.now()
@@ -180,6 +184,7 @@ def itineraries(request):
         "tbd": [serialize(i, user, request) for i in tbd],
         "history": [serialize(i, user, request) for i in history],
         "groups": [{"id": g.id, "name": g.name} for g in groups],
+        "personal_count": qs.filter(groups__isnull=True).count(),
         "notify_choices": Itinerary.NOTIFY_CHOICES,
         "types": Itinerary.Type.choices,
     })
@@ -194,11 +199,15 @@ def itinerary_update(request, pk):
     if it.date_time and it.date_time < timezone.now():
         return _error("已經過去的行程不能修改")
     try:
-        _apply_fields(it, _json_body(request), request.user)
+        data = _json_body(request)
+        _apply_fields(it, data, request.user)
+        group_ids = _pick_groups(it, data, request.user)
     except InvalidInput as exc:
         return _error(str(exc))
     it.is_notified = False   # 時間或提醒改了，重新提醒
-    it.save()
+    with transaction.atomic():
+        it.save()
+        it.groups.set(group_ids)
     return JsonResponse({"ok": True, "item": serialize(it, request.user, request)})
 
 
@@ -210,18 +219,6 @@ def itinerary_delete(request, pk):
         return _error("只有建立者或群組成員可以刪除", 403)
     it.delete()
     return JsonResponse({"ok": True})
-
-
-@login_required
-@require_POST
-def itinerary_interest(request, pk):
-    """切換「我有興趣」"""
-    it = _get_visible(request, pk)
-    if it.interested.filter(pk=request.user.pk).exists():
-        it.interested.remove(request.user)
-    else:
-        it.interested.add(request.user)
-    return JsonResponse({"ok": True, "item": serialize(it, request.user, request)})
 
 
 @login_required
@@ -374,15 +371,17 @@ def join_group(request, code):
 @login_required
 @require_http_methods(["GET", "POST"])
 def share(request, token):
-    """分享出去的行程邀約：登入後可以按「我有興趣」加入"""
-    it = get_object_or_404(Itinerary.objects.select_related("group", "creator"), share_token=token)
+    """分享出去的行程邀約：登入後按「加入這個行程」就看得到，也會收到提醒"""
+    it = get_object_or_404(Itinerary.objects.select_related("creator"), share_token=token)
+    already = it.recipients().filter(pk=request.user.pk).exists()
     if request.method == "POST":
-        it.interested.add(request.user)
+        if not already:
+            it.interested.add(request.user)
         return redirect(f"{reverse('player:home')}?tab=plan")
     return render(request, "planner/share.html", {
         "it": it,
-        "interested": it.interested.all(),
-        "i_am_interested": it.interested.filter(pk=request.user.pk).exists(),
+        "groups": it.groups.all(),
+        "already": already,
         "gcal_url": _gcal_url(it),
     })
 

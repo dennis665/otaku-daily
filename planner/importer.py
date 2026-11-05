@@ -57,7 +57,7 @@ def import_line_export(user, raw_bytes):
         if group is None:
             group = Group.objects.create(name=name, created_by=user)
             GroupMember.objects.create(group=group, user=user, is_owner=True)
-        existing = {(i.title, i.date_time) for i in group.itineraries.all()}
+        existing = {(i.title, i.date_time) for i in group.shared_itineraries.all()}
 
         for row in items:
             if not isinstance(row, dict):
@@ -84,7 +84,7 @@ def import_line_export(user, raw_bytes):
             except (TypeError, ValueError):
                 notify = 1440
             it = Itinerary.objects.create(
-                creator=user, group=group, title=title,
+                creator=user, title=title,
                 activity_type=row.get("activity_type") if row.get("activity_type") in valid_types else Itinerary.Type.OTHER,
                 date_time=when,
                 location=str(row.get("location") or "").strip()[:200],
@@ -93,7 +93,7 @@ def import_line_export(user, raw_bytes):
                 notify_minutes_before=notify if notify in valid_notify else 1440,
                 is_notified=bool(when and when < now),
             )
-            it.interested.add(user)
+            it.groups.add(group)
             if row.get("is_hidden"):
                 it.hidden_by.add(user)
             existing.add((title, when))

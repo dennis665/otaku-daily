@@ -7,16 +7,15 @@
   <p class="invite-kicker">{{ it.creator.username }} 邀請你參加</p>
   <h2 class="invite-title">{{ it.title }}</h2>
   <ul class="ev-info invite-info">
-    <li>{{ it.get_activity_type_display }}{% if it.group %}・👥 {{ it.group.name }}{% endif %}</li>
+    <li>{{ it.get_activity_type_display }}{% for g in groups %}・👥 {{ g.name }}{% endfor %}</li>
     <li>📅 {% if it.date_time %}{{ it.date_time|date:"n/j（D）H:i" }}{% else %}時間未定{% endif %}</li>
     {% if it.location %}<li>📍 {{ it.location }}</li>{% endif %}
     {% if it.notes %}<li>📝 {{ it.notes|linebreaksbr }}</li>{% endif %}
     {% for link in it.links %}<li>🔗 <a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.title|default:link.url }}</a></li>{% endfor %}
-    <li>🙋 有興趣：{% for u in interested %}{{ u.username }}{% if not forloop.last %}、{% endif %}{% empty %}還沒有人{% endfor %}</li>
   </ul>
   <form method="post">
     {% csrf_token %}
-    <button class="btn primary" type="submit" data-busy="處理中…">{% if i_am_interested %}前往行程看板{% else %}🙋 我有興趣{% endif %}</button>
+    <button class="btn primary" type="submit" data-busy="處理中…">{% if already %}前往行程看板{% else %}➕ 加入這個行程{% endif %}</button>
   </form>
   {% if gcal_url %}<p class="switch"><a href="{{ gcal_url }}" target="_blank" rel="noopener">📆 加到 Google 日曆</a></p>{% endif %}
 </main>

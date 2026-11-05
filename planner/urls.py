@@ -8,7 +8,6 @@ urlpatterns = [
     path("api/itineraries/", views.itineraries, name="itineraries"),
     path("api/itineraries/<int:pk>/", views.itinerary_update, name="itinerary_update"),
     path("api/itineraries/<int:pk>/delete/", views.itinerary_delete, name="itinerary_delete"),
-    path("api/itineraries/<int:pk>/interest/", views.itinerary_interest, name="itinerary_interest"),
     path("api/itineraries/<int:pk>/finalize/", views.itinerary_finalize, name="itinerary_finalize"),
     path("api/itineraries/<int:pk>/hide/", views.itinerary_hide, name="itinerary_hide"),
     path("api/groups/", views.groups, name="groups"),

@@ -16,8 +16,8 @@ class GroupAdmin(admin.ModelAdmin):
 
 @admin.register(Itinerary)
 class ItineraryAdmin(admin.ModelAdmin):
-    list_display = ("title", "activity_type", "date_time", "group", "creator")
-    list_filter = ("activity_type", "group")
+    list_display = ("title", "activity_type", "date_time", "creator")
+    list_filter = ("activity_type", "groups")
     search_fields = ("title", "location")
 
 

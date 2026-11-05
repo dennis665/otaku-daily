@@ -29,6 +29,29 @@
   let when = 'all';
   let type = '';
 
+  // 排序方式（記在這台裝置）
+  const SORTS = {
+    smart: '進行中優先（快結束的在前）',
+    start_asc: '開始日期：近 → 遠',
+    start_desc: '開始日期：遠 → 近',
+    end_asc: '快結束的優先',
+    newest: '最新收錄',
+    type: '依類型',
+  };
+  let sortKey = 'smart';
+  try { sortKey = localStorage.getItem('eventSort') || 'smart'; } catch { /* 無痕模式 */ }
+  if (!SORTS[sortKey]) sortKey = 'smart';
+  const far = '9999-12-31';
+  const sorters = {
+    smart: (a, b) => ({ now: 0, soon: 1 }[a.status.key] - { now: 0, soon: 1 }[b.status.key])
+      || (a.status.key === 'now' ? (a.end || far).localeCompare(b.end || far) : (a.start || far).localeCompare(b.start || far)),
+    start_asc: (a, b) => (a.start || far).localeCompare(b.start || far),
+    start_desc: (a, b) => (b.start || '').localeCompare(a.start || ''),
+    end_asc: (a, b) => (a.end || far).localeCompare(b.end || far),
+    newest: (a, b) => (b.added || '').localeCompare(a.added || '') || (a.start || far).localeCompare(b.start || far),
+    type: (a, b) => (a.type || '').localeCompare(b.type || '', 'zh-Hant') || sorters.smart(a, b),
+  };
+
   // 活動在某一天是否有在進行
   function activeOn(e, day) {
     if (!e.start && !e.end) return false;
@@ -126,7 +149,7 @@
     });
     list.innerHTML = '';
     if (!shown.length) list.append(el('p', 'empty', events.length ? '沒有符合條件的活動，換個篩選條件試試' : '目前沒有活動資料'));
-    else shown.forEach((e) => list.append(card(e)));
+    else [...shown].sort(sorters[sortKey]).forEach((e) => list.append(card(e)));
     $('e-shown').textContent = `顯示 ${shown.length} / ${events.length} 筆`;
   }
 
@@ -190,4 +213,14 @@
   }));
   search.addEventListener('input', render);
   clearBtn.addEventListener('click', () => { search.value = ''; render(); search.focus(); });
+
+  // 排序選單
+  const sortSel = $('e-sort');
+  Object.entries(SORTS).forEach(([k, label]) => sortSel.append(new Option(label, k)));
+  sortSel.value = sortKey;
+  sortSel.addEventListener('change', () => {
+    sortKey = sortSel.value;
+    try { localStorage.setItem('eventSort', sortKey); } catch { /* 無痕模式 */ }
+    render();
+  });
 })();
