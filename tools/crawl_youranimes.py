@@ -178,7 +178,7 @@ def main():
     for target in args.target:
         try:
             res = send(target, token, {"works": works, "errors": errors, "pages": total_pages})
-            print(f"{target}：新增 {res.get('created')}、更新 {res.get('updated')}、新播出紀錄 {res.get('airings_added')}、補封面 {res.get('images_set')}")
+            print(f"{target}：新增 {res.get('created')}、更新 {res.get('updated')}、新播出紀錄 {res.get('airings_added')}、缺封面 {res.get('missing_cover')}")
         except Exception as exc:
             failed = True
             print(f"{target}：送出失敗 {exc}")

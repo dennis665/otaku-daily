@@ -28,5 +28,6 @@
 - 行程小幫手：`planner` 模組（從 csi_server LINE 版移植）。一個行程可分享到多個群組；群組用搜尋會員邀請或邀請連結加入；權限是建立者或任一分享群組的成員才能編輯／刪除／定案；提醒自動發給建立者、所有群組成員與透過分享連結加入的人（沒有「我有興趣」）。測試：`python manage.py test planner`。
 - 推播通知：`notifications` 模組（Web Push，VAPID 金鑰首次使用時自動產生存 DB）。右上角 🔔 開啟；iPhone 需加入主畫面（iOS 16.4+）。行程提醒由 `/notify/tick/` 發送，GitHub Actions（`.github/workflows/notify-tick.yml`）在台灣 08:00～22:00 每 30 分鐘叫醒正式站，22:00 會先發出到隔天 08:00 前的提醒（節省 Render／Neon 免費額度）。測試：`python manage.py test notifications`。
 - 喚醒等待畫面：`templates/player/wake.html` + `static/video/wake.mp4`。service worker 安裝時存進手機；開頁時 Render 回 503 或 3.5 秒沒回應（且 `/version.json` 也沒醒）就顯示等待畫面播影片，每 2 秒檢查主機，醒了自動重新載入。測試站橫幅有「🎬 預覽等待畫面」（`/wake/?preview=1`）。換影片只要替換 `static/video/wake.mp4`。
+- 追劇小幫手：`dramas` 模組。作品以 youranimes 作品編號（source_id）為準，同一部只有一筆，劇庫「只新增、不刪除」（`dramas/sync.py`）。每日抓新番：GitHub Actions（`.github/workflows/drama-sync.yml`）台灣 16:00 執行 `tools/crawl_youranimes.py`，讀頁面 JSON-LD 後送到 `/dramas/api/sync/`（密碼在 GitHub Secrets 的 `DRAMA_SYNC_TOKEN`，程式只存指紋）。測試：`python manage.py test dramas`。
 - 北部動漫活動：讀取 Google 試算表（雲端排程每天台灣時間 08:00 更新），網站每天 08:30 後重新讀一次，見 `player/events.py`；備份用 `python manage.py update_events_snapshot` 更新。
 - 影音清單來源與快照：見 `player/playlist.py`；影音儲存庫新增檔案後執行 `python manage.py update_media_snapshot` 更新快照。
