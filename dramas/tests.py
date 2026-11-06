@@ -91,3 +91,69 @@ class ApiTests(TestCase):
     def test_requires_login(self):
         self.client.logout()
         self.assertEqual(self.client.get("/dramas/api/mine/", secure=True).status_code, 302)
+
+
+class SyncEndpointTests(TestCase):
+    TOKEN = "test-sync-token"
+
+    def setUp(self):
+        import hashlib
+        from unittest import mock
+        patcher = mock.patch("dramas.views.SYNC_TOKEN_SHA256", hashlib.sha256(self.TOKEN.encode()).hexdigest())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def send(self, works, token=None):
+        return self.client.post("/dramas/api/sync/", json.dumps({"works": works, "pages": 20, "errors": []}),
+                                content_type="application/json", secure=True, HTTP_X_SYNC_TOKEN=token or self.TOKEN)
+
+    def test_wrong_token(self):
+        self.assertEqual(self.send([], token="wrong").status_code, 404)
+
+    def test_crawl_adds_updates_and_logs(self):
+        from .models import SyncLog
+        upsert_works([{"source_id": 5466, "title": "不時輕聲地以俄語遮羞的鄰座艾莉同學", "airings": ["2024年7月新番"]}], mode="migrate")
+        res = self.send([
+            {"source_id": 5466, "title": "不時輕聲地以俄語遮羞的鄰座艾莉同學", "alt_titles": ["時々ボソッとロシア語でデレる隣のアーリャさん"],
+             "media_type": "TV", "images": ["https://img.example/a.webp"], "airings": ["動畫化決定"]},
+            {"source_id": 6050, "title": "膽大黨 第三季", "alt_titles": ["ダンダダン 第3期", "DAN DA DAN Season 3"],
+             "media_type": "TV", "images": ["https://img.example/b.webp"], "airings": ["動畫化決定"]},
+        ]).json()
+        self.assertEqual((res["created"], res["updated"]), (1, 1))
+        w = Work.objects.get(source_id=5466)
+        self.assertIn("時々ボソッとロシア語でデレる隣のアーリャさん", w.alt_titles)
+        self.assertEqual(w.images, ["https://img.example/a.webp"])
+        new = Work.objects.get(source_id=6050)
+        self.assertEqual(new.first_seen, date.today())
+        self.assertEqual(SyncLog.objects.count(), 1)
+        # 搜尋英文別名找得到
+        self.client.force_login(User.objects.create_user("u"))
+        titles = [x["title"] for x in self.client.get("/dramas/api/works/?q=DAN DA DAN", secure=True).json()["items"]]
+        self.assertEqual(titles, ["膽大黨 第三季"])
+        # 隔天清單沒有 5466：不刪除
+        self.send([{"source_id": 6050, "title": "膽大黨 第三季", "airings": ["2027年1月新番"]}])
+        self.assertTrue(Work.objects.filter(source_id=5466).exists())
+        self.assertEqual(Work.objects.get(source_id=6050).sort_key, "202701")
+
+
+class CrawlerParseTests(TestCase):
+    def test_parse_jsonld_and_pages(self):
+        import importlib.util
+        from pathlib import Path
+        spec = importlib.util.spec_from_file_location("crawler", Path(__file__).resolve().parent.parent / "tools" / "crawl_youranimes.py")
+        crawler = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(crawler)
+        html = '<script type="application/ld+json">' + json.dumps({"@type": "ItemList", "numberOfItems": 2, "itemListElement": [
+            {"item": {"@type": "Movie", "name": "10 Count", "url": "https://youranimes.tw/animes/3962", "alternateName": "テンカウント", "image": "https://x/a.webp"}},
+            {"item": {"@type": "TVSeries", "name": "膽大黨", "url": "https://youranimes.tw/animes/1", "alternateName": ["ダンダダン"]}},
+        ]}) + "</script>"
+        items, declared = crawler.parse(html, "日本動畫電影製作決定", "MOVIE")
+        self.assertEqual(declared, 2)
+        self.assertEqual(items[0]["title"], "10 Count")          # 開頭數字不會被截掉
+        self.assertEqual(items[0]["alt_titles"], ["テンカウント"])   # 單一字串也能處理
+        self.assertEqual(items[1]["media_type"], "TV")
+        pages = crawler.pages_to_crawl(date(2026, 11, 6))
+        labels = [p[1] for p in pages]
+        self.assertEqual(labels[:3], ["動畫化決定", "2026年7月新番", "2026年10月新番"])
+        self.assertIn("2028年10月新番", labels)
+        self.assertIn("2025年台版動畫電影", labels)

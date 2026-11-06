@@ -144,6 +144,10 @@
     }
     $('d-current').textContent = label[view] || '全部劇集';
     navBody.innerHTML = '';
+    if (view === 'explore') {
+      const s = nav.last_sync;
+      navBody.append(el('p', 'd-sync', s ? `🔄 劇庫每天 16:00 自動更新・上次 ${s.at}（新增 ${s.created} 部）` : '🔄 劇庫每天 16:00 自動更新'));
+    }
     navBody.append(el('div', 'chips wrap', null));
     navBody.lastChild.append(chip(`🌐 全部劇集`, '', nav.total));
 

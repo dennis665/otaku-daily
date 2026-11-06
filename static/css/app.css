@@ -364,3 +364,4 @@ body.sheet-open { overflow: hidden; }
 .d-year .chips { padding: 0 10px 8px; }
 /* 有分頁的清單不再需要自己的捲動區 */
 #m-list, #v-list { max-height: none; }
+.d-sync { margin: 0; color: var(--muted); font-size: .76rem; }

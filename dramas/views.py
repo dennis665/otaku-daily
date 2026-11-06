@@ -1,4 +1,7 @@
 """追劇小幫手 API"""
+import hashlib
+import hmac
+import json
 import time
 from datetime import date, timedelta
 
@@ -6,11 +9,14 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import Airing, Follow, Work, normalize
+from .models import Airing, Follow, SyncLog, Work, normalize
+from .sync import upsert_works
 
 User = get_user_model()
 PAGE_SIZE = 20
@@ -168,6 +174,11 @@ def filters(request):
         return JsonResponse(_build_nav(_nav_rows(ids), len(ids)), json_dumps_params={"ensure_ascii": False})
     if _filter_cache["data"] is None or time.time() - _filter_cache["at"] > 600:
         _filter_cache["data"] = _build_nav(_nav_rows(), Work.objects.count())
+        log = SyncLog.objects.first()
+        _filter_cache["data"]["last_sync"] = {
+            "at": f"{timezone.localtime(log.created_at):%m/%d %H:%M}",
+            "created": log.stats.get("created", 0),
+        } if log else None
         _filter_cache["at"] = time.time()
     return JsonResponse(_filter_cache["data"], json_dumps_params={"ensure_ascii": False})
 
@@ -181,3 +192,28 @@ def follow(request, pk):
     if not created:
         obj.delete()
     return JsonResponse({"ok": True, "followed": created})
+
+
+# ---------- 每日抓新番：GitHub 排程把抓到的清單送到這裡（.github/workflows/drama-sync.yml） ----------
+# 程式裡只放密碼的指紋；密碼本身設定在 GitHub 的 Secrets（DRAMA_SYNC_TOKEN）
+SYNC_TOKEN_SHA256 = "0aa648ee0836cc021f5bd9553b572a8a7b62dfc061d50a1a8ec4e9119d126237"
+
+
+@csrf_exempt
+@require_POST
+def sync(request):
+    token = request.headers.get("X-Sync-Token", "")
+    if not hmac.compare_digest(hashlib.sha256(token.encode()).hexdigest(), SYNC_TOKEN_SHA256):
+        raise Http404
+    try:
+        data = json.loads(request.body)
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "資料格式錯誤"}, status=400)
+    works = [w for w in data.get("works", []) if isinstance(w, dict) and w.get("source_id") and w.get("title")]
+    stats = upsert_works(works, mode="crawl")
+    missing = len(stats.pop("need_images"))
+    summary = {**stats, "received": len(works), "missing_cover": missing,
+               "pages": data.get("pages"), "errors": (data.get("errors") or [])[:20]}
+    SyncLog.objects.create(stats=summary)
+    _dup_cache["at"] = _filter_cache["at"] = 0   # 分類與同名判斷重新計算
+    return JsonResponse({"ok": True, **summary}, json_dumps_params={"ensure_ascii": False})

@@ -95,6 +95,11 @@ def upsert_works(items, mode="crawl"):
                 if title != w.title and title not in w.alt_titles and not w.title.endswith(title):
                     w.alt_titles = [*w.alt_titles, title]
                     changed = True
+                # 來源網站提供的其他名稱（日文、簡中、英文）加進別名，搜尋時也找得到
+                extra = [a for a in (item.get("alt_titles") or []) if a and a != w.title and a not in w.alt_titles][:10]
+                if extra:
+                    w.alt_titles = [*w.alt_titles, *extra]
+                    changed = True
                 if created:
                     default = item.get("media_type") or "TV"
                     w.media_type = media_from_title(title, default)

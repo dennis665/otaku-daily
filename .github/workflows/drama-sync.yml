@@ -1,0 +1,27 @@
+# 每日抓新番：從 youranimes 抓季番與動畫電影清單，更新 Ukiyo 劇庫（正式站與測試站）
+# 台灣時間每天 16:00 執行（GitHub 排程用 UTC：台灣 16:00 = UTC 08:00），尖峰時段可能延遲幾分鐘
+# 也可以在 GitHub 的 Actions 頁面手動執行
+# 需要在 GitHub 專案的 Settings → Secrets and variables → Actions 設定 DRAMA_SYNC_TOKEN
+name: 每日抓新番
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: 抓取並更新劇庫
+        env:
+          DRAMA_SYNC_TOKEN: ${{ secrets.DRAMA_SYNC_TOKEN }}
+        run: >
+          python tools/crawl_youranimes.py
+          --target https://otaku-daily.onrender.com
+          --target https://otaku-daily-staging.onrender.com

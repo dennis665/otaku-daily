@@ -116,6 +116,16 @@ class Recommendation(models.Model):
         constraints = [models.UniqueConstraint(fields=["from_user", "to_user", "work"], name="unique_recommendation")]
 
 
+class SyncLog(models.Model):
+    """每日抓新番的結果紀錄（新增幾部、更新幾部、哪些頁面失敗）"""
+    created_at = models.DateTimeField(auto_now_add=True)
+    stats = models.JSONField(default=dict)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "劇庫更新紀錄"
+        ordering = ["-created_at"]
+
+
 # ---------- 名稱處理（搬家、每日抓取、搜尋共用） ----------
 _PUNCT = re.compile(r"[\s\-_:：!！?？・·.,，、~～()（）\[\]【】「」『』〈〉《》\"'’/／]+")
 
