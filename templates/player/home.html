@@ -5,6 +5,7 @@
 <header class="topbar">
   <div class="brand-sm">{% include "partials/avatar_rotator.html" %}{% include "partials/wordmark.html" %}</div>
   <div class="user">
+    <button class="icon sm bell" id="s-open" type="button" title="個人設定" aria-label="個人設定">⚙️</button>
     <button class="icon sm bell" id="n-open" type="button" title="通知設定" aria-label="通知設定">🔔</button>
     <span>{{ user.username }}</span>
     <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn ghost sm" type="submit">登出</button></form>
@@ -13,10 +14,11 @@
 
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="music" role="tab"><i>🎵</i><span>音樂 <b>{{ audio_count }}</b></span></button>
-  <button class="tab" data-tab="video" role="tab"><i>🎬</i><span>影片 <b>{{ video_count }}</b></span></button>
-  <button class="tab" data-tab="events" role="tab"><i>🎪</i><span>活動 <b id="e-count">…</b></span></button>
-  <button class="tab" data-tab="plan" role="tab"><i>📅</i><span>行程 <b id="p-count">…</b></span></button>
-  <button class="tab" data-tab="drama" role="tab"><i>📺</i><span>追劇 <b id="d-count">…</b></span></button>
+  {# 使用者在 ⚙️ 個人設定關掉的分頁不顯示（hidden_tabs） #}
+  <button class="tab" data-tab="video" role="tab"{% if "video" in hidden_tabs %} hidden{% endif %}><i>🎬</i><span>影片 <b>{{ video_count }}</b></span></button>
+  <button class="tab" data-tab="events" role="tab"{% if "events" in hidden_tabs %} hidden{% endif %}><i>🎪</i><span>活動 <b id="e-count">…</b></span></button>
+  <button class="tab" data-tab="plan" role="tab"{% if "plan" in hidden_tabs %} hidden{% endif %}><i>📅</i><span>行程 <b id="p-count">…</b></span></button>
+  <button class="tab" data-tab="drama" role="tab"{% if "drama" in hidden_tabs %} hidden{% endif %}><i>📺</i><span>追劇 <b id="d-count">…</b></span></button>
 </nav>
 
 {% if not playlist %}
@@ -58,6 +60,16 @@
     <input type="range" id="m-vol" min="0" max="100" value="100" aria-label="音量">
   </div>
   <p class="loop-text" id="m-loop-text">全部循環</p>
+  {# 歌單：全部歌曲＋自己建立的歌單，播放順序跟著目前選的歌單走 #}
+  <div class="m-lists">
+    <div class="chips" id="m-lists" role="group" aria-label="歌單"></div>
+    <button class="chip add" id="m-list-new" type="button">＋ 新歌單</button>
+  </div>
+  <div class="m-list-bar" id="m-list-bar" hidden>
+    <span id="m-list-info"></span>
+    <button class="act" id="m-list-edit" type="button">✏️ 改名／刪除</button>
+  </div>
+  <p class="empty sm" id="m-list-empty" hidden>這個歌單還沒有歌。到「全部歌曲」在歌名右邊按 ＋ 就能加進來。</p>
   <div id="m-list-pager-top"></div>
   <ol class="list" id="m-list"></ol>
   <div id="m-list-pager-bottom"></div>
@@ -201,6 +213,47 @@
       <button class="btn primary sm" type="submit">建立</button>
     </form>
   </div>
+</div>
+
+{# 個人設定 #}
+<div class="sheet-backdrop" id="s-sheet" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><h3>⚙️ 個人設定</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <p class="sheet-sub">要顯示哪些分頁？關掉的分頁不會出現，用不到的功能可以先收起來（隨時可以再打開，資料都會保留）。</p>
+    <div class="tab-toggles" id="s-tabs">
+      <label class="toggle-row is-fixed"><span>🎵 音樂</span><small>首頁，固定顯示</small><input type="checkbox" checked disabled></label>
+      <label class="toggle-row"><span>🎬 影片</span><input type="checkbox" data-tab="video"></label>
+      <label class="toggle-row"><span>🎪 活動</span><input type="checkbox" data-tab="events"></label>
+      <label class="toggle-row"><span>📅 行程</span><input type="checkbox" data-tab="plan"></label>
+      <label class="toggle-row"><span>📺 追劇</span><input type="checkbox" data-tab="drama"></label>
+    </div>
+    <p class="alert" id="s-error" hidden></p>
+  </div>
+</div>
+
+{# 加入歌單：勾選＝在歌單裡，取消勾選＝移出 #}
+<div class="sheet-backdrop" id="m-add" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><h3>🎶 加入歌單</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <p class="sheet-sub" id="m-add-song"></p>
+    <div class="tab-toggles" id="m-add-lists"></div>
+    <form class="field with-btn" id="m-add-form" novalidate>
+      <input id="m-add-name" maxlength="40" placeholder="建立新歌單並加入這首" aria-label="新歌單名稱">
+      <button class="btn primary sm" type="submit">建立</button>
+    </form>
+    <p class="alert" id="m-add-error" hidden></p>
+  </div>
+</div>
+
+{# 新增 / 改名 / 刪除歌單 #}
+<div class="sheet-backdrop" id="m-edit" hidden>
+  <form class="sheet small" id="m-edit-form" novalidate>
+    <div class="sheet-head"><h3 id="m-edit-title">新歌單</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <label class="field"><span>歌單名稱</span><input id="m-edit-name" maxlength="40" required placeholder="例如：通勤必聽、熱血戰鬥曲"></label>
+    <p class="alert" id="m-edit-error" hidden></p>
+    <button class="btn ghost danger-text" id="m-edit-delete" type="button" hidden>🗑 刪除這個歌單</button>
+    <div class="sheet-foot"><button class="btn ghost" type="button" data-close>取消</button><button class="btn primary" type="submit">儲存</button></div>
+  </form>
 </div>
 
 {# 通知設定 #}

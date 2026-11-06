@@ -47,11 +47,12 @@
   // 清單分頁：只畫出目前這一頁（清單資料很小，主要是讓畫面不用一次畫出上百列）
   // lists[listEl.id] = { items, onPick, pager, active }
   const lists = {};
-  function renderList(listEl, items, onPick) {
+  function renderList(listEl, items, onPick, decorate) {
     const key = listEl.id;
     const state = lists[key] || (lists[key] = { items, onPick, active: -1 });
     state.items = items;
     state.onPick = onPick;
+    state.decorate = decorate;
     if (!state.pager) {
       state.pager = window.Pager.create({
         key, top: $(`${key}-pager-top`), bottom: $(`${key}-pager-bottom`),
@@ -74,6 +75,7 @@
       li.querySelector('.no').textContent = i + 1;
       li.querySelector('.name').textContent = item.title;
       li.addEventListener('click', () => state.onPick(i));
+      if (state.decorate) state.decorate(li, item, i);
       listEl.appendChild(li);
     });
   }
@@ -196,13 +198,16 @@
 
   // ---------- 音樂 ----------
   const mList = $('m-list');
-  let mIndex = -1;
+  let mIndex = -1;          // 目前歌曲在 queue 裡的位置
+  let queue = songs;        // 目前選的歌單（全部歌曲或自訂歌單），上一首／下一首照這個順序
+  let curSong = null;
   const mLoop = setupLoop($('m-loop'), $('m-loop-text'), 'musicLoop');
 
   function loadSong(i, autoplay = true) {
-    if (!songs.length) return;
+    if (!queue.length) return;
     mIndex = i;
-    const s = songs[i];
+    const s = queue[i];
+    curSong = s;
     if (autoplay) trackMediaLoading(audio);
     audio.src = s.audio;
     $('m-title').textContent = s.title;
@@ -211,15 +216,15 @@
     $('m-seek').value = 0;
     $('m-cur').textContent = '0:00';
     markActive(mList, i);
-    store.set('musicIndex', i);
+    store.set('musicId', s.id);
     updateMediaSession(s);
     if (autoplay) audio.play().catch(() => {});
   }
   const playSong = () => (mIndex < 0 ? loadSong(0) : audio.play().catch(() => {}));
   $('m-play').addEventListener('click', () => (audio.paused ? playSong() : audio.pause()));
-  $('m-prev').addEventListener('click', () => loadSong(nextIndex(mLoop(), Math.max(mIndex, 0), songs.length, -1)));
-  $('m-next').addEventListener('click', () => loadSong(nextIndex(mLoop(), mIndex, songs.length, 1)));
-  audio.addEventListener('ended', () => (mLoop() === 'ONE' ? audio.play() : loadSong(nextIndex(mLoop(), mIndex, songs.length, 1))));
+  $('m-prev').addEventListener('click', () => loadSong(nextIndex(mLoop(), Math.max(mIndex, 0), queue.length, -1)));
+  $('m-next').addEventListener('click', () => loadSong(nextIndex(mLoop(), mIndex, queue.length, 1)));
+  audio.addEventListener('ended', () => (mLoop() === 'ONE' ? audio.play() : loadSong(nextIndex(mLoop(), mIndex, queue.length, 1))));
 
   const setPlaying = (on) => {
     $('m-play').textContent = on ? '⏸' : '▶';
@@ -260,8 +265,238 @@
     if (Number(vol.value) > 0) { lastVol = Number(vol.value); applyVol(0); } else applyVol(lastVol || 100);
   });
 
-  renderList(mList, songs, (i) => loadSong(i));
-  setupFinder('m', songs, (i) => loadSong(i), () => mIndex, '首');
+  // 搜尋找的是全部歌曲；不在目前歌單裡的歌，先切回「全部歌曲」再播放
+  setupFinder('m', songs, (i) => {
+    let at = queue.indexOf(songs[i]);
+    if (at < 0) { selectList('all'); at = i; }
+    loadSong(at);
+  }, () => (curSong ? songs.indexOf(curSong) : -1), '首');
+
+  // ---------- 自訂歌單（存在伺服器，換手機也看得到） ----------
+  const csrf = () => (document.querySelector('input[name=csrfmiddlewaretoken]') || {}).value || '';
+  async function api(url, body) {
+    const opts = { credentials: 'same-origin' };
+    if (body !== undefined) {
+      opts.method = 'POST';
+      opts.headers = { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() };
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(url, opts);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.ok === false) throw new Error(json.error || '操作失敗，請稍後再試');
+    return json;
+  }
+  const openSheet = (id) => { $(id).hidden = false; document.body.classList.add('sheet-open'); };
+  const closeSheet = (id) => {
+    $(id).hidden = true;
+    if (!document.querySelector('.sheet-backdrop:not([hidden])')) document.body.classList.remove('sheet-open');
+  };
+  ['s-sheet', 'm-add', 'm-edit'].forEach((id) => {
+    $(id).addEventListener('click', (e) => { if (e.target.id === id || e.target.closest('[data-close]')) closeSheet(id); });
+  });
+  const showError = (id, msg) => { const el = $(id); el.textContent = msg || ''; el.hidden = !msg; };
+
+  const songById = new Map(songs.map((s) => [s.id, s]));
+  let myLists = [];
+  let listId = store.get('musicList', 'all');
+  const currentList = () => myLists.find((p) => p.id === listId) || null;
+
+  function paintLists() {
+    const cur = currentList();
+    const box = $('m-lists');
+    box.innerHTML = '';
+    const chip = (id, label, n) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.classList.toggle('active', cur ? cur.id === id : id === 'all');
+      b.textContent = `${label} `;
+      const count = document.createElement('b');
+      count.textContent = n;
+      b.append(count);
+      b.addEventListener('click', () => selectList(id));
+      box.appendChild(b);
+    };
+    chip('all', '🎵 全部歌曲', songs.length);
+    myLists.forEach((p) => chip(p.id, p.name, p.songs.filter((id) => songById.has(id)).length));
+    $('m-list-bar').hidden = !cur;
+    $('m-list-empty').hidden = !cur || queue.length > 0;
+    if (cur) $('m-list-info').textContent = `「${cur.name}」共 ${queue.length} 首・依加入順序播放`;
+  }
+
+  // 每一列右邊的按鈕：全部歌曲＝＋ 加入歌單（已在某個歌單裡顯示 ✓）；自訂歌單＝✕ 移出這個歌單
+  function decorateSong(li, song) {
+    const cur = currentList();
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'li-act';
+    if (cur) {
+      btn.classList.add('rm');
+      btn.textContent = '✕';
+      btn.title = `從「${cur.name}」移除`;
+      btn.addEventListener('click', (e) => { e.stopPropagation(); toggleSong(cur, song, false).catch((err) => alert(err.message)); });
+    } else {
+      const inAny = myLists.some((p) => p.songs.includes(song.id));
+      btn.classList.toggle('on', inAny);
+      btn.textContent = inAny ? '✓' : '＋';
+      btn.title = '加入歌單';
+      btn.addEventListener('click', (e) => { e.stopPropagation(); openAdd(song); });
+    }
+    btn.setAttribute('aria-label', btn.title);
+    li.appendChild(btn);
+  }
+
+  // 重新整理目前的播放清單；resetPage＝切換歌單時回到第一頁（或正在播的那一頁）
+  function refreshQueue(resetPage) {
+    const cur = currentList();
+    queue = cur ? cur.songs.map((id) => songById.get(id)).filter(Boolean) : songs;
+    mIndex = curSong ? queue.indexOf(curSong) : -1;
+    const state = lists[mList.id];
+    if (state) {
+      state.active = mIndex;
+      if (resetPage) state.pager.reset();
+    }
+    renderList(mList, queue, (i) => loadSong(i), decorateSong);
+    // 翻到正在播的那一頁（不捲動畫面）
+    if (resetPage && mIndex >= 0) lists[mList.id].pager.showIndex(mIndex, queue.length);
+    paintLists();
+  }
+  function selectList(id) {
+    listId = id;
+    store.set('musicList', id);
+    refreshQueue(true);
+  }
+  function replaceList(p) {
+    const i = myLists.findIndex((x) => x.id === p.id);
+    if (i >= 0) myLists[i] = p; else myLists.push(p);
+  }
+  async function toggleSong(p, song, on) {
+    const res = await api(`/api/playlists/${p.id}/`, on ? { add: song.id } : { remove: song.id });
+    replaceList(res.playlist);
+    refreshQueue(false);
+    return res.playlist;
+  }
+
+  // 加入歌單視窗：每個歌單一個開關，打開＝加入、關掉＝移出
+  let addSong = null;
+  function paintAdd() {
+    const box = $('m-add-lists');
+    box.innerHTML = '';
+    box.hidden = !myLists.length;
+    $('m-add-name').placeholder = myLists.length ? '或建立新歌單並加入這首' : '還沒有歌單，輸入名稱建立一個';
+    myLists.forEach((p) => {
+      const row = document.createElement('label');
+      row.className = 'toggle-row';
+      const name = document.createElement('span');
+      name.textContent = p.name;
+      const n = document.createElement('em');
+      n.textContent = `${p.songs.length} 首`;
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = p.songs.includes(addSong.id);
+      cb.addEventListener('change', async () => {
+        cb.disabled = true;
+        showError('m-add-error', '');
+        try {
+          const np = await toggleSong(myLists.find((x) => x.id === p.id), addSong, cb.checked);
+          n.textContent = `${np.songs.length} 首`;
+        } catch (err) {
+          cb.checked = !cb.checked;
+          showError('m-add-error', err.message);
+        }
+        cb.disabled = false;
+      });
+      row.append(name, n, cb);
+      box.appendChild(row);
+    });
+  }
+  function openAdd(song) {
+    addSong = song;
+    $('m-add-song').textContent = `🎵 ${song.title}`;
+    $('m-add-name').value = '';
+    showError('m-add-error', '');
+    paintAdd();
+    openSheet('m-add');
+  }
+  $('m-add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('m-add-name').value.trim();
+    if (!name) { showError('m-add-error', '請輸入歌單名稱'); return; }
+    try {
+      const res = await api('/api/playlists/', { name, songs: [addSong.id] });
+      replaceList(res.playlist);
+      $('m-add-name').value = '';
+      showError('m-add-error', '');
+      paintAdd();
+      refreshQueue(false);
+    } catch (err) { showError('m-add-error', err.message); }
+  });
+
+  // 新增 / 改名 / 刪除歌單
+  let editing = null;
+  function openEdit(p) {
+    editing = p;
+    $('m-edit-title').textContent = p ? '✏️ 編輯歌單' : '＋ 新歌單';
+    $('m-edit-name').value = p ? p.name : '';
+    $('m-edit-delete').hidden = !p;
+    showError('m-edit-error', '');
+    openSheet('m-edit');
+  }
+  $('m-list-new').addEventListener('click', () => openEdit(null));
+  $('m-list-edit').addEventListener('click', () => openEdit(currentList()));
+  $('m-edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('m-edit-name').value.trim();
+    if (!name) { showError('m-edit-error', '請輸入歌單名稱'); return; }
+    try {
+      const res = editing ? await api(`/api/playlists/${editing.id}/`, { name }) : await api('/api/playlists/', { name });
+      replaceList(res.playlist);
+      closeSheet('m-edit');
+      if (editing) refreshQueue(false); else selectList(res.playlist.id);
+    } catch (err) { showError('m-edit-error', err.message); }
+  });
+  $('m-edit-delete').addEventListener('click', async () => {
+    if (!editing || !window.confirm(`確定刪除歌單「${editing.name}」？（歌曲本身不會被刪除）`)) return;
+    try {
+      await api(`/api/playlists/${editing.id}/delete/`, {});
+      myLists = myLists.filter((p) => p.id !== editing.id);
+      closeSheet('m-edit');
+      selectList('all');
+    } catch (err) { showError('m-edit-error', err.message); }
+  });
+
+  refreshQueue(false);
+  // 背景讀取歌單（不顯示載入遮罩）
+  fetch('/api/playlists/', { credentials: 'same-origin', loading: false })
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((res) => { myLists = res.playlists || []; refreshQueue(true); })
+    .catch(() => paintLists());
+
+  // ---------- 個人設定：要顯示哪些分頁 ----------
+  const tabBtnOf = (name) => document.querySelector(`.tab[data-tab="${name}"]`);
+  const toggles = [...document.querySelectorAll('#s-tabs input[data-tab]')];
+  $('s-open').addEventListener('click', () => {
+    toggles.forEach((cb) => { cb.checked = !tabBtnOf(cb.dataset.tab).hidden; });
+    showError('s-error', '');
+    openSheet('s-sheet');
+  });
+  toggles.forEach((cb) => cb.addEventListener('change', async () => {
+    const hidden = toggles.filter((x) => !x.checked).map((x) => x.dataset.tab);
+    toggles.forEach((x) => { x.disabled = true; });
+    try {
+      await api('/api/prefs/', { hidden_tabs: hidden });
+      toggles.forEach((x) => {
+        const btn = tabBtnOf(x.dataset.tab);
+        btn.hidden = !x.checked;
+        if (btn.hidden && btn.classList.contains('active')) tabBtnOf('music').click();
+      });
+      showError('s-error', '');
+    } catch (err) {
+      cb.checked = !cb.checked;
+      showError('s-error', err.message);
+    }
+    toggles.forEach((x) => { x.disabled = false; });
+  }));
 
   // ---------- 影片 ----------
   const vList = $('v-list');
@@ -303,17 +538,18 @@
 
   // ---------- 還原上次的狀態 (不自動播放，瀏覽器也不允許) ----------
   applyVol(store.get('volume', 100));
-  const lastSong = store.get('musicIndex', -1);
-  if (lastSong >= 0 && lastSong < songs.length) loadSong(lastSong, false);
+  const lastSong = songById.get(store.get('musicId', '')) || songs[store.get('musicIndex', -1)];
+  if (lastSong && queue.includes(lastSong)) loadSong(queue.indexOf(lastSong), false);
   const lastVideo = store.get('videoIndex', -1);
-  if (lastVideo >= 0 && lastVideo < videos.length) loadVideo(lastVideo, false);
+  const videoOn = !tabBtnOf('video').hidden;   // 影片分頁關掉時不預先載入影片
+  if (videoOn && lastVideo >= 0 && lastVideo < videos.length) loadVideo(lastVideo, false);
   // 指定分頁：網址 ?tab=plan（例如從邀請頁回來）優先，否則還原上次的分頁
   const params = new URLSearchParams(location.search);
   window.appLaunchParams = params;   // 給行程頁讀取 ?invite= 等參數（網址列稍後會清掉）
   const wantTab = params.get('tab') || store.get('tab', 'music');
   if (params.has('tab')) history.replaceState(null, '', location.pathname);
   const tabBtn = document.querySelector(`.tab[data-tab="${wantTab}"]`);
-  if (tabBtn && wantTab !== 'music') tabBtn.click();
+  if (tabBtn && !tabBtn.hidden && wantTab !== 'music') tabBtn.click();
 
   // 點通知時 App 已經開著：切到指定分頁，並交給該分頁處理其他參數（例如群組邀請）
   window.handleAppLink = (url) => {
