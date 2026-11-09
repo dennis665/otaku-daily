@@ -35,6 +35,13 @@
   body.is-maint .wake { display: none; }
   body.is-maint .maint { display: block; }
   body.is-maint .retry { display: inline-block; }
+  .retry { transition: transform .1s, background .2s; -webkit-tap-highlight-color: transparent; }
+  .retry:active { transform: scale(.94); background: rgba(255, 255, 255, .25); }
+  .retry:disabled { opacity: .75; cursor: default; }
+  .retry .spin { display: inline-block; }
+  .retry.busy .spin { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .result { margin: 8px 0 0; font-size: .8rem; color: #ffd38a; min-height: 1.2em; }
   body.is-maint .bar i { animation-duration: 3.2s; background: linear-gradient(90deg, #ffb35e, #ff6fae); }
   .retry { margin-top: 12px; padding: 9px 22px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .1); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 </style>
@@ -50,7 +57,8 @@
   <p class="title maint"><b>Ukiyo</b> 🛠 伺服器維護中</p>
   <p class="sub maint">主機暫時無法啟動，請稍後再回來看看。<br>這個畫面會持續幫你檢查，恢復後自動進入。</p>
   <div class="bar"><i></i></div>
-  <button class="retry maint" id="retry" type="button">🔄 重新檢查</button>
+  <button class="retry maint" id="retry" type="button"><span class="spin">🔄</span> <span id="retry-text">重新檢查</span></button>
+  <p class="result maint" id="result" aria-live="polite"></p>
   <p class="dl" id="dl"></p>
 </div>
 <script>
@@ -119,23 +127,43 @@
     if (s === 90) document.getElementById('hint').textContent = '比平常久，可能是網路不穩，再等一下';
     if (s >= MAINT_AFTER && !maint) showMaint();
   }, 1000);
-  if (preview) return;   // 預覽模式不自動跳轉
-
-  // 問主機醒了沒（喚醒中每 2 秒、維護中每 15 秒），醒了就重新載入原本要開的頁面
+  // 問主機醒了沒；醒了就重新載入原本要開的頁面（預覽模式只回報結果、不跳轉）
+  const awake = async () => {
+    try {
+      const r = await fetch('/version.json', { cache: 'no-store' });
+      return r.ok && (r.headers.get('content-type') || '').includes('json');
+    } catch { return false; }   // 還沒醒或沒網路
+  };
+  // 自動檢查：喚醒中每 2 秒、維護中每 15 秒
   let timer = null;
   async function poll() {
     clearTimeout(timer);
-    try {
-      const r = await fetch('/version.json', { cache: 'no-store' });
-      if (r.ok && (r.headers.get('content-type') || '').includes('json')) { location.reload(); return; }
-    } catch { /* 還沒醒或沒網路 */ }
+    if (await awake()) { location.reload(); return; }
     timer = setTimeout(poll, maint ? 15000 : 2000);
   }
-  timer = setTimeout(poll, 1500);
-  document.getElementById('retry').addEventListener('click', (e) => {
+  if (!preview) timer = setTimeout(poll, 1500);
+
+  // 「重新檢查」：按下去轉圈、至少顯示 1 秒，再告訴使用者結果
+  const retry = document.getElementById('retry');
+  const retryText = document.getElementById('retry-text');
+  const result = document.getElementById('result');
+  retry.addEventListener('click', async (e) => {
     e.stopPropagation();
-    say('🔄 檢查中…', true);
-    poll();
+    if (retry.disabled) return;
+    retry.disabled = true;
+    retry.classList.add('busy');
+    retryText.textContent = '檢查中…';
+    result.textContent = '';
+    clearTimeout(timer);
+    const [ok] = await Promise.all([awake(), new Promise((r) => setTimeout(r, 1000))]);
+    retry.classList.remove('busy');
+    retry.disabled = false;
+    retryText.textContent = '重新檢查';
+    const t = new Date();
+    const hm = `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`;
+    if (ok && !preview) { result.textContent = '✅ 主機恢復了，正在進入…'; location.reload(); return; }
+    result.textContent = ok ? `✅ 主機正常（預覽模式不會跳轉）・${hm}` : `😢 還沒恢復（${hm} 檢查），之後每 15 秒會自動再檢查`;
+    if (!preview) timer = setTimeout(poll, 15000);
   });
 })();
 </script>
