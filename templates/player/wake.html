@@ -30,6 +30,13 @@
   .preview span { font-size: .8rem; font-weight: 700; color: #1a1300; background: #ffd34d; border-radius: 99px; padding: 6px 12px; }
   .preview a { color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .3); border-radius: 99px; padding: 6px 14px; text-decoration: none; font-size: .85rem; }
   body.is-preview .preview { display: flex; }
+  /* 超過 3 分鐘還沒醒：切換成「伺服器維護中」 */
+  .maint { display: none; }
+  body.is-maint .wake { display: none; }
+  body.is-maint .maint { display: block; }
+  body.is-maint .retry { display: inline-block; }
+  body.is-maint .bar i { animation-duration: 3.2s; background: linear-gradient(90deg, #ffb35e, #ff6fae); }
+  .retry { margin-top: 12px; padding: 9px 22px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .1); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -38,9 +45,12 @@
 <div class="tap">👆 點一下畫面播放</div>
 <div class="preview"><span>🎬 預覽模式（主機其實已醒著）</span><a href="/">✕ 返回</a></div>
 <div class="panel" role="status" aria-live="polite">
-  <p class="title"><b>Ukiyo</b> 主機喚醒中… <span id="sec">0</span> 秒</p>
-  <p class="sub" id="hint">免費主機休息後要 30～60 秒才會醒來，醒了會自動進入</p>
+  <p class="title wake"><b>Ukiyo</b> 主機喚醒中… <span id="sec">0</span> 秒</p>
+  <p class="sub wake" id="hint">免費主機休息後要 30～60 秒才會醒來，醒了會自動進入</p>
+  <p class="title maint"><b>Ukiyo</b> 🛠 伺服器維護中</p>
+  <p class="sub maint">主機暫時無法啟動，請稍後再回來看看。<br>這個畫面會持續幫你檢查，恢復後自動進入。</p>
   <div class="bar"><i></i></div>
+  <button class="retry maint" id="retry" type="button">🔄 重新檢查</button>
   <p class="dl" id="dl"></p>
 </div>
 <script>
@@ -94,25 +104,39 @@
     if (cached) { done = true; say('🎬 影片已存在手機', true); } else say('🎬 影片下載中 0%（邊下載邊播放）');
   })();
 
+  // 超過 3 分鐘還沒醒（正常 30～60 秒）＝主機商那邊出狀況，改顯示「伺服器維護中」，檢查頻率放慢
+  const MAINT_AFTER = 180;
   const start = Date.now();
   const secEl = document.getElementById('sec');
+  const params = new URLSearchParams(location.search);
+  let maint = params.get('preview') === 'maint';   // 預覽維護畫面：/wake/?preview=maint
+  const showMaint = () => { maint = true; document.body.classList.add('is-maint'); document.title = 'Ukiyo 伺服器維護中'; };
+  if (maint) showMaint();
   setInterval(() => {
     const s = Math.floor((Date.now() - start) / 1000);
     secEl.textContent = s;
     if (s === 45) document.getElementById('hint').textContent = '快好了，再等一下下…';
-    if (s === 90) document.getElementById('hint').textContent = '比平常久，可能是網路不穩，也可以稍後再開';
+    if (s === 90) document.getElementById('hint').textContent = '比平常久，可能是網路不穩，再等一下';
+    if (s >= MAINT_AFTER && !maint) showMaint();
   }, 1000);
   if (preview) return;   // 預覽模式不自動跳轉
 
-  // 每 2 秒問一次主機醒了沒，醒了就重新載入原本要開的頁面
+  // 問主機醒了沒（喚醒中每 2 秒、維護中每 15 秒），醒了就重新載入原本要開的頁面
+  let timer = null;
   async function poll() {
+    clearTimeout(timer);
     try {
       const r = await fetch('/version.json', { cache: 'no-store' });
       if (r.ok && (r.headers.get('content-type') || '').includes('json')) { location.reload(); return; }
     } catch { /* 還沒醒或沒網路 */ }
-    setTimeout(poll, 2000);
+    timer = setTimeout(poll, maint ? 15000 : 2000);
   }
-  setTimeout(poll, 1500);
+  timer = setTimeout(poll, 1500);
+  document.getElementById('retry').addEventListener('click', (e) => {
+    e.stopPropagation();
+    say('🔄 檢查中…', true);
+    poll();
+  });
 })();
 </script>
 </body>
