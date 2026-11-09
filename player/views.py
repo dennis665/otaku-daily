@@ -129,7 +129,7 @@ def playlist_delete(request, pk):
 
 @login_required
 def events_api(request):
-    """北部動漫活動（資料來自 Google 試算表，每天 08:30 後更新一次）"""
+    """北部動漫活動（資料來自 Google 試算表，每天 08:30、13:00、20:00 後各更新一次）"""
     events, fresh = get_events()
     checked = max((e["checked"] for e in events if e["checked"]), default="")
     return JsonResponse({"events": events, "updated": checked, "fresh": fresh}, json_dumps_params={"ensure_ascii": False})

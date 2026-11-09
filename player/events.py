@@ -3,8 +3,8 @@
 試算表由雲端排程每天更新，這裡只負責讀取與整理。
 
 - 試算表設為「知道連結的人可檢視」，用 CSV 匯出網址讀取，不需要 Google 金鑰
-- 試算表的雲端排程在台灣時間每天 08:00 左右執行（約 2 分鐘跑完），所以網站一天只更新一次：
-  每天 08:30 之後第一次有人看活動時重新讀取，其他時間都用快取
+- 試算表的雲端排程在台灣時間每天 08:00（完整更新）、12:30、19:30（動漫快訊）執行，
+  網站在 08:30、13:00、20:00 之後第一次有人看活動時重新讀取，其他時間都用快取
 - 讀取失敗時沿用舊快取（5 分鐘後再重試），再不行就用專案內的備份
   (player/data/events_snapshot.json，執行 `python manage.py update_events_snapshot` 更新)
 """
@@ -26,7 +26,7 @@ SHEET_GID = "1"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
 SNAPSHOT_PATH = Path(__file__).resolve().parent / "data" / "events_snapshot.json"
 TAIPEI = ZoneInfo("Asia/Taipei")
-DAILY_REFRESH = (8, 30)   # 台灣時間 08:30：排程 08:00 執行完後再讀
+REFRESH_POINTS = ((8, 30), (13, 0), (20, 0))   # 台灣時間：排程 08:00／12:30／19:30 執行完後再讀
 RETRY_SECONDS = 300
 
 # 試算表欄位名稱 → 程式用的欄位
@@ -83,12 +83,11 @@ def load_snapshot():
 
 
 def last_refresh_point(now=None):
-    """最近一次的每日更新時間點（台灣時間 08:30），回傳 Unix 時間"""
+    """最近一次的更新時間點（台灣時間 08:30／13:00／20:00），回傳 Unix 時間"""
     now = now or datetime.now(TAIPEI)
-    point = now.replace(hour=DAILY_REFRESH[0], minute=DAILY_REFRESH[1], second=0, microsecond=0)
-    if now < point:
-        point -= timedelta(days=1)
-    return point.timestamp()
+    points = [now.replace(hour=h, minute=m, second=0, microsecond=0) for h, m in REFRESH_POINTS]
+    past = [p for p in points if p <= now]
+    return (max(past) if past else max(points) - timedelta(days=1)).timestamp()
 
 
 def get_events():
