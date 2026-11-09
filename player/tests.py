@@ -47,3 +47,20 @@ class PrefsAndPlaylistTests(TestCase):
         self.assertEqual(self.post(f"/api/playlists/{p.id}/", {"add": "x"}).status_code, 404)
         self.assertEqual(self.post(f"/api/playlists/{p.id}/delete/", {}).status_code, 404)
         self.assertEqual(self.client.get("/api/playlists/").json()["playlists"], [])
+
+
+class EventsRefreshTests(TestCase):
+    def test_force_refresh_rereads_sheet_but_not_too_often(self):
+        from unittest import mock
+
+        from player import events as ev
+        ev._cache.update(data=None, timestamp=0.0, retry_at=0.0)
+        with mock.patch.object(ev, "fetch_csv", return_value="") as fetch, \
+                mock.patch.object(ev, "parse_events", side_effect=[[{"n": 1}], [{"n": 2}], [{"n": 3}]]):
+            self.assertEqual(ev.get_events()[0], [{"n": 1}])
+            self.assertEqual(ev.get_events()[0], [{"n": 1}])            # 一般讀取用快取
+            self.assertEqual(ev.get_events(force=True)[0], [{"n": 1}])  # 剛讀過不到 60 秒，不重讀
+            ev._cache["timestamp"] -= 61
+            self.assertEqual(ev.get_events(force=True)[0], [{"n": 2}])  # 超過 60 秒，手動重新整理會重讀
+            self.assertEqual(fetch.call_count, 2)
+            self.assertTrue(ev.fetched_at())

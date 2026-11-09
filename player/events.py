@@ -28,6 +28,7 @@ SNAPSHOT_PATH = Path(__file__).resolve().parent / "data" / "events_snapshot.json
 TAIPEI = ZoneInfo("Asia/Taipei")
 REFRESH_POINTS = ((8, 30), (13, 0), (20, 0))   # 台灣時間：排程 08:00／12:30／19:30 執行完後再讀
 RETRY_SECONDS = 300
+FORCE_MIN_SECONDS = 60   # 手動「重新整理」：距離上次讀取至少 60 秒才真的再讀一次試算表（避免連按）
 
 # 試算表欄位名稱 → 程式用的欄位
 COLUMNS = {
@@ -90,10 +91,19 @@ def last_refresh_point(now=None):
     return (max(past) if past else max(points) - timedelta(days=1)).timestamp()
 
 
-def get_events():
-    """回傳 (活動清單, 是否為最新資料)"""
+def fetched_at():
+    """上次成功讀取試算表的時間（台灣時間 HH:MM），沒讀過回傳空字串"""
+    ts = _cache["timestamp"]
+    return datetime.fromtimestamp(ts, TAIPEI).strftime("%H:%M") if ts else ""
+
+
+def get_events(force=False):
+    """回傳 (活動清單, 是否為最新資料)；force＝使用者按「重新整理」，略過快取直接讀試算表"""
     now = time.time()
     fresh_cache = _cache["data"] is not None and _cache["timestamp"] >= last_refresh_point()
+    if force and now - _cache["timestamp"] >= FORCE_MIN_SECONDS:
+        fresh_cache = False
+        _cache["retry_at"] = 0.0
     if fresh_cache or now < _cache["retry_at"]:
         return _cache["data"] or load_snapshot(), fresh_cache
 

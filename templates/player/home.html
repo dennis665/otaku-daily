@@ -118,7 +118,10 @@
   <div class="chips" id="e-types" role="group" aria-label="類型"></div>
   <div class="e-bar">
     <p class="e-meta" id="e-meta"></p>
-    <label class="e-sort"><span aria-hidden="true">↕</span><select id="e-sort" aria-label="排序方式"></select></label>
+    <div class="e-tools">
+      <button class="e-refresh" id="e-refresh" type="button" title="重新讀取最新活動" aria-label="重新讀取最新活動"><span>🔄</span></button>
+      <label class="e-sort"><span aria-hidden="true">↕</span><select id="e-sort" aria-label="排序方式"></select></label>
+    </div>
   </div>
   <div id="e-pager-top"></div>
   <div class="events" id="e-list"></div>

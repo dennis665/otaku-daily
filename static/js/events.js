@@ -186,6 +186,7 @@
     meta.append(el('span', null, ''));
     meta.lastChild.id = 'e-shown';
     if (data.updated) meta.append(document.createTextNode(`・資料更新 ${short(data.updated)}`));
+    if (data.fetched_at) meta.append(document.createTextNode(`・讀取 ${data.fetched_at}`));
     if (!data.fresh) meta.append(el('span', 'warn', '（暫時連不到試算表，顯示上次的資料）'));
     buildTypes();
     render();
@@ -199,11 +200,43 @@
 
   // 背景先載入，不鎖畫面
   let loaded = false;
-  const loading = fetch('/api/events/', { loading: false, credentials: 'same-origin' })
+  let loadedAt = Date.now();
+  const getEvents = (opts = {}, refresh = false) => fetch(`/api/events/${refresh ? '?refresh=1' : ''}`, { credentials: 'same-origin', ...opts })
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(setData)
+    .then((data) => { loadedAt = Date.now(); setData(data); return data; });
+  const loading = getEvents({ loading: false })
     .catch(fail)
     .finally(() => { loaded = true; });
+
+  // 🔄 重新整理：請伺服器馬上重讀試算表（顯示載入遮罩），完成後提示讀到幾筆
+  const refreshBtn = $('e-refresh');
+  refreshBtn.addEventListener('click', async () => {
+    if (refreshBtn.disabled) return;
+    refreshBtn.disabled = true;
+    refreshBtn.classList.add('busy');
+    const before = events.length;
+    try {
+      await getEvents({}, true);
+      const diff = events.length - before;
+      flash(diff > 0 ? `✅ 已更新，新增 ${diff} 筆` : '✅ 已是最新資料');
+    } catch {
+      flash('⚠️ 讀取失敗，請稍後再試');
+    }
+    refreshBtn.classList.remove('busy');
+    refreshBtn.disabled = false;
+  });
+  function flash(text) {
+    const tip = el('span', 'e-flash', text);
+    meta.prepend(tip);
+    setTimeout(() => tip.remove(), 3000);
+  }
+
+  // App 放在背景很久再切回來：超過 30 分鐘就自動在背景重讀一次（伺服器有更新排程的新資料就會帶回來）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && loaded && Date.now() - loadedAt > 30 * 60 * 1000) {
+      getEvents({ loading: false }).catch(() => {});
+    }
+  });
 
   // 切到活動分頁時還沒載完：顯示載入遮罩直到完成
   const waitIfNeeded = () => { if (!loaded && window.AppLoading) window.AppLoading.track(loading); };

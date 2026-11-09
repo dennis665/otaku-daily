@@ -12,7 +12,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from notifications.reminders import SCHEDULE_HINT
 
-from .events import get_events
+from .events import fetched_at, get_events
 from .models import HIDEABLE_TABS, Playlist, UserPrefs
 from .playlist import get_playlist
 
@@ -130,9 +130,10 @@ def playlist_delete(request, pk):
 @login_required
 def events_api(request):
     """北部動漫活動（資料來自 Google 試算表，每天 08:30、13:00、20:00 後各更新一次）"""
-    events, fresh = get_events()
+    events, fresh = get_events(force=request.GET.get("refresh") == "1")
     checked = max((e["checked"] for e in events if e["checked"]), default="")
-    return JsonResponse({"events": events, "updated": checked, "fresh": fresh}, json_dumps_params={"ensure_ascii": False})
+    return JsonResponse({"events": events, "updated": checked, "fresh": fresh, "fetched_at": fetched_at()},
+                        json_dumps_params={"ensure_ascii": False})
 
 
 @never_cache

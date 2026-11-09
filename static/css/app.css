@@ -395,3 +395,12 @@ body.sheet-open { overflow: hidden; }
 #m-add-form, #m-add-form input { margin-top: 0; }
 #m-add-form input { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font-size: 1rem; }
 .danger-text { width: 100%; color: var(--err) !important; border-color: rgba(255, 128, 128, .4) !important; margin: 4px 0 8px; }
+
+/* 活動：重新整理按鈕 */
+.e-tools { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.e-refresh { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg2); color: var(--text); cursor: pointer; font-size: .95rem; transition: transform .1s; -webkit-tap-highlight-color: transparent; }
+.e-refresh:active { transform: scale(.9); }
+.e-refresh span { display: inline-block; }
+.e-refresh.busy span { animation: e-spin .8s linear infinite; }
+@keyframes e-spin { to { transform: rotate(360deg); } }
+.e-flash { display: inline-block; color: var(--pink); font-weight: 700; margin-right: 6px; }
