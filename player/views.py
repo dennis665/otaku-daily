@@ -3,7 +3,7 @@ import json
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
 from django.templatetags.static import static
@@ -140,6 +140,14 @@ def events_api(request):
 def version(request):
     """目前部署的版本，App 切回前景時用來檢查有沒有新版本"""
     return JsonResponse({"version": settings.APP_VERSION})
+
+
+@login_required
+def loudness_test(request):
+    """音量統一試聽（只在測試站開放）：範例音檔放在影音儲存庫 video/_loudness_test/"""
+    if settings.APP_ENV != "staging":
+        raise Http404
+    return render(request, "player/loudness_test.html")
 
 
 def wake(request):

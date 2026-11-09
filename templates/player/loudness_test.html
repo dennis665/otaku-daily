@@ -1,0 +1,71 @@
+{% load static %}<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14122b">
+<title>音量統一試聽｜Ukiyo 測試站</title>
+<style>
+  body { margin:0; background:#14122b; color:#f2f0ff; font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px); }
+  a.back { color:#a9a3d6; text-decoration:none; font-size:.9rem; }
+  h1 { font-size:1.2rem; margin:10px 0 6px; }
+  p.sub { color:#a9a3d6; font-size:.86rem; margin:0 0 16px; line-height:1.7; }
+  h2 { font-size:1rem; margin:20px 0 4px; }
+  h2 small { color:#a9a3d6; font-weight:400; font-size:.8rem; }
+  .row { display:grid; grid-template-columns:7.5em 1fr; align-items:center; gap:8px; background:#232046; border:1px solid #36325f; border-radius:12px; padding:8px 10px; margin-top:8px; }
+  .row.rec { border-color:#ff6fae; box-shadow:0 0 0 2px rgba(255,111,174,.2); }
+  .lab b { display:block; font-size:.9rem; }
+  .lab small { color:#a9a3d6; font-size:.75rem; }
+  .bad { color:#ff8080; } .ok { color:#6fe3a1; }
+  audio { width:100%; height:40px; }
+  .tip { background:rgba(94,231,255,.08); border:1px solid #5ee7ff; color:#5ee7ff; border-radius:12px; padding:10px 12px; font-size:.84rem; line-height:1.7; margin-top:20px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/">‹ 回 Ukiyo</a>
+  <h1>🔊 音量統一試聽</h1>
+  <p class="sub">戴上藍牙耳機、<b>手機音量固定在 2～3 格</b>，依序播放比較。<br>
+    目標：最小聲的歌也聽得清楚舒服，最大聲的歌不會刺耳，兩首聽起來差不多大聲。</p>
+  <div id="songs">載入中…</div>
+  <div class="tip">LUFS 是響度單位，越接近 0 越大聲；差 1 幾乎聽不出來，差 6 大約「聽起來大一倍」。<br>
+    -14：Spotify／YouTube 的標準，比較保守。-12：一般流行歌 CD 的程度。-11：最大聲，動態稍微被壓縮。</div>
+</main>
+<script>
+(() => {
+  const BASE = 'https://raw.githubusercontent.com/dennis665/fenglan-media-assets/main/video/_loudness_test/';
+  const LEVELS = [
+    ['before', '原檔', (m) => m.before],
+    ['after', '-14 LUFS', (m) => m.after],
+    ['12', '-12 LUFS（推薦）', (m) => m.i12],
+    ['11', '-11 LUFS', (m) => m.i11],
+  ];
+  const audios = [];
+  fetch(BASE + 'meta.json', { cache: 'no-store' }).then((r) => r.json()).then((meta) => {
+    const box = document.getElementById('songs');
+    box.innerHTML = '';
+    [['quiet', '最小聲的歌'], ['loud', '最大聲的歌']].forEach(([key, label]) => {
+      const m = meta[key];
+      const h = document.createElement('h2');
+      h.innerHTML = `${label} <small></small>`;
+      h.querySelector('small').textContent = m.name;
+      box.append(h);
+      LEVELS.forEach(([suffix, name, val]) => {
+        const v = val(m);
+        const row = document.createElement('div');
+        row.className = 'row' + (suffix === '12' ? ' rec' : '');
+        const bad = suffix === 'before' && Math.abs(v + 12) > 4;
+        row.innerHTML = `<div class="lab"><b>${name}</b><small class="${bad ? 'bad' : 'ok'}">實測 ${v.toFixed(1)}</small></div><audio controls preload="none"></audio>`;
+        const a = row.querySelector('audio');
+        a.src = `${BASE}${key}_${suffix}.mp3`;
+        a.addEventListener('play', () => audios.forEach((x) => { if (x !== a) x.pause(); }));   // 一次只播一首
+        audios.push(a);
+        box.append(row);
+      });
+    });
+  }).catch(() => { document.getElementById('songs').textContent = '範例讀取失敗，請稍後重新整理'; });
+})();
+</script>
+</body>
+</html>
