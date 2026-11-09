@@ -30,16 +30,19 @@
     目標：最小聲的歌也聽得清楚舒服，最大聲的歌不會刺耳，兩首聽起來差不多大聲。</p>
   <div id="songs">載入中…</div>
   <div class="tip">LUFS 是響度單位，越接近 0 越大聲；差 1 幾乎聽不出來，差 6 大約「聽起來大一倍」。<br>
-    -14：Spotify／YouTube 的標準，比較保守。-12：一般流行歌 CD 的程度。-11：最大聲，動態稍微被壓縮。</div>
+    -33～-35：你要的小聲版本，每差 1 只有一點點差別。-14、-12：一般串流平台／CD 的音量（留著對照）。<br>
+    統一之後每首歌都一樣大聲，只要找到一個「手機固定在 2～3 格剛好」的數字就好。</div>
 </main>
 <script>
 (() => {
   const BASE = 'https://raw.githubusercontent.com/dennis665/fenglan-media-assets/main/video/_loudness_test/';
   const LEVELS = [
     ['before', '原檔', (m) => m.before],
+    ['33', '-33 LUFS', (m) => m.i33],
+    ['34', '-34 LUFS', (m) => m.i34],
+    ['35', '-35 LUFS', (m) => m.i35],
     ['after', '-14 LUFS', (m) => m.after],
-    ['12', '-12 LUFS（推薦）', (m) => m.i12],
-    ['11', '-11 LUFS', (m) => m.i11],
+    ['12', '-12 LUFS', (m) => m.i12],
   ];
   const audios = [];
   fetch(BASE + 'meta.json', { cache: 'no-store' }).then((r) => r.json()).then((meta) => {
@@ -54,8 +57,8 @@
       LEVELS.forEach(([suffix, name, val]) => {
         const v = val(m);
         const row = document.createElement('div');
-        row.className = 'row' + (suffix === '12' ? ' rec' : '');
-        const bad = suffix === 'before' && Math.abs(v + 12) > 4;
+        row.className = 'row' + (suffix === '34' ? ' rec' : '');
+        const bad = suffix === 'before' && Math.abs(v + 34) > 4;
         row.innerHTML = `<div class="lab"><b>${name}</b><small class="${bad ? 'bad' : 'ok'}">實測 ${v.toFixed(1)}</small></div><audio controls preload="none"></audio>`;
         const a = row.querySelector('audio');
         a.src = `${BASE}${key}_${suffix}.mp3`;
