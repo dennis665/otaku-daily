@@ -28,7 +28,12 @@
 <body>
 <main>
   <a class="back" href="/">‹ 回 Ukiyo</a>
-  <h1>🎧 音質比較（都已調到 -35）</h1>
+  <h1>🔍 10 秒重點片段</h1>
+  <p class="sub">從整首歌自動挑出最容易聽出壓縮差異的兩段，每個品質都切同一段 10 秒，<b>已放大到正常音量</b>（手機不用開很大格）。<br>
+    片段用無損格式存，放大不會再多一次失真，聽到的差別就是各品質本身的差別。</p>
+  <div id="clips">載入中…</div>
+
+  <h1 style="margin-top:32px">🎧 音質比較（整首，都已調到 -35）</h1>
   <p class="sub">同一首歌、同樣音量，只差在壓縮品質，由小到大排列。戴藍牙耳機依序播放，聽聽看從哪一個開始聽不出差別。<br>
     按「🙈 盲測」會打亂順序、藏起名稱，比較不會被檔案大小影響判斷。<br>
     其他版本都是從 App 現有的 MP3（藍框）轉出來的，最多只能和它一樣好；粉紅框的「★ YouTube 原始音源」是重新下載官方音源只轉一次，才有機會比現在更好。</p>
@@ -55,6 +60,40 @@
     ['12', '-12 LUFS', (m) => m.i12],
   ];
   const audios = [];
+
+  // ---------- 10 秒重點片段：每段各自可盲測 ----------
+  function paintClip(box, clip, blind) {
+    box.querySelectorAll('.row').forEach((r) => r.remove());
+    const list = blind ? [...clip.files].sort(() => Math.random() - 0.5) : clip.files;
+    list.forEach((it, i) => {
+      const row = document.createElement('div');
+      row.className = 'row' + (it.key === 'mp3_128' ? ' cur' : '') + (!blind && it.key.startsWith('yt_') ? ' rec' : '');
+      row.innerHTML = '<div class="lab"><b></b><small></small></div><audio controls preload="none"></audio>';
+      row.querySelector('b').textContent = blind ? `第 ${i + 1} 個` : it.label;
+      row.querySelector('small').textContent = blind ? '？' : `原檔 ${it.kb} KB・${it.kbps} kbps`;
+      row.dataset.answer = `${it.label}（${it.kb} KB）`;
+      const a = row.querySelector('audio');
+      a.src = BASE + it.file;
+      a.addEventListener('play', () => audios.forEach((x) => { if (x !== a) x.pause(); }));
+      audios.push(a);
+      box.append(row);
+    });
+    box.querySelector('.reveal').hidden = !blind;
+  }
+  fetch(BASE + 'clips/meta.json', { cache: 'no-store' }).then((r) => r.json()).then((c) => {
+    const root = document.getElementById('clips');
+    root.innerHTML = '';
+    c.clips.forEach((clip) => {
+      const box = document.createElement('div');
+      const m = Math.floor(clip.start / 60), s = String(Math.floor(clip.start % 60)).padStart(2, '0');
+      box.innerHTML = `<h2></h2><div class="qbar"><button type="button" class="blind">🙈 盲測</button><button type="button" class="reveal" hidden>👀 公布答案</button></div>`;
+      box.querySelector('h2').textContent = `${clip.label}（${m}:${s} 起）`;
+      box.querySelector('.blind').addEventListener('click', () => paintClip(box, clip, true));
+      box.querySelector('.reveal').addEventListener('click', () => box.querySelectorAll('.row').forEach((row) => { row.querySelector('small').textContent = row.dataset.answer; }));
+      root.append(box);
+      paintClip(box, clip, false);
+    });
+  }).catch(() => { document.getElementById('clips').textContent = '片段讀取失敗，請稍後重新整理'; });
 
   // ---------- 音質比較 ----------
   let qItems = [];
