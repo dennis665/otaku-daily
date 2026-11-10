@@ -212,7 +212,7 @@
     audio.src = s.audio;
     $('m-title').textContent = s.title;
     $('m-dl').href = s.audio;
-    $('m-dl').setAttribute('download', `${s.title}.mp3`);
+    $('m-dl').setAttribute('download', `${s.title}.${(s.audio.split('.').pop() || 'm4a').toLowerCase()}`);
     $('m-seek').value = 0;
     $('m-cur').textContent = '0:00';
     markActive(mList, i);

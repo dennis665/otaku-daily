@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import time
+import urllib.parse
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
@@ -38,6 +39,17 @@ def _airing_sort(a):
     return "000000" if a.sort_key == "999999" else a.sort_key
 
 
+def _current_audio(links):
+    """舊資料存的是 .mp3 網址；音樂改成 .m4a 後，依檔名換成影音儲存庫裡目前的檔案"""
+    from player.playlist import audio_urls
+    urls = audio_urls()
+    out = []
+    for link in links or []:
+        name = urllib.parse.unquote((link.get("url") or "").rsplit("/", 1)[-1]).rsplit(".", 1)[0]
+        out.append({**link, "url": urls.get(name, link.get("url"))})
+    return out
+
+
 def serialize(w, followed_ids):
     airings = sorted(w.airings.all(), key=_airing_sort)
     title = w.title
@@ -55,7 +67,7 @@ def serialize(w, followed_ids):
         "info_url": w.info_url,
         "airings": [a.label for a in airings],
         "latest": airings[-1].label if airings else "",   # 有實際播出就是最新那季；只有動畫化決定才顯示它
-        "mp3": w.mp3_links,
+        "mp3": _current_audio(w.mp3_links),
         "mp4": w.mp4_links,
         "followers": getattr(w, "n_followers", None),
         "followed": w.id in followed_ids,

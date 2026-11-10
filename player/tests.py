@@ -64,3 +64,18 @@ class EventsRefreshTests(TestCase):
             self.assertEqual(ev.get_events(force=True)[0], [{"n": 2}])  # 超過 60 秒，手動重新整理會重讀
             self.assertEqual(fetch.call_count, 2)
             self.assertTrue(ev.fetched_at())
+
+
+class PlaylistFormatTests(TestCase):
+    def test_m4a_preferred_over_mp3_and_video_kept(self):
+        from player.playlist import build_playlist
+        songs = build_playlist(["A.mp3", "A.m4a", "A.mp4", "B.mp3", "B.mp4", "C.m4a", "D.txt"])
+        by = {s["id"]: s for s in songs}
+        self.assertTrue(by["A"]["audio"].endswith("A.m4a"))
+        self.assertTrue(by["A"]["video"].endswith("A.mp4"))
+        self.assertTrue(by["B"]["audio"].endswith("B.mp3"))
+        self.assertTrue(by["C"]["audio"].endswith("C.m4a"))
+        self.assertIsNone(by["C"]["video"])
+        self.assertNotIn("D", by)
+        # 順序反過來也一樣用 .m4a
+        self.assertTrue(build_playlist(["A.m4a", "A.mp3"])[0]["audio"].endswith("A.m4a"))

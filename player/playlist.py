@@ -1,6 +1,6 @@
 """
 從 GitHub 公開儲存庫 (dennis665/fenglan-media-assets) 的 video 資料夾讀取影音清單。
-同名的 .mp3 / .mp4 視為同一首歌；結果快取 10 分鐘。
+同名的音樂檔（.m4a，舊的 .mp3）與 .mp4 視為同一首歌；同時有 .m4a 與 .mp3 時用 .m4a；結果快取 10 分鐘。
 
 GitHub API 未登入時每個 IP 每小時只能呼叫 60 次，雲端免費主機的對外 IP 由多人共用，
 額度常被別人用完，因此：
@@ -57,13 +57,14 @@ def build_playlist(names):
     songs = {}
     for name in names:
         base, dot, ext = name.rpartition(".")
-        if not dot or ext.lower() not in ("mp3", "mp4"):
+        ext = ext.lower() if dot else ""
+        if ext not in ("m4a", "mp3", "mp4"):
             continue
         song = songs.setdefault(base, {"id": base, "title": base, "audio": None, "video": None})
-        if ext.lower() == "mp3":
-            song["audio"] = _raw_url(name)
-        else:
+        if ext == "mp4":
             song["video"] = _raw_url(name)
+        elif ext == "m4a" or not (song["audio"] or "").endswith(".m4a"):   # 同時有 .m4a 與 .mp3 時用 .m4a
+            song["audio"] = _raw_url(name)
     return sorted(songs.values(), key=lambda s: s["title"])
 
 
@@ -82,3 +83,8 @@ def get_playlist():
     _cache["data"] = playlist
     _cache["timestamp"] = now
     return playlist
+
+
+def audio_urls():
+    """歌名（檔名，不含副檔名）→ 目前的音樂網址；追劇卡片的「主題曲」連結用它換成最新檔案"""
+    return {s["id"]: s["audio"] for s in get_playlist() if s["audio"]}
