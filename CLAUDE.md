@@ -33,4 +33,5 @@
 - 個人設定與自訂歌單：`player` 模組的 `UserPrefs`（右上角 ⚙️，可關閉影片／活動／行程／追劇分頁，音樂固定顯示）與 `Playlist`（歌曲以檔名為編號，依加入順序；播放的上一首／下一首跟著目前選的歌單）。測試：`python manage.py test player`。
 - 背景連續播放：每首歌開始播時先把下一首整首下載到記憶體（blob），播完直接換上，iPhone 鎖定畫面或在背景時也不用等網路（`player.js` 的 planNext／prefetchNext）。
 - 離線聽歌：音樂分頁的「📥 存到手機」把目前歌單的歌存進 Cache Storage（`ukiyo-offline-songs`），service worker 攔截 raw.githubusercontent 的請求，有存就從手機分段提供（不耗流量）；主頁每次從網路成功打開就存一份（`ukiyo-offline-page`），沒網路時用它開 App；個人歌單在 localStorage 存最近一次的副本（`myLists`），離線模式（`body.offline-mode`）只留音樂分頁、有存歌的歌單與存在手機的歌，其他分頁、設定、搜尋、新增或編輯歌單、登出都隱藏；沒網路的提示頁網路恢復會自動重新載入；沒網路時送出表單（例如登入）留在原頁提示。登出時只刪歌單副本，存的主頁與歌保留，沒網路時以「📴 離線模式」開啟（不顯示帳號、只有全部歌曲）；沒網路時開任何頁面都改開存的主頁。影音庫換檔後，手機裡對不上的舊檔會自動清掉。
+- 動畫小卡抽卡：`gacha` 模組（開發中，第一階段）。卡片＝作品×稀有度（N/R/SR/SSR/UR/LR，機率見 `gacha/models.py`），每天台灣 00:00 重置：追的作品每部 1 抽＋全作品隨機 3 抽，50 抽保底 SSR 以上；結果由伺服器決定並記錄。測試：`python manage.py test gacha`。
 - 影音清單來源與快照：見 `player/playlist.py`；影音儲存庫新增檔案後執行 `python manage.py update_media_snapshot` 更新快照。

@@ -15,5 +15,6 @@ urlpatterns = [
     path("plan/", include("planner.urls")),
     path("notify/", include("notifications.urls")),
     path("dramas/", include("dramas.urls")),
+    path("gacha/", include("gacha.urls")),
     path("", include("player.urls")),
 ]
