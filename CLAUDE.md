@@ -31,5 +31,6 @@
 - 追劇小幫手：`dramas` 模組。作品以 youranimes 作品編號（source_id）為準，同一部只有一筆，劇庫「只新增、不刪除」（`dramas/sync.py`）。每日抓新番：GitHub Actions（`.github/workflows/drama-sync.yml`）台灣 16:00 執行 `tools/crawl_youranimes.py`，讀頁面 JSON-LD 後送到 `/dramas/api/sync/`（密碼在 GitHub Secrets 的 `DRAMA_SYNC_TOKEN`，程式只存指紋）。測試：`python manage.py test dramas`。
 - 北部動漫活動：讀取 Google 試算表（claude.ai 雲端排程「每日 AI 與北部動漫活動資訊更新」台灣 08:00 完整更新、「北部動漫快訊」12:30／19:30 只搜新公告），網站在 08:30、13:00、20:00 後各重新讀一次；活動分頁的 🔄 可手動重讀（伺服器端同一份快取至少間隔 60 秒），App 在背景超過 30 分鐘切回來也會自動重讀，見 `player/events.py`；備份用 `python manage.py update_events_snapshot` 更新。
 - 個人設定與自訂歌單：`player` 模組的 `UserPrefs`（右上角 ⚙️，可關閉影片／活動／行程／追劇分頁，音樂固定顯示）與 `Playlist`（歌曲以檔名為編號，依加入順序；播放的上一首／下一首跟著目前選的歌單）。測試：`python manage.py test player`。
+- 背景連續播放：每首歌開始播時先把下一首整首下載到記憶體（blob），播完直接換上，iPhone 鎖定畫面或在背景時也不用等網路（`player.js` 的 planNext／prefetchNext）。
 - 離線聽歌：音樂分頁的「📥 存到手機」把目前歌單的歌存進 Cache Storage（`ukiyo-offline-songs`），service worker 攔截 raw.githubusercontent 的請求，有存就從手機分段提供（不耗流量）；主頁每次從網路成功打開就存一份（`ukiyo-offline-page`），沒網路時用它開 App；個人歌單在 localStorage 存最近一次的副本（`myLists`），離線只能播放、不能修改。登出時只刪歌單副本，存的主頁與歌保留，沒網路時以「📴 離線模式」開啟（不顯示帳號、只有全部歌曲）；沒網路時開任何頁面都改開存的主頁。影音庫換檔後，手機裡對不上的舊檔會自動清掉。
 - 影音清單來源與快照：見 `player/playlist.py`；影音儲存庫新增檔案後執行 `python manage.py update_media_snapshot` 更新快照。

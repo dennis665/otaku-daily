@@ -203,7 +203,7 @@
   let curSong = null;
   const mLoop = setupLoop($('m-loop'), $('m-loop-text'), 'musicLoop');
 
-  function loadSong(i, autoplay = true, dir = 1) {
+  function loadSong(i, autoplay = true, dir = 1, src = null) {
     if (!queue.length) return;
     if (!playable(queue[i])) {
       // 離線時往同一個方向找下一首已存到手機的歌
@@ -215,8 +215,10 @@
     mIndex = i;
     const s = queue[i];
     curSong = s;
-    if (autoplay) trackMediaLoading(audio);
-    audio.src = s.audio;
+    if (autoplay && !document.hidden) trackMediaLoading(audio);
+    if (curBlob && curBlob !== src) { URL.revokeObjectURL(curBlob); curBlob = null; }
+    if (src) curBlob = src;
+    audio.src = src || s.audio;
     $('m-title').textContent = s.title;
     $('m-dl').href = s.audio;
     $('m-dl').setAttribute('download', `${s.title}.${(s.audio.split('.').pop() || 'm4a').toLowerCase()}`);
@@ -230,8 +232,48 @@
   const playSong = () => (mIndex < 0 ? loadSong(0) : audio.play().catch(() => {}));
   $('m-play').addEventListener('click', () => (audio.paused ? playSong() : audio.pause()));
   $('m-prev').addEventListener('click', () => loadSong(nextIndex(mLoop(), Math.max(mIndex, 0), queue.length, -1), true, -1));
-  $('m-next').addEventListener('click', () => loadSong(nextIndex(mLoop(), mIndex, queue.length, 1)));
-  audio.addEventListener('ended', () => (mLoop() === 'ONE' ? audio.play() : loadSong(nextIndex(mLoop(), mIndex, queue.length, 1))));
+  $('m-next').addEventListener('click', () => playNext());
+  audio.addEventListener('ended', () => (mLoop() === 'ONE' ? audio.play() : playNext()));
+
+  // ---------- 背景連續播放 ----------
+  // iPhone 鎖定畫面或切到別的 App 時，歌一停網頁就會被暫停，下一首要等回到 App 才開始下載，所以會卡很久。
+  // 解法：每首歌開始播時，就先把「下一首」整首下載到記憶體；播完直接換上，不用等網路，中間不會停。
+  let curBlob = null;       // 目前播放中、從記憶體播的那首（換歌時釋放）
+  let plan = null;          // 預先準備的下一首：{ from, index, song, mode, url }
+  function planNext() {
+    if (!queue.length) return null;
+    const mode = mLoop();
+    if (plan && plan.from === curSong && plan.mode === mode && queue[plan.index] === plan.song) return plan;
+    let j = nextIndex(mode, mIndex, queue.length, 1);
+    for (let k = 0; k < queue.length && !playable(queue[j]); k += 1) j = (j + 1) % queue.length;
+    dropPlan();
+    plan = { from: curSong, index: j, song: queue[j], mode, url: null, loading: false };
+    return plan;
+  }
+  function dropPlan() {
+    if (plan && plan.url && plan.url !== curBlob) URL.revokeObjectURL(plan.url);
+    plan = null;
+  }
+  async function prefetchNext() {
+    const p = planNext();
+    if (!p || p.url || p.loading) return;
+    p.loading = true;
+    try {
+      const res = await fetch(p.song.audio, { loading: false, mode: 'cors' });   // 存在手機的歌會由 service worker 直接給
+      if (res.status === 200) {
+        const url = URL.createObjectURL(await res.blob());
+        if (plan === p) p.url = url; else URL.revokeObjectURL(url);
+      }
+    } catch { /* 下載失敗就照舊從網路播 */ }
+    p.loading = false;
+  }
+  function playNext() {
+    const p = planNext();
+    if (!p) return;
+    plan = null;   // 用掉了
+    loadSong(p.index, true, 1, p.url);
+  }
+  audio.addEventListener('playing', () => { prefetchNext(); });
 
   const setPlaying = (on) => {
     $('m-play').textContent = on ? '⏸' : '▶';
