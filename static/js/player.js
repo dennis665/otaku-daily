@@ -537,7 +537,7 @@
   // ---------- 離線聽歌：把歌存到手機（service worker 會改從手機播放），歌單也在手機存一份最近的副本 ----------
   const SONG_CACHE = 'ukiyo-offline-songs';
   const canSave = 'caches' in window && 'serviceWorker' in navigator;
-  const saved = new Set();          // 已存到手機的音樂網址
+  const saved = new Map();          // 已存到手機的音樂：網址 → 檔案大小（bytes），容量自己算，刪掉馬上更新
   let saving = null;                // 下載中：{ stop: false }
   function isOnline() { return navigator.onLine !== false; }
   function playable(s) { return isOnline() || saved.has(s.audio); }
@@ -559,9 +559,12 @@
     $('m-off-get').disabled = !saving && !isOnline();
     $('m-off-del').hidden = !!saving || !have;
     offNote(!isOnline());
-    if (navigator.storage && navigator.storage.estimate && !saving) {
-      const est = await navigator.storage.estimate().catch(() => null);
-      if (est && est.usage) $('m-off-info').textContent += `・手機已用 ${Math.round(est.usage / 1048576)} MB`;
+    // 只算存到手機的歌（瀏覽器自己的用量統計會延遲更新，也包含 App 本身的檔案）
+    let bytes = 0;
+    saved.forEach((n) => { bytes += n; });
+    if (bytes && !saving) {
+      const mb = bytes / 1048576;
+      $('m-off-info').textContent += `・歌曲共 ${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
     }
   }
   async function saveSongs() {
@@ -579,8 +582,9 @@
       try {
         const res = await fetch(s.audio, { loading: false, mode: 'cors', cache: 'no-store' });
         if (res.status !== 200) throw new Error(res.status);
+        const size = Number(res.headers.get('content-length')) || 0;
         await cache.put(s.audio, res);
-        saved.add(s.audio);
+        saved.set(s.audio, size);
       } catch {
         failed += 1;
         if (!isOnline()) break;
@@ -608,7 +612,9 @@
       const current = new Set(songs.map((s) => s.audio));
       for (const req of await cache.keys()) {
         // 影音庫已經換掉或刪掉的檔案：從手機清掉，不佔空間
-        if (current.has(req.url)) saved.add(req.url); else await cache.delete(req);
+        if (!current.has(req.url)) { await cache.delete(req); continue; }
+        const res = await cache.match(req, { ignoreVary: true });
+        saved.set(req.url, (res && Number(res.headers.get('content-length'))) || (res ? (await res.blob()).size : 0));
       }
     } catch { /* 無痕模式等情況無法使用 */ }
     refreshQueue(false);
