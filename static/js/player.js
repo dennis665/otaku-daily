@@ -203,8 +203,15 @@
   let curSong = null;
   const mLoop = setupLoop($('m-loop'), $('m-loop-text'), 'musicLoop');
 
-  function loadSong(i, autoplay = true) {
+  function loadSong(i, autoplay = true, dir = 1) {
     if (!queue.length) return;
+    if (!playable(queue[i])) {
+      // 離線時往同一個方向找下一首已存到手機的歌
+      let j = i;
+      for (let k = 0; k < queue.length && !playable(queue[j]); k += 1) j = (j + dir + queue.length) % queue.length;
+      if (!playable(queue[j])) { offNote(true, '📴 目前離線，這個歌單沒有已存到手機的歌'); return; }
+      i = j;
+    }
     mIndex = i;
     const s = queue[i];
     curSong = s;
@@ -222,7 +229,7 @@
   }
   const playSong = () => (mIndex < 0 ? loadSong(0) : audio.play().catch(() => {}));
   $('m-play').addEventListener('click', () => (audio.paused ? playSong() : audio.pause()));
-  $('m-prev').addEventListener('click', () => loadSong(nextIndex(mLoop(), Math.max(mIndex, 0), queue.length, -1)));
+  $('m-prev').addEventListener('click', () => loadSong(nextIndex(mLoop(), Math.max(mIndex, 0), queue.length, -1), true, -1));
   $('m-next').addEventListener('click', () => loadSong(nextIndex(mLoop(), mIndex, queue.length, 1)));
   audio.addEventListener('ended', () => (mLoop() === 'ONE' ? audio.play() : loadSong(nextIndex(mLoop(), mIndex, queue.length, 1))));
 
@@ -275,6 +282,7 @@
   // ---------- 自訂歌單（存在伺服器，換手機也看得到） ----------
   const csrf = () => (document.querySelector('input[name=csrfmiddlewaretoken]') || {}).value || '';
   async function api(url, body) {
+    if (!isOnline()) throw new Error('目前離線，暫時不能修改，連上網路後再試');
     const opts = { credentials: 'same-origin' };
     if (body !== undefined) {
       opts.method = 'POST';
@@ -326,6 +334,14 @@
 
   // 每一列右邊的按鈕：全部歌曲＝＋ 加入歌單（已在某個歌單裡顯示 ✓）；自訂歌單＝✕ 移出這個歌單
   function decorateSong(li, song) {
+    li.classList.toggle('unavail', !playable(song));
+    if (saved.has(song.audio)) {
+      const mark = document.createElement('span');
+      mark.className = 'saved-mark';
+      mark.textContent = '📱';
+      mark.title = '已存到手機，可離線播放';
+      li.insertBefore(mark, li.querySelector('.playing'));
+    }
     const cur = currentList();
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -360,6 +376,7 @@
     // 翻到正在播的那一頁（不捲動畫面）
     if (resetPage && mIndex >= 0) lists[mList.id].pager.showIndex(mIndex, queue.length);
     paintLists();
+    paintOffline();
   }
   function selectList(id) {
     listId = id;
@@ -465,12 +482,110 @@
     } catch (err) { showError('m-edit-error', err.message); }
   });
 
+  // ---------- 離線聽歌：把歌存到手機（service worker 會改從手機播放），歌單也在手機存一份最近的副本 ----------
+  const SONG_CACHE = 'ukiyo-offline-songs';
+  const PAGE_CACHE = 'ukiyo-offline-page';
+  const canSave = 'caches' in window && 'serviceWorker' in navigator;
+  const saved = new Set();          // 已存到手機的音樂網址
+  let saving = null;                // 下載中：{ stop: false }
+  function isOnline() { return navigator.onLine !== false; }
+  function playable(s) { return isOnline() || saved.has(s.audio); }
+  const tellWorker = () => { if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'songs-changed' }); };
+  function offNote(show, text) {
+    const el = $('m-off-note');
+    el.textContent = text || '📴 目前離線：只能播已存到手機的歌（📱），歌單暫時不能修改';
+    el.hidden = !show;
+  }
+  async function paintOffline() {
+    const box = $('m-offline');
+    if (!canSave) { box.hidden = true; return; }
+    box.hidden = false;
+    const have = queue.filter((s) => saved.has(s.audio)).length;
+    const name = currentList() ? '這個歌單' : '全部歌曲';
+    $('m-off-info').textContent = saving ? `存到手機中… ${saving.done}／${saving.total} 首` : `📱 ${name}已存 ${have}／${queue.length} 首`;
+    $('m-off-get').textContent = saving ? '⏹ 停止' : '📥 存到手機';
+    $('m-off-get').hidden = !saving && (have === queue.length || !queue.length);
+    $('m-off-get').disabled = !saving && !isOnline();
+    $('m-off-del').hidden = !!saving || !have;
+    offNote(!isOnline());
+    if (navigator.storage && navigator.storage.estimate && !saving) {
+      const est = await navigator.storage.estimate().catch(() => null);
+      if (est && est.usage) $('m-off-info').textContent += `・手機已用 ${Math.round(est.usage / 1048576)} MB`;
+    }
+  }
+  async function saveSongs() {
+    const todo = queue.filter((s) => !saved.has(s.audio));
+    if (!todo.length) return;
+    const mb = Math.round(todo.length * 1.1);
+    if (todo.length > 20 && !window.confirm(`要把 ${todo.length} 首存到手機嗎？約 ${mb} MB，建議連 Wi-Fi 再下載。`)) return;
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});   // 請瀏覽器不要自動清掉
+    saving = { stop: false, done: 0, total: todo.length };
+    let failed = 0;
+    const cache = await caches.open(SONG_CACHE);
+    for (const s of todo) {
+      if (saving.stop) break;
+      paintOffline();
+      try {
+        const res = await fetch(s.audio, { loading: false, mode: 'cors', cache: 'no-store' });
+        if (res.status !== 200) throw new Error(res.status);
+        await cache.put(s.audio, res);
+        saved.add(s.audio);
+      } catch {
+        failed += 1;
+        if (!isOnline()) break;
+      }
+      saving.done += 1;
+    }
+    saving = null;
+    tellWorker();
+    refreshQueue(false);
+    if (failed) alert(`有 ${failed} 首沒存成功（可能是網路不穩或手機空間不足），可以再按一次「存到手機」補存。`);
+  }
+  async function removeSongs() {
+    const list = queue.filter((s) => saved.has(s.audio));
+    const name = currentList() ? `「${currentList().name}」` : '全部歌曲';
+    if (!list.length || !window.confirm(`要把${name}已存到手機的 ${list.length} 首刪掉嗎？（之後播放會改用網路，可以再存回來）`)) return;
+    const cache = await caches.open(SONG_CACHE);
+    await Promise.all(list.map((s) => cache.delete(s.audio, { ignoreVary: true }).then(() => saved.delete(s.audio))));
+    tellWorker();
+    refreshQueue(false);
+  }
+  async function loadSaved() {
+    if (!canSave) return;
+    try {
+      const cache = await caches.open(SONG_CACHE);
+      const current = new Set(songs.map((s) => s.audio));
+      for (const req of await cache.keys()) {
+        // 影音庫已經換掉或刪掉的檔案：從手機清掉，不佔空間
+        if (current.has(req.url)) saved.add(req.url); else await cache.delete(req);
+      }
+    } catch { /* 無痕模式等情況無法使用 */ }
+    refreshQueue(false);
+  }
+  $('m-off-get').addEventListener('click', () => {
+    if (saving) saving.stop = true; else saveSongs().catch((err) => { saving = null; alert(err.message); paintOffline(); });
+  });
+  $('m-off-del').addEventListener('click', () => removeSongs().catch((err) => alert(err.message)));
+  window.addEventListener('online', () => { refreshQueue(false); loadMyLists(); });
+  window.addEventListener('offline', () => refreshQueue(false));
+  // 登出：刪掉手機裡的個人資料（存的主頁與歌單）；存到手機的歌不是個人資料，保留下來
+  const logout = document.querySelector('form[action$="/logout/"]');
+  if (logout) logout.addEventListener('submit', () => {
+    try { localStorage.removeItem('myLists'); } catch { /* 忽略 */ }
+    if ('caches' in window) caches.delete(PAGE_CACHE);
+  });
+
+  // 背景讀取歌單（不顯示載入遮罩）；讀不到（離線）就用手機裡最近一次的副本
+  function loadMyLists() {
+    return fetch('/api/playlists/', { credentials: 'same-origin', loading: false, cache: 'no-store' })
+      .then((r) => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : Promise.reject()))
+      .then((res) => { myLists = res.playlists || []; store.set('myLists', myLists); refreshQueue(true); })
+      .catch(() => { myLists = store.get('myLists', []); refreshQueue(true); });
+  }
+  myLists = isOnline() ? [] : store.get('myLists', []);
   refreshQueue(false);
-  // 背景讀取歌單（不顯示載入遮罩）
-  fetch('/api/playlists/', { credentials: 'same-origin', loading: false })
-    .then((r) => (r.ok ? r.json() : Promise.reject()))
-    .then((res) => { myLists = res.playlists || []; refreshQueue(true); })
-    .catch(() => paintLists());
+  loadMyLists();
+  loadSaved();
 
   // ---------- 個人設定：要顯示哪些分頁 ----------
   const tabBtnOf = (name) => document.querySelector(`.tab[data-tab="${name}"]`);

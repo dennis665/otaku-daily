@@ -69,6 +69,15 @@
     <span id="m-list-info"></span>
     <button class="act" id="m-list-edit" type="button">✏️ 改名／刪除</button>
   </div>
+  {# 離線聽歌：把目前歌單存到手機，沒網路也能播 #}
+  <div class="m-offline" id="m-offline" hidden>
+    <span id="m-off-info"></span>
+    <span class="m-off-btns">
+      <button class="act" id="m-off-get" type="button">📥 存到手機</button>
+      <button class="act" id="m-off-del" type="button" title="刪掉已存到手機的歌">🗑 刪除</button>
+    </span>
+  </div>
+  <p class="off-note" id="m-off-note" hidden></p>
   <p class="empty sm" id="m-list-empty" hidden>這個歌單還沒有歌。到「全部歌曲」在歌名右邊按 ＋ 就能加進來。</p>
   <div id="m-list-pager-top"></div>
   <ol class="list" id="m-list"></ol>

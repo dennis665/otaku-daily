@@ -389,6 +389,15 @@ body.sheet-open { overflow: hidden; }
 .m-list-bar[hidden] { display: none; }
 .m-list-bar .act { flex: none; white-space: nowrap; }
 .empty.sm { font-size: .85rem; margin: 6px 0 12px; }
+/* 離線聽歌 */
+.m-offline { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .8rem; margin: 0 2px 8px; flex-wrap: wrap; }
+.m-offline[hidden], .off-note[hidden] { display: none; }
+.m-off-btns { display: inline-flex; gap: 6px; flex: none; }
+.m-off-btns .act { white-space: nowrap; }
+.m-off-btns .act[hidden] { display: none; }
+.off-note { background: rgba(255, 196, 0, .12); border: 1px solid rgba(255, 196, 0, .35); color: var(--text); border-radius: 10px; padding: 8px 12px; font-size: .85rem; margin: 0 0 10px; }
+.list li .saved-mark { flex: none; font-size: .8rem; opacity: .8; }
+.list li.unavail { opacity: .4; }
 .list .li-act { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg2); color: var(--text); cursor: pointer; font-size: .95rem; line-height: 1; }
 .list .li-act.on { border-color: var(--pink); color: var(--pink); }
 .list .li-act.rm { color: var(--err); }

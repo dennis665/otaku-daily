@@ -1,5 +1,5 @@
 {% load static %}// Ukiyo service worker：快取網站外殼 (CSS / JS / 圖示)、主機喚醒等待畫面、推播通知
-// 影音清單的歌曲與影片不快取，以免塞爆手機空間（等待畫面的短片例外，約 4.5MB）
+// 影音清單的歌曲與影片預設不快取；使用者在音樂分頁按「存到手機」的歌才存（離線聽歌），主頁也存一份讓沒網路時能打開
 const CACHE = 'otaku-daily-v1';
 // 等待畫面：頁面內容有改才重新存（快取名稱含頁面指紋）；影片只有換片時才重新下載（網址含檔案指紋）
 const WAKE_URL = '/wake/';
@@ -7,7 +7,11 @@ const WAKE_VIDEO = '{% static "video/wake.mp4" %}';
 const WAKE_POSTER = '{% static "video/wake-poster.jpg" %}';
 const WAKE_PAGE_CACHE = 'ukiyo-wake-page-{{ wake_hash }}';
 const WAKE_VIDEO_CACHE = `ukiyo-wake-video-${WAKE_VIDEO.split('/').pop()}`;
-const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE];
+// 離線聽歌：主頁（含歌曲清單，登入者自己的）與使用者下載到手機的歌；名稱固定，改版也不會被清掉
+const PAGE_CACHE = 'ukiyo-offline-page';
+const SONG_CACHE = 'ukiyo-offline-songs';
+const HOME_URL = '/';
+const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE, PAGE_CACHE, SONG_CACHE];
 
 async function storeWake() {
   const page = await caches.open(WAKE_PAGE_CACHE);
@@ -37,22 +41,45 @@ const offlinePage = (err) => new Response(
   { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
 );
 
-// 開頁：一律走網路（登入狀態才會正確）。
+// 主頁每次從網路成功打開就存一份（離線時用）；被導到登入頁＝已登出，刪掉存的主頁（裡面有個人歌單資料）
+function rememberPage(req, res) {
+  const url = new URL(req.url);
+  if (res.redirected && new URL(res.url).pathname.startsWith('/accounts/login')) {
+    caches.delete(PAGE_CACHE);
+  } else if (url.pathname === HOME_URL && res.status === 200 && !res.redirected) {
+    const copy = res.clone();
+    caches.open(PAGE_CACHE).then((c) => c.put(HOME_URL, copy)).catch(() => {});
+  }
+  return res;
+}
+
+// 沒有網路：主頁用存好的那份，其他頁面顯示離線提示
+async function offlineFallback(req, err) {
+  if (new URL(req.url).pathname === HOME_URL) {
+    const cached = await caches.match(HOME_URL, { cacheName: PAGE_CACHE });
+    if (cached) return cached;
+  }
+  return offlinePage(err);
+}
+
+// 開頁：一律走網路（登入狀態才會正確），沒網路才用手機裡存的主頁。
 // 免費主機休眠時 Render 會回 503「應用程式載入中」，或一直等不到回應 → 改顯示我們自己的等待畫面（影片輪播），主機醒了會自動重新載入
 async function openPage(req) {
-  const network = fetch(req);
+  if (self.navigator && self.navigator.onLine === false) return offlineFallback(req, '離線');
+  const network = fetch(req).then((res) => rememberPage(req, res));
+  const fallback = (err) => offlineFallback(req, err);
   const slow = new Promise((resolve) => setTimeout(() => resolve('slow'), WAKE_AFTER_MS));
   let res;
   try {
     res = await Promise.race([network, slow]);
   } catch (err) {
-    return offlinePage(err);
+    return fallback(err);
   }
-  if (res === 'slow' && (await serverAwake())) return network.catch(offlinePage);   // 主機醒著，只是頁面比較慢：繼續等
+  if (res === 'slow' && (await serverAwake())) return network.catch(fallback);   // 主機醒著，只是頁面比較慢：繼續等
   if (res === 'slow' || res.status === 503) {
     const wake = await caches.match(WAKE_URL, { ignoreSearch: true });
     if (wake) return wake;
-    if (res === 'slow') return network.catch(offlinePage);
+    if (res === 'slow') return network.catch(fallback);
   }
   return res;
 }
@@ -68,7 +95,24 @@ async function serverAwake() {
   }
 }
 
-// 等待影片：手機裡有存就從存好的檔案提供，並支援分段讀取（iPhone 播影片一定會分段要資料，回 206）
+// 從存好的檔案提供影音，並支援分段讀取（iPhone 播影音一定會分段要資料，回 206）
+function rangeResponse(buf, type, req) {
+  const size = buf.byteLength;
+  const headers = { 'Content-Type': type, 'Accept-Ranges': 'bytes' };
+  const m = /bytes=(\d*)-(\d*)/.exec(req.headers.get('range') || '');
+  if (!m) return new Response(buf, { status: 200, headers: { ...headers, 'Content-Length': String(size) } });
+  let start = m[1] === '' ? size - Number(m[2]) : Number(m[1]);
+  let end = m[1] !== '' && m[2] !== '' ? Number(m[2]) : size - 1;
+  start = Math.max(0, start);
+  end = Math.min(end, size - 1);
+  if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+  return new Response(buf.slice(start, end + 1), {
+    status: 206,
+    headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': String(end - start + 1) },
+  });
+}
+
+// 等待影片
 let videoBuf = null;
 async function serveVideo(req) {
   if (!videoBuf) {
@@ -76,25 +120,45 @@ async function serveVideo(req) {
     if (!cached) return fetch(req);
     videoBuf = await cached.arrayBuffer();
   }
-  const size = videoBuf.byteLength;
-  const headers = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes' };
-  const m = /bytes=(\d*)-(\d*)/.exec(req.headers.get('range') || '');
-  if (!m) return new Response(videoBuf, { status: 200, headers: { ...headers, 'Content-Length': String(size) } });
-  let start = m[1] === '' ? size - Number(m[2]) : Number(m[1]);
-  let end = m[1] !== '' && m[2] !== '' ? Number(m[2]) : size - 1;
-  start = Math.max(0, start);
-  end = Math.min(end, size - 1);
-  if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
-  return new Response(videoBuf.slice(start, end + 1), {
-    status: 206,
-    headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': String(end - start + 1) },
-  });
+  return rangeResponse(videoBuf, 'video/mp4', req);
 }
+
+// 下載到手機的歌：有存就直接從手機播（不用網路、不耗流量），沒存就照常走網路
+// 最近讀過的一首留在記憶體，避免每次分段讀取都重新讀檔
+let songMem = { url: '', buf: null, type: '' };
+async function serveSong(req) {
+  const key = req.url.split('#')[0];
+  if (songMem.url !== key) {
+    const cache = await caches.open(SONG_CACHE);
+    const cached = await cache.match(key, { ignoreVary: true });
+    if (!cached) return fetch(req);
+    songMem = { url: key, buf: await cached.arrayBuffer(), type: cached.headers.get('content-type') || 'audio/mp4' };
+  }
+  return rangeResponse(songMem.buf, songMem.type, req);
+}
+let songKeys = null;   // 已下載歌曲網址（加快判斷；頁面下載或刪除後會通知更新）
+async function hasSong(url) {
+  if (!songKeys) {
+    const cache = await caches.open(SONG_CACHE);
+    songKeys = new Set((await cache.keys()).map((r) => r.url));
+  }
+  return songKeys.has(url);
+}
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'songs-changed') { songKeys = null; songMem = { url: '', buf: null, type: '' }; }
+});
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (req.method !== 'GET') return;
+
+  // 影音儲存庫的歌：手機裡有存才接手
+  if (url.origin === 'https://raw.githubusercontent.com') {
+    event.respondWith(hasSong(req.url.split('#')[0]).then((yes) => (yes ? serveSong(req) : fetch(req))).catch(() => fetch(req)));
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
 
   if (url.pathname === WAKE_VIDEO) {
     event.respondWith(serveVideo(req));
