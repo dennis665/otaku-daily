@@ -27,6 +27,8 @@
   .chips span { display:inline-block; margin:4px 4px 0 0; padding:2px 8px; border-radius:99px; background:#1d1a3a; color:#55507a; font-size:.75rem; }
   .chips span.on { color:#fff; background:#8a7bff; }
   .err { color:#ff8080; }
+  .thumbs { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .thumbs img { width:60px; aspect-ratio:3/4; object-fit:cover; border-radius:6px; border:2px solid #777; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -63,17 +65,26 @@
     $('album').innerHTML = a.works.length ? '' : '<p class="sub">還沒有卡片，抽一張吧！</p>';
     a.works.forEach((w) => {
       const chips = a.rarities.map((r) => `<span class="${w.cards[r] ? 'on' : ''}">${esc(a.labels[r])}${w.cards[r] && w.cards[r].count > 1 ? '×' + w.cards[r].count : ''}</span>`).join('');
-      $('album').insertAdjacentHTML('beforeend', `<div class="w"><b>${esc(w.title)}</b>　${w.have}／${w.total}<div class="chips">${chips}</div></div>`);
+      const thumbs = a.rarities.filter((r) => w.cards[r]).map((r) => `<img class="th r-${r}" data-w="${w.work_id}" data-r="${r}" src="${esc(w.cards[r].image)}" alt="" referrerpolicy="no-referrer">`).join('');
+      $('album').insertAdjacentHTML('beforeend', `<div class="w"><b>${esc(w.title)}</b>　${w.have}／${w.total}<div class="chips">${chips}</div><div class="thumbs">${thumbs}</div></div>`);
     });
+    // 點縮圖：在上方大圖顯示這張卡
+    $('album').querySelectorAll('img.th').forEach((img) => img.addEventListener('click', () => {
+      const w = a.works.find((x) => String(x.work_id) === img.dataset.w);
+      show(w.cards[img.dataset.r], false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
   }
   async function pull(workId) {
     $('err').textContent = '';
     const body = new URLSearchParams(workId ? { work_id: workId } : {});
     const r = await (await fetch('/gacha/api/pull/', { method: 'POST', headers: { 'X-CSRFToken': csrf }, body })).json();
     if (!r.ok) { $('err').textContent = r.error; return; }
-    const c = r.card;
-    $('result').innerHTML = `<div class="card r-${c.rarity}"><img src="${esc(c.image)}" alt="" referrerpolicy="no-referrer"><div class="t"><b>${esc(c.rarity_label)}</b>${c.new ? '🆕 ' : ''}${r.pity ? '（保底）' : ''}${esc(c.title)}</div></div>`;
+    show(r.card, r.pity);
     load();
+  }
+  function show(c, pity) {
+    $('result').innerHTML = `<div class="card r-${c.rarity}"><img src="${esc(c.image)}" alt="" referrerpolicy="no-referrer"><div class="t"><b>${esc(c.rarity_label)}</b>${c.new ? '🆕 ' : ''}${pity ? '（保底）' : ''}${esc(c.title)}${c.count > 1 ? `　×${c.count}` : ''}</div></div>`;
   }
   $('free').onclick = () => pull(null);
   load();
