@@ -85,8 +85,13 @@ def get_playlist():
     return playlist
 
 
-# 內容完全相同、已刪掉的重複歌曲：舊名稱 → 保留的名稱（追劇連結與個人歌單會自動換成保留的那首）
+# 已刪掉的重複歌曲或改過名的歌：舊名稱 → 目前的名稱（追劇連結、個人歌單、存到手機的歌會自動換成目前那首）
 SONG_ALIASES = {
+    # 2026-11-10 依命名規則改名（動畫作品中文名＋OP／ED／主題曲）
+    "催眠麥克風 Division Battle Anthem+": "催眠麥克風 Rhyme Anima + OP",
+    "とた - オリーブ": "致遙不可及彼方的你 主題曲",
+    "幻想魔傳 最遊記": "幻想魔傳 最遊記 OP",
+    "幸運星": "幸運☆星 OP",
     "Dr.STONE 新石紀 SCIENCE FUTURE2": "Dr.STONE 新石紀 SCIENCE FUTURE 第二季",
     "新石紀 第三季": "Dr.STONE 新石紀 SCIENCE FUTURE3",
     "SAKAMOTO DAYS 坂本日常2": "SAKAMOTO DAYS 坂本日常 第二季",
@@ -96,6 +101,17 @@ SONG_ALIASES = {
 
 def resolve_song(name):
     return SONG_ALIASES.get(name, name)
+
+
+def alias_map():
+    """給頁面用：舊歌名 → 目前歌名、舊音樂網址 → 目前網址（手機裡用舊網址存的歌改用新網址，不用重新下載）"""
+    current = {s["id"]: s["audio"] for s in get_playlist() if s["audio"]}
+    ids, urls = {}, {}
+    for old, new in SONG_ALIASES.items():
+        if new in current:
+            ids[old] = new
+            urls[_raw_url(f"{old}.m4a")] = current[new]
+    return {"ids": ids, "urls": urls}
 
 
 def audio_urls():

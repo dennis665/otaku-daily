@@ -285,6 +285,7 @@
 </div>
 
 {{ playlist|json_script:"playlist-data" }}
+{{ song_aliases|json_script:"song-aliases" }}
 {% endblock %}
 {% block scripts %}
 <script src="{% static 'js/player.js' %}"></script>

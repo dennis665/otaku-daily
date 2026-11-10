@@ -90,3 +90,16 @@ class SongAliasTests(TestCase):
         user = User.objects.create_user("cat", password="pw-123456")
         p = Playlist.objects.create(user=user, name="x", songs=["膽大黨2", "膽大黨 第二季", "A"])
         self.assertEqual(_pl_json(p)["songs"], ["膽大黨 第二季", "A"])
+
+
+class RenamedSongTests(TestCase):
+    def test_renamed_song_maps_old_name_and_url(self):
+        from unittest import mock
+
+        from player import playlist as pl
+        with mock.patch.object(pl, "get_playlist", return_value=[{"id": "幸運☆星 OP", "audio": pl._raw_url("幸運☆星 OP.m4a")}]):
+            m = pl.alias_map()
+            self.assertEqual(m["ids"]["幸運星"], "幸運☆星 OP")
+            self.assertEqual(m["urls"][pl._raw_url("幸運星.m4a")], pl._raw_url("幸運☆星 OP.m4a"))
+            self.assertEqual(pl.audio_urls()["幸運星"], pl._raw_url("幸運☆星 OP.m4a"))
+        self.assertEqual(pl.resolve_song("幸運星"), "幸運☆星 OP")

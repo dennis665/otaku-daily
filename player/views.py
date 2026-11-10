@@ -14,7 +14,7 @@ from notifications.reminders import SCHEDULE_HINT
 
 from .events import fetched_at, get_events
 from .models import HIDEABLE_TABS, Playlist, UserPrefs
-from .playlist import get_playlist, resolve_song
+from .playlist import alias_map, get_playlist, resolve_song
 
 
 @login_required
@@ -26,6 +26,7 @@ def home(request):
         "video_count": sum(1 for s in playlist if s["video"]),
         "reminder_hint": SCHEDULE_HINT,
         "hidden_tabs": UserPrefs.hidden_for(request.user),
+        "song_aliases": alias_map(),
     })
 
 

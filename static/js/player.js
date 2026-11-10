@@ -347,6 +347,9 @@
   const showError = (id, msg) => { const el = $(id); el.textContent = msg || ''; el.hidden = !msg; };
 
   const songById = new Map(songs.map((s) => [s.id, s]));
+  // 改過名的歌：舊名稱／舊網址 → 目前的（伺服器提供）
+  const aliases = (() => { try { return JSON.parse($('song-aliases').textContent); } catch { return { ids: {}, urls: {} }; } })();
+  const findSong = (id) => songById.get(id) || songById.get(aliases.ids[id]);
   let myLists = [];
   let listId = store.get('musicList', 'all');
   // 離線時選到的歌單如果沒有存到手機的歌，就先顯示「全部歌曲」（不改掉記住的選擇）
@@ -612,7 +615,21 @@
       const current = new Set(songs.map((s) => s.audio));
       for (const req of await cache.keys()) {
         // 影音庫已經換掉或刪掉的檔案：從手機清掉，不佔空間
-        if (!current.has(req.url)) { await cache.delete(req); continue; }
+        if (!current.has(req.url)) {
+          // 歌改名了：手機裡的檔案改用新網址存，不用重新下載；其他（已刪掉的歌）清掉不佔空間
+          const to = aliases.urls[req.url];
+          if (to && current.has(to) && !(await cache.match(to, { ignoreVary: true }))) {
+            const old = await cache.match(req, { ignoreVary: true });
+            if (old) {
+              const size = Number(old.headers.get('content-length')) || 0;
+              await cache.put(to, old);
+              saved.set(to, size);
+            }
+          }
+          await cache.delete(req);
+          tellWorker();
+          continue;
+        }
         const res = await cache.match(req, { ignoreVary: true });
         saved.set(req.url, (res && Number(res.headers.get('content-length'))) || (res ? (await res.blob()).size : 0));
       }
@@ -743,7 +760,7 @@
 
   // ---------- 還原上次的狀態 (不自動播放，瀏覽器也不允許) ----------
   applyVol(store.get('volume', 100));
-  const lastSong = songById.get(store.get('musicId', '')) || songs[store.get('musicIndex', -1)];
+  const lastSong = findSong(store.get('musicId', '')) || songs[store.get('musicIndex', -1)];
   if (lastSong && queue.includes(lastSong)) loadSong(queue.indexOf(lastSong), false);
   const lastVideo = store.get('videoIndex', -1);
   const videoOn = !tabBtnOf('video').hidden;   // 影片分頁關掉時不預先載入影片
