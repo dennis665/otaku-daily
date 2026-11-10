@@ -484,7 +484,6 @@
 
   // ---------- 離線聽歌：把歌存到手機（service worker 會改從手機播放），歌單也在手機存一份最近的副本 ----------
   const SONG_CACHE = 'ukiyo-offline-songs';
-  const PAGE_CACHE = 'ukiyo-offline-page';
   const canSave = 'caches' in window && 'serviceWorker' in navigator;
   const saved = new Set();          // 已存到手機的音樂網址
   let saving = null;                // 下載中：{ stop: false }
@@ -568,19 +567,34 @@
   $('m-off-del').addEventListener('click', () => removeSongs().catch((err) => alert(err.message)));
   window.addEventListener('online', () => { refreshQueue(false); loadMyLists(); });
   window.addEventListener('offline', () => refreshQueue(false));
-  // 登出：刪掉手機裡的個人資料（存的主頁與歌單）；存到手機的歌不是個人資料，保留下來
+  // 登出：刪掉手機裡的個人歌單副本；存的主頁與歌保留，沒網路時仍可以聽存在手機的歌（離線模式）
   const logout = document.querySelector('form[action$="/logout/"]');
   if (logout) logout.addEventListener('submit', () => {
     try { localStorage.removeItem('myLists'); } catch { /* 忽略 */ }
-    if ('caches' in window) caches.delete(PAGE_CACHE);
+    store.set('loggedOut', true);
   });
+  // 已登出、沒網路打開的是存在手機的主頁：不顯示帳號名稱，改標示離線模式
+  function showLoggedOut(on) {
+    $('u-name').textContent = on ? '📴 離線模式' : $('u-name').dataset.name;
+    if (logout) logout.hidden = on;
+  }
+  if (store.get('loggedOut', false) && !isOnline()) showLoggedOut(true);
 
   // 背景讀取歌單（不顯示載入遮罩）；讀不到（離線）就用手機裡最近一次的副本
   function loadMyLists() {
     return fetch('/api/playlists/', { credentials: 'same-origin', loading: false, cache: 'no-store' })
       .then((r) => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : Promise.reject()))
-      .then((res) => { myLists = res.playlists || []; store.set('myLists', myLists); refreshQueue(true); })
-      .catch(() => { myLists = store.get('myLists', []); refreshQueue(true); });
+      .then((res) => {
+        myLists = res.playlists || [];
+        store.set('myLists', myLists);
+        if (store.get('loggedOut', false)) { store.set('loggedOut', false); showLoggedOut(false); }
+        refreshQueue(true);
+      })
+      .catch(() => {
+        myLists = store.get('myLists', []);
+        if (store.get('loggedOut', false)) showLoggedOut(true);
+        refreshQueue(true);
+      });
   }
   myLists = isOnline() ? [] : store.get('myLists', []);
   refreshQueue(false);

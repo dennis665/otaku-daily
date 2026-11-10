@@ -7,7 +7,7 @@
   <div class="user">
     <button class="icon sm bell" id="s-open" type="button" title="個人設定" aria-label="個人設定">⚙️</button>
     <button class="icon sm bell" id="n-open" type="button" title="通知設定" aria-label="通知設定">🔔</button>
-    <span>{{ user.username }}</span>
+    <span id="u-name" data-name="{{ user.username }}">{{ user.username }}</span>
     <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn ghost sm" type="submit">登出</button></form>
   </div>
 </header>

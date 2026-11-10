@@ -41,25 +41,21 @@ const offlinePage = (err) => new Response(
   { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
 );
 
-// 主頁每次從網路成功打開就存一份（離線時用）；被導到登入頁＝已登出，刪掉存的主頁（裡面有個人歌單資料）
+// 主頁每次從網路成功打開就存一份（離線時用）；登出後也保留，沒網路時仍能聽存在手機的歌
+// （個人歌單不在頁面裡，登出時頁面程式會刪掉手機裡的歌單副本；換別人登入就會被新的主頁取代）
 function rememberPage(req, res) {
   const url = new URL(req.url);
-  if (res.redirected && new URL(res.url).pathname.startsWith('/accounts/login')) {
-    caches.delete(PAGE_CACHE);
-  } else if (url.pathname === HOME_URL && res.status === 200 && !res.redirected) {
+  if (url.pathname === HOME_URL && res.status === 200 && !res.redirected) {
     const copy = res.clone();
     caches.open(PAGE_CACHE).then((c) => c.put(HOME_URL, copy)).catch(() => {});
   }
   return res;
 }
 
-// 沒有網路：主頁用存好的那份，其他頁面顯示離線提示
+// 沒有網路：不管開哪一頁都改開存好的主頁（音樂分頁可以播存在手機的歌），沒存過才顯示離線提示
 async function offlineFallback(req, err) {
-  if (new URL(req.url).pathname === HOME_URL) {
-    const cached = await caches.match(HOME_URL, { cacheName: PAGE_CACHE });
-    if (cached) return cached;
-  }
-  return offlinePage(err);
+  const cached = await caches.match(HOME_URL, { cacheName: PAGE_CACHE });
+  return cached || offlinePage(err);
 }
 
 // 開頁：一律走網路（登入狀態才會正確），沒網路才用手機裡存的主頁。
