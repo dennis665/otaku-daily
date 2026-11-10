@@ -349,7 +349,12 @@
   const songById = new Map(songs.map((s) => [s.id, s]));
   let myLists = [];
   let listId = store.get('musicList', 'all');
-  const currentList = () => myLists.find((p) => p.id === listId) || null;
+  // 離線時選到的歌單如果沒有存到手機的歌，就先顯示「全部歌曲」（不改掉記住的選擇）
+  const currentList = () => {
+    const p = myLists.find((x) => x.id === listId) || null;
+    if (p && !isOnline() && !p.songs.some((id) => songById.has(id) && saved.has(songById.get(id).audio))) return null;
+    return p;
+  };
 
   function paintLists() {
     const cur = currentList();
@@ -367,8 +372,12 @@
       b.addEventListener('click', () => selectList(id));
       box.appendChild(b);
     };
-    chip('all', '🎵 全部歌曲', songs.length);
-    myLists.forEach((p) => chip(p.id, p.name, p.songs.filter((id) => songById.has(id)).length));
+    const usable = (id) => songById.has(id) && playable(songById.get(id));
+    chip('all', '🎵 全部歌曲', songs.filter(playable).length);
+    myLists.forEach((p) => {
+      const n = p.songs.filter(usable).length;
+      if (n || isOnline()) chip(p.id, p.name, n);   // 離線模式：沒有存到手機的歌的歌單不顯示
+    });
     $('m-list-bar').hidden = !cur;
     $('m-list-empty').hidden = !cur || queue.length > 0;
     if (cur) $('m-list-info').textContent = `「${cur.name}」共 ${queue.length} 首・依加入順序播放`;
@@ -408,6 +417,7 @@
   function refreshQueue(resetPage) {
     const cur = currentList();
     queue = cur ? cur.songs.map((id) => songById.get(id)).filter(Boolean) : songs;
+    if (!isOnline()) queue = queue.filter(playable);   // 離線模式：只列出存在手機的歌
     mIndex = curSong ? queue.indexOf(curSong) : -1;
     const state = lists[mList.id];
     if (state) {
@@ -534,7 +544,7 @@
   const tellWorker = () => { if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'songs-changed' }); };
   function offNote(show, text) {
     const el = $('m-off-note');
-    el.textContent = text || '📴 目前離線：只能播已存到手機的歌（📱），歌單暫時不能修改';
+    el.textContent = text || '📴 離線模式：只顯示存在手機的歌，連上網路後會自動恢復';
     el.hidden = !show;
   }
   async function paintOffline() {
@@ -602,13 +612,26 @@
       }
     } catch { /* 無痕模式等情況無法使用 */ }
     refreshQueue(false);
+    applyOfflineMode();
   }
   $('m-off-get').addEventListener('click', () => {
     if (saving) saving.stop = true; else saveSongs().catch((err) => { saving = null; alert(err.message); paintOffline(); });
   });
   $('m-off-del').addEventListener('click', () => removeSongs().catch((err) => alert(err.message)));
-  window.addEventListener('online', () => { refreshQueue(false); loadMyLists(); });
-  window.addEventListener('offline', () => refreshQueue(false));
+  // 離線模式：只留音樂分頁的歌單與存在手機的歌，其他用不到的（其他分頁、設定、搜尋、新增歌單等）都藏起來
+  function applyOfflineMode() {
+    const off = !isOnline();
+    document.body.classList.toggle('offline-mode', off);
+    // 音樂分頁上的數字：離線時改成存在手機的歌數
+    const count = document.querySelector('.tab[data-tab="music"] b');
+    if (count) {
+      if (!count.dataset.all) count.dataset.all = count.textContent;
+      count.textContent = off ? songs.filter((s) => saved.has(s.audio)).length : count.dataset.all;
+    }
+    if (off && !document.querySelector('.tab[data-tab="music"]').classList.contains('active')) tabBtnOf('music').click();
+  }
+  window.addEventListener('online', () => { applyOfflineMode(); refreshQueue(false); loadMyLists(); });
+  window.addEventListener('offline', () => { applyOfflineMode(); refreshQueue(false); });
   // 登出：刪掉手機裡的個人歌單副本；存的主頁與歌保留，沒網路時仍可以聽存在手機的歌（離線模式）
   const logout = document.querySelector('form[action$="/logout/"]');
   if (logout) logout.addEventListener('submit', () => {
@@ -625,6 +648,11 @@
   // 背景讀取歌單（不顯示載入遮罩）；讀不到（離線）就用手機裡最近一次的副本
   function loadMyLists() {
     return fetch('/api/playlists/', { credentials: 'same-origin', loading: false, cache: 'no-store' })
+      .then((r) => {
+        // 用存在手機的主頁打開、但其實已經登出（網路恢復後）：回到登入頁
+        if (r.redirected && new URL(r.url).pathname.startsWith('/accounts/login')) { location.replace('/accounts/login/'); return Promise.reject(); }
+        return r;
+      })
       .then((r) => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : Promise.reject()))
       .then((res) => {
         myLists = res.playlists || [];
@@ -721,6 +749,7 @@
   if (params.has('tab')) history.replaceState(null, '', location.pathname);
   const tabBtn = document.querySelector(`.tab[data-tab="${wantTab}"]`);
   if (tabBtn && !tabBtn.hidden && wantTab !== 'music') tabBtn.click();
+  applyOfflineMode();
 
   // 點通知時 App 已經開著：切到指定分頁，並交給該分頁處理其他參數（例如群組邀請）
   window.handleAppLink = (url) => {

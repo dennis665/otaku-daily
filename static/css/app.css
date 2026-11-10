@@ -389,6 +389,13 @@ body.sheet-open { overflow: hidden; }
 .m-list-bar[hidden] { display: none; }
 .m-list-bar .act { flex: none; white-space: nowrap; }
 .empty.sm { font-size: .85rem; margin: 6px 0 12px; }
+/* 離線模式：只留音樂分頁的歌單與存在手機的歌 */
+body.offline-mode .tabs .tab:not([data-tab="music"]),
+body.offline-mode #s-open, body.offline-mode #n-open, body.offline-mode .topbar .user form,
+body.offline-mode #m-finder, body.offline-mode #m-dl,
+body.offline-mode #m-list-new, body.offline-mode #m-list-edit,
+body.offline-mode .list .li-act,
+body.offline-mode #m-off-get, body.offline-mode #m-off-del { display: none !important; }
 /* 離線聽歌 */
 .m-offline { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .8rem; margin: 0 2px 8px; flex-wrap: wrap; }
 .m-offline[hidden], .off-note[hidden] { display: none; }

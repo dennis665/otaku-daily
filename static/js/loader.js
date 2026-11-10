@@ -119,6 +119,13 @@
       res = await nativeFetch(form.action || location.href, { method: 'POST', body, credentials: 'same-origin' });
     } catch {
       done();
+      if (navigator.onLine === false) {
+        // 沒網路：留在原頁提示，不改用一般方式送出（會跳到無法連線的畫面）
+        loader.classList.remove('is-immediate');
+        form.querySelectorAll('button[type=submit]').forEach((btn) => { btn.disabled = false; });
+        alert('目前沒有網路連線，請連線後再試 📶');
+        return;
+      }
       navigateAfterPaint(() => form.submit());   // 背景送出失敗：改用一般方式送出
       return;
     }

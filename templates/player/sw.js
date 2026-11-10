@@ -36,8 +36,9 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// 網路恢復（或按「重新連線」）就自動重新載入，不用把 App 關掉重開
 const offlinePage = (err) => new Response(
-  `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="background:#14122b;color:#fff;font-family:sans-serif;display:grid;place-items:center;height:100vh;margin:0"><p>目前沒有網路連線，請連線後再試 📶</p><!-- ${String(err && err.message || err || '').replace(/--/g, '')} --></body>`,
+  `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="background:#14122b;color:#fff;font-family:sans-serif;display:grid;place-items:center;height:100vh;margin:0;text-align:center"><div><p>目前沒有網路連線，連線後會自動重新開啟 📶</p><button onclick="location.reload()" style="margin-top:12px;padding:10px 22px;border-radius:99px;border:0;background:linear-gradient(135deg,#ff6fae,#8a7bff);color:#fff;font-size:1rem">🔄 重新連線</button></div><script>addEventListener('online',()=>location.reload());setInterval(()=>fetch('/version.json',{cache:'no-store'}).then(r=>{if(r.ok)location.reload()}).catch(()=>{}),5000);</script><!-- ${String(err && err.message || err || '').replace(/--/g, '')} --></body>`,
   { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
 );
 
