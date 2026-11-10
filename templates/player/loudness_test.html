@@ -30,7 +30,8 @@
   <a class="back" href="/">‹ 回 Ukiyo</a>
   <h1>🎧 音質比較（都已調到 -35）</h1>
   <p class="sub">同一首歌、同樣音量，只差在壓縮品質，由小到大排列。戴藍牙耳機依序播放，聽聽看從哪一個開始聽不出差別。<br>
-    按「🙈 盲測」會打亂順序、藏起名稱，比較不會被檔案大小影響判斷。</p>
+    按「🙈 盲測」會打亂順序、藏起名稱，比較不會被檔案大小影響判斷。<br>
+    其他版本都是從 App 現有的 MP3（藍框）轉出來的，最多只能和它一樣好；粉紅框的「★ YouTube 原始音源」是重新下載官方音源只轉一次，才有機會比現在更好。</p>
   <div class="qbar"><button id="blind" type="button">🙈 盲測</button><button id="reveal" type="button" hidden>👀 公布答案</button></div>
   <div id="quality">載入中…</div>
 
@@ -63,10 +64,10 @@
     const list = blind ? [...qItems].sort(() => Math.random() - 0.5) : qItems;
     list.forEach((it, i) => {
       const row = document.createElement('div');
-      row.className = 'row' + (it.key === 'mp3_128' ? ' cur' : '');
+      row.className = 'row' + (it.key === 'mp3_128' ? ' cur' : '') + (!blind && it.key.startsWith('yt_') ? ' rec' : '');
       row.innerHTML = '<div class="lab"><b></b><small></small></div><audio controls preload="none"></audio>';
       row.querySelector('b').textContent = blind ? `第 ${i + 1} 個` : it.label;
-      row.querySelector('small').textContent = blind ? '？' : `${it.kb} KB・${it.kbps} kbps`;
+      row.querySelector('small').textContent = blind ? '？' : `${it.kb} KB・${it.kbps} kbps${it.note ? `・${it.note}` : ''}`;
       row.dataset.answer = `${it.label}（${it.kb} KB）`;
       const a = row.querySelector('audio');
       a.src = BASE + it.file;
