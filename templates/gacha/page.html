@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14122b">
+<title>抽卡（測試）｜Ukiyo</title>
+<style>
+  body { margin:0; background:#14122b; color:#f2f0ff; font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 16px) 16px 40px; }
+  a { color:#a9a3d6; text-decoration:none; font-size:.9rem; }
+  h1 { font-size:1.2rem; margin:10px 0 4px; } h2 { font-size:1rem; margin:22px 0 8px; }
+  .sub { color:#a9a3d6; font-size:.85rem; margin:0 0 12px; }
+  button { border:0; border-radius:99px; padding:10px 18px; font:inherit; color:#fff; background:linear-gradient(135deg,#ff6fae,#8a7bff); cursor:pointer; }
+  button:disabled { opacity:.4; }
+  .works { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+  .works button { border-radius:12px; font-size:.82rem; padding:10px; background:#232046; border:1px solid #36325f; text-align:left; }
+  .result { min-height:10px; margin:14px 0; display:flex; justify-content:center; }
+  .card { width:220px; border-radius:14px; overflow:hidden; background:#232046; border:3px solid #777; animation:pop .5s ease; }
+  .card img { width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:#111; }
+  .card .t { padding:8px 10px; font-size:.85rem; } .card b { display:inline-block; margin-right:6px; }
+  .r-N { border-color:#8a8aa0 } .r-R { border-color:#c0c8d8 } .r-SR { border-color:#ffd166 }
+  .r-SSR { border-color:#ff6fae; box-shadow:0 0 18px #ff6fae } .r-UR { border-color:#5ee7ff; box-shadow:0 0 24px #5ee7ff }
+  .r-LR { border-color:#000; box-shadow:0 0 30px #ffd166, 0 0 60px #ff6fae }
+  @keyframes pop { from { transform:scale(.6) rotateY(90deg); opacity:0 } to { transform:none; opacity:1 } }
+  .album .w { background:#232046; border:1px solid #36325f; border-radius:12px; padding:8px 10px; margin-bottom:8px; font-size:.85rem; }
+  .chips span { display:inline-block; margin:4px 4px 0 0; padding:2px 8px; border-radius:99px; background:#1d1a3a; color:#55507a; font-size:.75rem; }
+  .chips span.on { color:#fff; background:#8a7bff; }
+  .err { color:#ff8080; }
+</style>
+</head>
+<body>
+<main>
+  <a href="/">‹ 回 Ukiyo</a>
+  <h1>🎴 動畫小卡抽卡（測試版）</h1>
+  <p class="sub" id="info">讀取中…</p>
+  <button id="free">🎲 全作品隨機抽</button>
+  <p class="err" id="err"></p>
+  <div class="result" id="result"></div>
+  <h2>追的作品（今天每部 1 抽）</h2>
+  <div class="works" id="works"></div>
+  <h2>📖 我的集卡冊</h2>
+  <div class="album" id="album"></div>
+</main>
+{% csrf_token %}
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const csrf = document.querySelector('input[name=csrfmiddlewaretoken]').value;
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  async function load() {
+    const s = await (await fetch('/gacha/api/status/')).json();
+    $('info').textContent = `今天 ${s.day}・隨機抽剩 ${s.free_left} 次・再 ${s.pity_left} 抽必出 SSR 以上`;
+    $('free').disabled = !s.free_left;
+    $('works').innerHTML = s.follow_left.length ? '' : '<p class="sub">今天追的作品都抽完了（或還沒追任何作品）</p>';
+    s.follow_left.forEach((w) => {
+      const b = document.createElement('button');
+      b.textContent = `🎴 ${w.title}`;
+      b.onclick = () => pull(w.id);
+      $('works').appendChild(b);
+    });
+    const a = await (await fetch('/gacha/api/album/')).json();
+    $('album').innerHTML = a.works.length ? '' : '<p class="sub">還沒有卡片，抽一張吧！</p>';
+    a.works.forEach((w) => {
+      const chips = a.rarities.map((r) => `<span class="${w.cards[r] ? 'on' : ''}">${esc(a.labels[r])}${w.cards[r] && w.cards[r].count > 1 ? '×' + w.cards[r].count : ''}</span>`).join('');
+      $('album').insertAdjacentHTML('beforeend', `<div class="w"><b>${esc(w.title)}</b>　${w.have}／${w.total}<div class="chips">${chips}</div></div>`);
+    });
+  }
+  async function pull(workId) {
+    $('err').textContent = '';
+    const body = new URLSearchParams(workId ? { work_id: workId } : {});
+    const r = await (await fetch('/gacha/api/pull/', { method: 'POST', headers: { 'X-CSRFToken': csrf }, body })).json();
+    if (!r.ok) { $('err').textContent = r.error; return; }
+    const c = r.card;
+    $('result').innerHTML = `<div class="card r-${c.rarity}"><img src="${esc(c.image)}" alt="" referrerpolicy="no-referrer"><div class="t"><b>${esc(c.rarity_label)}</b>${c.new ? '🆕 ' : ''}${r.pity ? '（保底）' : ''}${esc(c.title)}</div></div>`;
+    load();
+  }
+  $('free').onclick = () => pull(null);
+  load();
+})();
+</script>
+</body>
+</html>

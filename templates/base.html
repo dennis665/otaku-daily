@@ -35,7 +35,7 @@
       <p>載入中<span class="dots"></span></p>
     </div>
   </div>
-  {% if app_env == "staging" %}<div class="env-banner">🧪 測試站・<a href="/wake/?preview=1">🎬 預覽等待畫面</a>・<a href="/wake/?preview=maint">🛠 維護畫面</a>・<a href="/loudness-test/">🔊 音量試聽</a></div>{% endif %}
+  {% if app_env == "staging" %}<div class="env-banner">🧪 測試站・<a href="/wake/?preview=1">🎬 預覽等待畫面</a>・<a href="/wake/?preview=maint">🛠 維護畫面</a>・<a href="/loudness-test/">🔊 音量試聽</a>・<a href="/gacha/">🎴 抽卡</a></div>{% endif %}
   {% block content %}{% endblock %}
   <script>
     // 註冊 service worker，讓網站可以「加入主畫面」安裝成 App

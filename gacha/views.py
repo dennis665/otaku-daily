@@ -53,3 +53,14 @@ def album(request):
         g["cards"][c.rarity] = _card(c.work, c.rarity, c.count)
     items = [{**g, "have": len(g["cards"]), "total": len(RARITIES)} for g in groups.values()]
     return _json({"rarities": RARITIES, "labels": RARITY_LABEL, "works": items})
+
+
+@login_required
+def page(request):
+    """簡易抽卡頁（測試站限定，正式版畫面完成前先用來試玩）"""
+    from django.conf import settings
+    from django.http import Http404
+    from django.shortcuts import render
+    if getattr(settings, "APP_ENV", "") != "staging":
+        raise Http404
+    return render(request, "gacha/page.html")
