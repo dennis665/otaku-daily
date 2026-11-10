@@ -79,3 +79,14 @@ class PlaylistFormatTests(TestCase):
         self.assertNotIn("D", by)
         # 順序反過來也一樣用 .m4a
         self.assertTrue(build_playlist(["A.m4a", "A.mp3"])[0]["audio"].endswith("A.m4a"))
+
+
+class SongAliasTests(TestCase):
+    def test_removed_duplicate_resolves_to_kept_song(self):
+        from player.playlist import resolve_song
+        from player.views import _pl_json
+        self.assertEqual(resolve_song("膽大黨2"), "膽大黨 第二季")
+        self.assertEqual(resolve_song("葬送的芙莉蓮"), "葬送的芙莉蓮")
+        user = User.objects.create_user("cat", password="pw-123456")
+        p = Playlist.objects.create(user=user, name="x", songs=["膽大黨2", "膽大黨 第二季", "A"])
+        self.assertEqual(_pl_json(p)["songs"], ["膽大黨 第二季", "A"])

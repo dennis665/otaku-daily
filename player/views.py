@@ -14,7 +14,7 @@ from notifications.reminders import SCHEDULE_HINT
 
 from .events import fetched_at, get_events
 from .models import HIDEABLE_TABS, Playlist, UserPrefs
-from .playlist import get_playlist
+from .playlist import get_playlist, resolve_song
 
 
 @login_required
@@ -64,7 +64,8 @@ def prefs(request):
 
 
 def _pl_json(p):
-    return {"id": p.id, "name": p.name, "songs": p.songs}
+    # 已刪掉的重複歌曲換成保留的那首（同一首不重複出現）
+    return {"id": p.id, "name": p.name, "songs": list(dict.fromkeys(resolve_song(s) for s in p.songs))}
 
 
 def _clean_name(value):

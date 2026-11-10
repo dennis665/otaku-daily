@@ -85,6 +85,23 @@ def get_playlist():
     return playlist
 
 
+# 內容完全相同、已刪掉的重複歌曲：舊名稱 → 保留的名稱（追劇連結與個人歌單會自動換成保留的那首）
+SONG_ALIASES = {
+    "Dr.STONE 新石紀 SCIENCE FUTURE2": "Dr.STONE 新石紀 SCIENCE FUTURE 第二季",
+    "新石紀 第三季": "Dr.STONE 新石紀 SCIENCE FUTURE3",
+    "SAKAMOTO DAYS 坂本日常2": "SAKAMOTO DAYS 坂本日常 第二季",
+    "膽大黨2": "膽大黨 第二季",
+}
+
+
+def resolve_song(name):
+    return SONG_ALIASES.get(name, name)
+
+
 def audio_urls():
     """歌名（檔名，不含副檔名）→ 目前的音樂網址；追劇卡片的「主題曲」連結用它換成最新檔案"""
-    return {s["id"]: s["audio"] for s in get_playlist() if s["audio"]}
+    urls = {s["id"]: s["audio"] for s in get_playlist() if s["audio"]}
+    for old, new in SONG_ALIASES.items():
+        if old not in urls and new in urls:
+            urls[old] = urls[new]
+    return urls
