@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14122b">
-<title>音量統一試聽｜Ukiyo 測試站</title>
+<title>音質與音量試聽｜Ukiyo 測試站</title>
 <style>
   body { margin:0; background:#14122b; color:#f2f0ff; font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif; }
   main { max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px); }
@@ -19,13 +19,22 @@
   .lab small { color:#a9a3d6; font-size:.75rem; }
   .bad { color:#ff8080; } .ok { color:#6fe3a1; }
   audio { width:100%; height:40px; }
+  .qbar { display:flex; gap:8px; margin-bottom:4px; }
+  .qbar button { border:1px solid #36325f; background:#1d1a3a; color:#f2f0ff; border-radius:99px; padding:7px 14px; font:inherit; font-size:.85rem; }
+  .row.cur { border-color:#5ee7ff; }
   .tip { background:rgba(94,231,255,.08); border:1px solid #5ee7ff; color:#5ee7ff; border-radius:12px; padding:10px 12px; font-size:.84rem; line-height:1.7; margin-top:20px; }
 </style>
 </head>
 <body>
 <main>
   <a class="back" href="/">‹ 回 Ukiyo</a>
-  <h1>🔊 音量統一試聽</h1>
+  <h1>🎧 音質比較（都已調到 -35）</h1>
+  <p class="sub">同一首歌、同樣音量，只差在壓縮品質，由小到大排列。戴藍牙耳機依序播放，聽聽看從哪一個開始聽不出差別。<br>
+    按「🙈 盲測」會打亂順序、藏起名稱，比較不會被檔案大小影響判斷。</p>
+  <div class="qbar"><button id="blind" type="button">🙈 盲測</button><button id="reveal" type="button" hidden>👀 公布答案</button></div>
+  <div id="quality">載入中…</div>
+
+  <h1 style="margin-top:32px">🔊 音量統一試聽</h1>
   <p class="sub">戴上藍牙耳機、<b>手機音量固定在 2～3 格</b>，依序播放比較。<br>
     目標：最小聲的歌也聽得清楚舒服，最大聲的歌不會刺耳，兩首聽起來差不多大聲。</p>
   <div id="songs">載入中…</div>
@@ -45,6 +54,39 @@
     ['12', '-12 LUFS', (m) => m.i12],
   ];
   const audios = [];
+
+  // ---------- 音質比較 ----------
+  let qItems = [];
+  function paintQuality(blind) {
+    const box = document.getElementById('quality');
+    box.innerHTML = '';
+    const list = blind ? [...qItems].sort(() => Math.random() - 0.5) : qItems;
+    list.forEach((it, i) => {
+      const row = document.createElement('div');
+      row.className = 'row' + (it.key === 'mp3_128' ? ' cur' : '');
+      row.innerHTML = '<div class="lab"><b></b><small></small></div><audio controls preload="none"></audio>';
+      row.querySelector('b').textContent = blind ? `第 ${i + 1} 個` : it.label;
+      row.querySelector('small').textContent = blind ? '？' : `${it.kb} KB・${it.kbps} kbps`;
+      row.dataset.answer = `${it.label}（${it.kb} KB）`;
+      const a = row.querySelector('audio');
+      a.src = BASE + it.file;
+      a.addEventListener('play', () => audios.forEach((x) => { if (x !== a) x.pause(); }));
+      audios.push(a);
+      box.append(row);
+    });
+    document.getElementById('reveal').hidden = !blind;
+  }
+  fetch(BASE + 'q/meta.json', { cache: 'no-store' }).then((r) => r.json()).then((q) => {
+    qItems = q.items.slice().sort((a, b) => a.kb - b.kb);
+    paintQuality(false);
+  }).catch(() => { document.getElementById('quality').textContent = '範例讀取失敗，請稍後重新整理'; });
+  document.getElementById('blind').addEventListener('click', () => paintQuality(true));
+  document.getElementById('reveal').addEventListener('click', () => {
+    document.querySelectorAll('#quality .row').forEach((row) => {
+      row.querySelector('small').textContent = row.dataset.answer;
+    });
+  });
+
   fetch(BASE + 'meta.json', { cache: 'no-store' }).then((r) => r.json()).then((meta) => {
     const box = document.getElementById('songs');
     box.innerHTML = '';
