@@ -2,21 +2,34 @@ import random
 from collections import Counter
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from dramas.models import Follow, Work
 
-from . import service
-from .models import FREE_DAILY, PITY_AT, GachaState, OwnedCard, Pull
+from . import cards, service
+from .models import FREE_DAILY, PITY_AT, Card, GachaState, OwnedCard, Pull
 
 User = get_user_model()
+
+
+def setUpModule():
+    # 測試不連 GitHub 讀卡片索引
+    cards._state["at"] = 1e18
+
+
+def make_work(sid, title, rarities=("N", "R", "SR", "SSR")):
+    w = Work.objects.create(source_id=sid, title=title)
+    for i, r in enumerate(rarities):
+        Card.objects.create(work=w, rarity=r, file=f"{sid}/{r}_{i}.webp")
+    return w
 
 
 class GachaTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("amy", password="pw-123456")
-        self.w1 = Work.objects.create(source_id=1, title="芙莉蓮", images=["a.jpg"])
-        self.w2 = Work.objects.create(source_id=2, title="藥師", images=["b.jpg"])
+        self.w1 = make_work(1, "芙莉蓮")
+        self.w2 = make_work(2, "藥師")
+        self.empty = Work.objects.create(source_id=3, title="沒有卡片的作品")
 
     def test_rarity_distribution_roughly_matches(self):
         rng = random.Random(1)
@@ -25,18 +38,32 @@ class GachaTests(TestCase):
         self.assertAlmostEqual(c["SSR"] / 20000, 0.05, delta=0.01)
         self.assertTrue(all(service.roll_rarity(rng, pity=True) in service.HIGH for _ in range(200)))
 
-    def test_follow_pull_once_per_day(self):
+    def test_follow_pull_once_per_day_and_only_works_with_cards(self):
         with self.assertRaises(service.PullError):
             service.pull(self.user, self.w1.id)            # 沒追不能抽
         Follow.objects.create(user=self.user, work=self.w1)
+        Follow.objects.create(user=self.user, work=self.empty)
+        self.assertEqual(service.status(self.user)["follow_left"], [self.w1.id])   # 沒卡片的作品不列出
         service.pull(self.user, self.w1.id)
         with self.assertRaises(service.PullError):
             service.pull(self.user, self.w1.id)            # 同一天不能再抽
+        with self.assertRaises(service.PullError):
+            service.pull(self.user, self.empty.id)
         self.assertEqual(service.status(self.user)["follow_left"], [])
+
+    def test_same_rarity_can_have_many_cards(self):
+        w = make_work(9, "多卡作品", rarities=("N", "N", "N"))
+        got = {service.pick_card(w.id, False, random.Random(i)).id for i in range(60)}
+        self.assertEqual(len(got), 3)   # 三張 N 都抽得到
+
+    def test_missing_rarity_falls_back(self):
+        w = make_work(8, "只有 R", rarities=("R",))
+        self.assertTrue(all(service.pick_card(w.id, False, random.Random(i)).rarity == "R" for i in range(30)))
 
     def test_free_pulls_limited_and_owned_counts(self):
         for _ in range(FREE_DAILY):
-            service.pull(self.user)
+            p, _ = service.pull(self.user)
+            self.assertIn(p.work_id, {self.w1.id, self.w2.id})
         with self.assertRaises(service.PullError):
             service.pull(self.user)
         self.assertEqual(sum(OwnedCard.objects.filter(user=self.user).values_list("count", flat=True)), FREE_DAILY)
@@ -49,28 +76,36 @@ class GachaTests(TestCase):
         self.assertEqual(GachaState.objects.get(user=self.user).since_ssr, 0)
         self.assertEqual(Pull.objects.count(), 1)
 
+    def test_apply_index_creates_and_deactivates(self):
+        Work.objects.create(source_id=77, title="新作品")
+        created, gone = cards.apply_index({"works": {"77": [{"file": "77/SSR_a.webp", "rarity": "SSR", "name": "主角"}]}})
+        self.assertEqual(created, 1)
+        self.assertTrue(Card.objects.get(file="77/SSR_a.webp").active)
+        created, gone = cards.apply_index({"works": {}})
+        self.assertFalse(Card.objects.get(file="77/SSR_a.webp").active)
+        self.assertGreater(gone, 0)
+
 
 class GachaApiTests(TestCase):
     def test_pull_and_album(self):
         user = User.objects.create_user("bob", password="pw-123456")
-        w = Work.objects.create(source_id=9, title="葬送的芙莉蓮", images=["1.jpg", "2.jpg"])
+        w = make_work(10, "葬送的芙莉蓮")
         Follow.objects.create(user=user, work=w)
         self.client.force_login(user)
         s = self.client.get("/gacha/api/status/").json()
         self.assertEqual([x["id"] for x in s["follow_left"]], [w.id])
         r = self.client.post("/gacha/api/pull/", {"work_id": w.id}).json()
         self.assertTrue(r["ok"] and r["card"]["new"])
+        self.assertTrue(r["card"]["image"].endswith(".webp"))
         self.assertEqual(self.client.post("/gacha/api/pull/", {"work_id": w.id}).status_code, 400)
         album = self.client.get("/gacha/api/album/").json()
         self.assertEqual(album["works"][0]["have"], 1)
+        self.assertEqual(album["works"][0]["total"], 4)   # 這部作品的所有卡都列出（沒抽到的顯示剪影）
 
-
-class PullAllTests(TestCase):
     def test_pull_all_follows_once(self):
         user = User.objects.create_user("cat", password="pw-123456")
-        ws = [Work.objects.create(source_id=100 + i, title=f"作品{i}", images=["x.jpg"]) for i in range(3)]
-        for w in ws:
-            Follow.objects.create(user=user, work=w)
+        for i in range(3):
+            Follow.objects.create(user=user, work=make_work(100 + i, f"作品{i}"))
         self.client.force_login(user)
         r = self.client.post("/gacha/api/pull-all/").json()
         self.assertEqual(len(r["cards"]), 3)
@@ -80,9 +115,8 @@ class PullAllTests(TestCase):
 
 class UnlimitedUserTests(TestCase):
     def test_unlimited_user_can_pull_repeatedly(self):
-        from django.test import override_settings
         user = User.objects.create_user("dennis", password="pw-123456")
-        w = Work.objects.create(source_id=500, title="測試作品", images=["x.jpg"])
+        w = make_work(500, "測試作品")
         Follow.objects.create(user=user, work=w)
         with override_settings(GACHA_UNLIMITED_USERS={"dennis"}):
             for _ in range(FREE_DAILY + 2):

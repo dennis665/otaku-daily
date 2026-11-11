@@ -11,7 +11,14 @@ const WAKE_VIDEO_CACHE = `ukiyo-wake-video-${WAKE_VIDEO.split('/').pop()}`;
 const PAGE_CACHE = 'ukiyo-offline-page';
 const SONG_CACHE = 'ukiyo-offline-songs';
 const HOME_URL = '/';
-const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE, PAGE_CACHE, SONG_CACHE];
+// 抽到的卡面圖片（頁面存進來，這裡只負責優先從手機提供；抽卡分頁可一鍵清除）
+const CARD_CACHE = 'ukiyo-cards';
+const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE, PAGE_CACHE, SONG_CACHE, CARD_CACHE];
+const isCardImage = (url) => url.origin === 'https://raw.githubusercontent.com' && url.pathname.includes('/fenglan-media-assets/main/cards/');
+async function serveCard(req) {
+  const cached = await caches.match(req.url, { cacheName: CARD_CACHE, ignoreVary: true });
+  return cached || fetch(req);
+}
 
 async function storeWake() {
   const page = await caches.open(WAKE_PAGE_CACHE);
@@ -149,6 +156,12 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET') return;
+
+  // 卡面圖片：手機裡有存就直接用
+  if (isCardImage(url)) {
+    event.respondWith(serveCard(req).catch(() => fetch(req)));
+    return;
+  }
 
   // 影音儲存庫的歌：手機裡有存才接手
   if (url.origin === 'https://raw.githubusercontent.com') {

@@ -12,15 +12,47 @@
   const rank = (r) => RAR.indexOf(r);
   let status = null;
 
+  // ---------- 卡面存到手機：抽到的卡（與卡冊裡的卡）圖片存進 Cache Storage，service worker 會優先從手機提供 ----------
+  const CARD_CACHE = 'ukiyo-cards';
+  const canCache = 'caches' in window;
+  async function saveImages(urls) {
+    if (!canCache) return;
+    try {
+      const cache = await caches.open(CARD_CACHE);
+      for (const url of [...new Set(urls)].filter(Boolean)) {
+        if (await cache.match(url, { ignoreVary: true })) continue;
+        if (!url.startsWith('https://raw.githubusercontent.com/')) continue;
+        const res = await fetch(url, { mode: 'cors', loading: false }).catch(() => null);
+        if (res && res.ok) await cache.put(url, res);
+      }
+    } catch { /* 手機空間不足或無痕模式：照常從網路讀 */ }
+    paintLocal();
+  }
+  async function paintLocal() {
+    const box = $('g-local');
+    if (!canCache || !box) return;
+    const n = (await (await caches.open(CARD_CACHE)).keys()).length;
+    box.hidden = !n;
+    $('g-local-info').textContent = `📱 手機裡存了 ${n} 張卡面（離線也看得到，讀取更快）`;
+  }
+  $('g-local-clear').addEventListener('click', async () => {
+    if (!window.confirm('要清除手機裡存的卡面圖片嗎？（卡冊不會受影響，之後會從網路重新讀取）')) return;
+    await caches.delete(CARD_CACHE);
+    paintLocal();
+  });
+
   // ---------- 卡片 ----------
   function cardHTML(c, opts = {}) {
     if (!c) {
       return `<div class="gcard is-missing r-${opts.rarity}"><div class="gcard-in"></div><div class="gcard-badge">${esc(LABEL[opts.rarity])}</div></div>`;
     }
     const back = opts.back ? '<div class="gcard-back">UKIYO</div>' : '';
-    return `<div class="gcard r-${c.rarity}" data-w="${c.work_id}" data-r="${c.rarity}">
+    const art = c.image
+      ? `<img src="${esc(c.image)}" alt="" loading="lazy">`
+      : `<div class="gcard-noimg">${esc(c.title)}</div>`;
+    return `<div class="gcard r-${c.rarity}${c.image ? '' : ' is-noimg'}" data-c="${c.card_id}">
       <div class="gcard-face">
-        <div class="gcard-in"><img src="${esc(c.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"><div class="gcard-name">${esc(c.title)}</div></div>
+        <div class="gcard-in">${art}<div class="gcard-name">${esc(c.name || c.title)}</div></div>
         <div class="gcard-frame"></div><div class="gcard-holo"></div><div class="gcard-glare"></div>
         <div class="gcard-badge">${esc(LABEL[c.rarity])}</div>
         ${c.count > 1 && opts.count !== false ? `<div class="gcard-count">×${c.count}</div>` : ''}
@@ -78,14 +110,16 @@
     $('g-all').innerHTML = `⚡ 追的作品全抽<small>${s.follow_left.length ? `${s.follow_left.length} 部一次抽` : '今天都抽完了'}</small>`;
     const box = $('g-works');
     box.innerHTML = '';
-    if (!s.follow_left.length) {
-      box.innerHTML = '<p class="g-empty">今天追的作品都抽完了（或還沒追任何作品，到「📺 追劇」按 ⭐ 追起來）。明天 00:00 重置！</p>';
+    if (!s.pool_works) {
+      box.innerHTML = '<p class="g-empty">🎴 卡片製作中，還沒有可以抽的卡，敬請期待！</p>';
+    } else if (!s.follow_left.length) {
+      box.innerHTML = '<p class="g-empty">今天追的作品都抽完了，或你追的作品還沒有卡片（到「📺 追劇」按 ⭐ 追有卡片的作品）。明天 00:00 重置！</p>';
     }
     s.follow_left.forEach((w) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'g-work';
-      b.innerHTML = `<img src="${esc(w.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${esc(w.title)}</span>`;
+      b.innerHTML = `${w.image ? `<img src="${esc(w.image)}" alt="" loading="lazy">` : '<i class="g-work-noimg"></i>'}<span>${esc(w.title)}</span>`;
       b.addEventListener('click', () => draw({ work_id: w.id }));
       box.appendChild(b);
     });
@@ -228,6 +262,7 @@
     status = data.status;
     paintStatus();
     skipping = false;
+    saveImages(data.cards.map((c) => c.image));   // 抽到的卡面直接存到手機
     albumStale = true;
     await perform(data.cards);
   }
@@ -295,6 +330,8 @@
       album = await res.json();
       albumStale = false;
       paintAlbum();
+      // 卡冊裡的卡面也存一份（之前抽到但還沒存的）
+      saveImages(album.works.flatMap((w) => w.cards.filter((c) => c.owned).map((c) => c.image)));
     } catch {
       $('g-sum').textContent = '讀取失敗，請稍後再試';
     }
@@ -306,7 +343,7 @@
     const fbox = $('g-filter');
     fbox.innerHTML = '';
     [['all', '全部'], ...RAR.map((r) => [r, LABEL[r]])].forEach(([k, label]) => {
-      const n = k === 'all' ? album.works.length : album.works.filter((w) => w.cards[k]).length;
+      const n = k === 'all' ? album.works.length : album.works.filter((w) => w.cards.some((c) => c.owned && c.rarity === k)).length;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `chip${filter === k ? ' active' : ''}`;
@@ -314,13 +351,13 @@
       b.addEventListener('click', () => { filter = k; shown = 20; paintAlbum(); });
       fbox.appendChild(b);
     });
-    const list = album.works.filter((w) => filter === 'all' || w.cards[filter]);
+    const list = album.works.filter((w) => filter === 'all' || w.cards.some((c) => c.owned && c.rarity === filter));
     const box = $('g-album-list');
     box.innerHTML = list.slice(0, shown).map((w) => `
       <div class="g-album-work">
         <header><b>${esc(w.title)}</b><span>${w.have}／${w.total}</span></header>
         <div class="g-progress"><i style="width:${(w.have / w.total) * 100}%"></i></div>
-        <div class="g-slots">${RAR.map((r) => cardHTML(w.cards[r], { rarity: r, count: true })).join('')}</div>
+        <div class="g-slots">${w.cards.map((c) => cardHTML(c.owned ? c : null, { rarity: c.rarity, count: true })).join('')}</div>
       </div>`).join('');
     $('g-more').hidden = list.length <= shown;
   }
@@ -328,15 +365,15 @@
   $('g-album-list').addEventListener('click', (e) => {
     const el = e.target.closest('.gcard:not(.is-missing)');
     if (!el) return;
-    const w = album.works.find((x) => String(x.work_id) === el.dataset.w);
-    if (w) openDetail(w.cards[el.dataset.r]);
+    const c = album.works.flatMap((w) => w.cards).find((x) => String(x.card_id) === el.dataset.c);
+    if (c) openDetail(c);
   });
 
   // ---------- 卡片大圖 ----------
   const detail = $('g-detail');
   function openDetail(c) {
     $('g-detail-card').innerHTML = cardHTML(c, { count: false });
-    $('g-detail-info').innerHTML = `<b>${esc(c.title)}</b><br>${esc(LABEL[c.rarity])}・持有 ${c.count} 張${c.first_at ? `・首次入手 ${esc(c.first_at)}` : ''}<br><small>手指在卡片上滑動可以傾斜欣賞</small>`;
+    $('g-detail-info').innerHTML = `<b>${esc(c.name || c.title)}</b><br>${c.name ? `${esc(c.title)}<br>` : ''}${esc(LABEL[c.rarity])}・持有 ${c.count} 張${c.first_at ? `・首次入手 ${esc(c.first_at)}` : ''}<br><small>手指在卡片上滑動可以傾斜欣賞</small>`;
     detail.hidden = false;
     document.body.classList.add('sheet-open');
   }

@@ -4,27 +4,31 @@ from django.views.decorators.http import require_GET, require_POST
 
 from dramas.models import Work
 
-from . import service
-from .models import FREE_DAILY, PITY_AT, RARITIES, RARITY_LABEL, RARITY_WEIGHT, OwnedCard
+from . import cards, service
+from .models import FREE_DAILY, PITY_AT, RARITIES, RARITY_LABEL, RARITY_WEIGHT, Card, OwnedCard
 
 
 def _json(data, status=200):
     return JsonResponse(data, status=status, json_dumps_params={"ensure_ascii": False})
 
 
-def _card(work, rarity, count=1, new=False, first_at=None):
-    images = work.images or []
-    # 稀有度越高用越後面的圖（作品有多張圖時，每個稀有度卡面不同）
-    img = images[min(RARITIES.index(rarity), len(images) - 1)] if images else ""
-    return {"work_id": work.id, "title": work.title, "rarity": rarity, "rarity_label": RARITY_LABEL[rarity],
-            "image": img, "count": count, "new": new,
-            "first_at": first_at.astimezone(service.TW).strftime("%Y/%m/%d") if first_at else ""}
+def _card(card, work_title, owned=None, new=False):
+    return {"card_id": card.id, "work_id": card.work_id, "title": work_title, "name": card.name,
+            "rarity": card.rarity, "rarity_label": RARITY_LABEL[card.rarity], "image": cards.image_url(card),
+            "owned": owned is not None, "count": owned.count if owned else 0, "new": new,
+            "first_at": owned.first_at.astimezone(service.TW).strftime("%Y/%m/%d") if owned else ""}
+
+
+def _cover(work_id):
+    """作品在抽卡畫面的封面：用這部作品稀有度最低的卡面"""
+    card = Card.objects.filter(work_id=work_id, active=True).order_by("id").first()
+    return cards.image_url(card) if card else ""
 
 
 def _status_json(user):
     s = service.status(user)
-    works = Work.objects.filter(id__in=s["follow_left"]).only("id", "title", "images")
-    s["follow_left"] = [{"id": w.id, "title": w.title, "image": (w.images or [""])[0]} for w in works]
+    works = Work.objects.filter(id__in=s["follow_left"]).only("id", "title")
+    s["follow_left"] = [{"id": w.id, "title": w.title, "image": _cover(w.id)} for w in works]
     s["free_daily"] = FREE_DAILY
     s["pity_at"] = PITY_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
@@ -38,12 +42,8 @@ def status(request):
 
 
 def _pulled(user, pairs):
-    counts = {(c.work_id, c.rarity): c for c in OwnedCard.objects.filter(user=user, work_id__in=[p.work_id for p, _ in pairs])}
-    out = []
-    for p, new in pairs:
-        oc = counts.get((p.work_id, p.rarity))
-        out.append({**_card(p.work, p.rarity, oc.count if oc else 1, new, oc.first_at if oc else None), "pity": p.pity})
-    return out
+    owned = {o.card_id: o for o in OwnedCard.objects.filter(user=user, card_id__in=[p.card_id for p, _ in pairs])}
+    return [{**_card(p.card, p.work.title, owned.get(p.card_id), new), "pity": p.pity} for p, new in pairs]
 
 
 @login_required
@@ -56,8 +56,8 @@ def pull(request):
         return _json({"ok": False, "error": "找不到這部作品"}, 400)
     except service.PullError as e:
         return _json({"ok": False, "error": str(e)}, 400)
-    card = _pulled(request.user, [(p, new)])[0]
-    return _json({"ok": True, "card": card, "cards": [card], "pity": p.pity, "status": _status_json(request.user)})
+    out = _pulled(request.user, [(p, new)])
+    return _json({"ok": True, "card": out[0], "cards": out, "pity": p.pity, "status": _status_json(request.user)})
 
 
 @login_required
@@ -73,14 +73,24 @@ def pull_all(request):
 @login_required
 @require_GET
 def album(request):
-    """集卡冊：依作品分組，每部 6 格（沒收集到的前端顯示剪影）"""
+    """集卡冊：依作品分組，列出這部作品所有卡片（還沒抽到的前端顯示剪影），依稀有度排序"""
+    cards.sync()
+    owned = {o.card_id: o for o in OwnedCard.objects.filter(user=request.user).select_related("card", "work")}
+    work_ids = {o.work_id for o in owned.values()}
+    last = {}
+    for o in owned.values():
+        last[o.work_id] = max(last.get(o.work_id, o.last_at), o.last_at)
+    titles = dict(Work.objects.filter(id__in=work_ids).values_list("id", "title"))
+    # 這些作品目前所有可抽的卡＋已經抽到的（包含停用的舊卡）
+    pool = {c.id: c for c in Card.objects.filter(work_id__in=work_ids, active=True)}
+    pool.update({cid: o.card for cid, o in owned.items()})
     groups = {}
-    total = 0
-    for c in OwnedCard.objects.filter(user=request.user).select_related("work").order_by("-last_at"):
-        g = groups.setdefault(c.work_id, {"work_id": c.work_id, "title": c.work.title, "cards": {}})
-        g["cards"][c.rarity] = _card(c.work, c.rarity, c.count, first_at=c.first_at)
-        total += c.count
-    items = [{**g, "have": len(g["cards"]), "total": len(RARITIES)} for g in groups.values()]
-    kinds = sum(i["have"] for i in items)
+    for c in sorted(pool.values(), key=lambda c: (RARITIES.index(c.rarity), c.id)):
+        groups.setdefault(c.work_id, []).append(_card(c, titles.get(c.work_id, ""), owned.get(c.id)))
+    items = []
+    for wid in sorted(groups, key=lambda w: last.get(w), reverse=True):
+        cs = groups[wid]
+        items.append({"work_id": wid, "title": titles.get(wid, ""), "cards": cs,
+                      "have": sum(1 for c in cs if c["owned"]), "total": len(cs)})
     return _json({"rarities": RARITIES, "labels": RARITY_LABEL, "works": items,
-                  "summary": {"works": len(items), "kinds": kinds, "pulls": total}})
+                  "summary": {"works": len(items), "kinds": len(owned), "pulls": sum(o.count for o in owned.values())}})
