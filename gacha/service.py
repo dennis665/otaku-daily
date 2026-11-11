@@ -41,6 +41,17 @@ def status(user):
     }
 
 
+def pull_all(user, rng=random):
+    """追的作品今天還沒抽的全部抽一次；回傳 [(Pull, 是否新卡)]"""
+    out = []
+    for wid in status(user)["follow_left"]:
+        try:
+            out.append(pull(user, wid, rng))
+        except PullError:
+            pass   # 同時在別的裝置抽過了
+    return out
+
+
 def pull(user, work_id=None, rng=random):
     """抽一張：有 work_id＝追的作品那部；沒有＝全作品隨機池。回傳 (Pull, 是否新卡)"""
     day = today()

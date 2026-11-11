@@ -26,9 +26,9 @@
   @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
   .dl { margin: 10px 0 0; font-size: .78rem; color: #5ee7ff; min-height: 1.2em; transition: opacity .6s; }
   .dl.fade { opacity: 0; }
-  .preview { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 14px); left: 12px; right: 12px; display: none; justify-content: space-between; align-items: center; }
+  .preview { z-index: 50; position: fixed; bottom: calc(env(safe-area-inset-bottom) + 14px); left: 12px; right: 12px; display: none; justify-content: space-between; align-items: center; }
   .preview span { font-size: .8rem; font-weight: 700; color: #1a1300; background: #ffd34d; border-radius: 99px; padding: 6px 12px; }
-  .preview a { color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .3); border-radius: 99px; padding: 6px 14px; text-decoration: none; font-size: .85rem; }
+  .preview a { color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .3); border-radius: 99px; padding: 10px 18px; text-decoration: none; font-size: .85rem; }
   body.is-preview .preview { display: flex; }
   /* 超過 3 分鐘還沒醒：切換成「伺服器維護中」 */
   .maint { display: none; }
@@ -50,7 +50,7 @@
 <div class="poster" aria-hidden="true"></div>
 <video id="v" muted playsinline autoplay loop preload="auto" poster="{% static 'video/wake-poster.jpg' %}" aria-hidden="true"></video>
 <div class="tap">👆 點一下畫面播放</div>
-<div class="preview"><span>🎬 預覽模式（主機其實已醒著）</span><a href="/">✕ 返回</a></div>
+<div class="preview"><span>🎬 預覽模式（主機其實已醒著）</span><a href="/" onclick="event.preventDefault();location.replace('/')">✕ 返回</a></div>
 <div class="panel" role="status" aria-live="polite">
   <p class="title wake"><b>Ukiyo</b> 主機喚醒中… <span id="sec">0</span> 秒</p>
   <p class="sub wake" id="hint">免費主機休息後要 30～60 秒才會醒來，醒了會自動進入</p>

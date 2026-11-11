@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}影音播放｜Ukiyo{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/gacha.css' %}">{% endblock %}
 {% block content %}
 <header class="topbar">
   <div class="brand-sm">{% include "partials/avatar_rotator.html" %}{% include "partials/wordmark.html" %}</div>
@@ -19,6 +20,7 @@
   <button class="tab" data-tab="events" role="tab"{% if "events" in hidden_tabs %} hidden{% endif %}><i>🎪</i><span>活動 <b id="e-count">…</b></span></button>
   <button class="tab" data-tab="plan" role="tab"{% if "plan" in hidden_tabs %} hidden{% endif %}><i>📅</i><span>行程 <b id="p-count">…</b></span></button>
   <button class="tab" data-tab="drama" role="tab"{% if "drama" in hidden_tabs %} hidden{% endif %}><i>📺</i><span>追劇 <b id="d-count">…</b></span></button>
+  <button class="tab" data-tab="gacha" role="tab"{% if "gacha" in hidden_tabs %} hidden{% endif %}><i>🎴</i><span>抽卡 <b id="g-count">…</b></span></button>
 </nav>
 
 {% if not playlist %}
@@ -154,6 +156,34 @@
   <div id="p-pager-bottom"></div>
 </section>
 
+{# 動畫小卡抽卡：每天追的作品各 1 抽＋全作品隨機 3 抽，抽到的卡收進集卡冊（gacha.js） #}
+<section id="panel-gacha" class="panel">
+  <div class="chips g-views" role="group" aria-label="抽卡">
+    <button class="chip active" data-g="draw" type="button">🎰 抽卡</button>
+    <button class="chip" data-g="album" type="button">📖 我的卡冊 <b id="g-album-n"></b></button>
+  </div>
+  <div id="g-draw">
+    <div class="g-machine" id="g-machine" aria-hidden="true">
+      <div class="g-aura"></div>
+      <div class="g-pack"><div class="g-pack-shine"></div><div class="g-pack-logo"><small>UKIYO</small>ANIME<br>CARDS<em>★ DAILY ★</em></div></div>
+    </div>
+    <p class="g-info" id="g-info">讀取中…</p>
+    <div class="g-actions">
+      <button class="g-btn" id="g-free" type="button">🎲 隨機抽</button>
+      <button class="g-btn alt" id="g-all" type="button">⚡ 追的作品全抽</button>
+    </div>
+    <h3 class="g-h">追的作品・今天各 1 抽</h3>
+    <div class="g-works" id="g-works"></div>
+    <details class="g-rates"><summary>📊 出貨機率與規則</summary><div id="g-rates"></div></details>
+  </div>
+  <div id="g-album" hidden>
+    <p class="g-info" id="g-sum"></p>
+    <div class="chips" id="g-filter" role="group" aria-label="依稀有度篩選"></div>
+    <div id="g-album-list"></div>
+    <button class="btn ghost g-more" id="g-more" type="button" hidden>顯示更多</button>
+  </div>
+</section>
+
 <section id="panel-drama" class="panel">
   <div class="chips" id="d-views" role="group" aria-label="追劇分類">
     <button class="chip active" data-view="mine" type="button">⭐ 我的追劇 <b></b></button>
@@ -238,6 +268,7 @@
       <label class="toggle-row"><span>🎪 活動</span><input type="checkbox" data-tab="events"></label>
       <label class="toggle-row"><span>📅 行程</span><input type="checkbox" data-tab="plan"></label>
       <label class="toggle-row"><span>📺 追劇</span><input type="checkbox" data-tab="drama"></label>
+      <label class="toggle-row"><span>🎴 抽卡</span><input type="checkbox" data-tab="gacha"></label>
     </div>
     <p class="alert" id="s-error" hidden></p>
   </div>
@@ -284,6 +315,22 @@
   </div>
 </div>
 
+{# 抽卡演出（全螢幕）與卡片大圖 #}
+<div class="g-stage" id="g-stage" hidden>
+  <canvas id="g-fx"></canvas>
+  <div class="g-rays"></div>
+  <div class="g-flash"></div>
+  <div class="g-stage-pack"><div class="g-pack"><div class="g-pack-shine"></div><div class="g-pack-logo"><small>UKIYO</small>ANIME<br>CARDS<em>★ DAILY ★</em></div></div></div>
+  <div class="g-reveal" id="g-reveal"></div>
+  <div class="g-stamp" id="g-stamp"></div>
+  <p class="g-tip" id="g-tip">點一下跳過</p>
+</div>
+<div class="g-detail" id="g-detail" hidden>
+  <div class="g-detail-card" id="g-detail-card"></div>
+  <p class="g-detail-info" id="g-detail-info"></p>
+  <button class="btn ghost" id="g-detail-close" type="button">關閉</button>
+</div>
+
 {{ playlist|json_script:"playlist-data" }}
 {{ song_aliases|json_script:"song-aliases" }}
 {% endblock %}
@@ -293,4 +340,5 @@
 <script src="{% static 'js/planner.js' %}"></script>
 <script src="{% static 'js/notify.js' %}"></script>
 <script src="{% static 'js/drama.js' %}"></script>
+<script src="{% static 'js/gacha.js' %}"></script>
 {% endblock %}

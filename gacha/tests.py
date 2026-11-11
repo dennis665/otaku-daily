@@ -63,3 +63,16 @@ class GachaApiTests(TestCase):
         self.assertEqual(self.client.post("/gacha/api/pull/", {"work_id": w.id}).status_code, 400)
         album = self.client.get("/gacha/api/album/").json()
         self.assertEqual(album["works"][0]["have"], 1)
+
+
+class PullAllTests(TestCase):
+    def test_pull_all_follows_once(self):
+        user = User.objects.create_user("cat", password="pw-123456")
+        ws = [Work.objects.create(source_id=100 + i, title=f"作品{i}", images=["x.jpg"]) for i in range(3)]
+        for w in ws:
+            Follow.objects.create(user=user, work=w)
+        self.client.force_login(user)
+        r = self.client.post("/gacha/api/pull-all/").json()
+        self.assertEqual(len(r["cards"]), 3)
+        self.assertEqual(r["status"]["follow_left"], [])
+        self.assertEqual(self.client.post("/gacha/api/pull-all/").status_code, 400)

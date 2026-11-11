@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 
 # 可以由使用者自己關閉的分頁（音樂是首頁，固定顯示）
-HIDEABLE_TABS = ("video", "events", "plan", "drama")
+HIDEABLE_TABS = ("video", "events", "plan", "drama", "gacha")
 
 
 class UserPrefs(models.Model):

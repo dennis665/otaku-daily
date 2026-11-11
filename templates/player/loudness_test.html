@@ -8,7 +8,7 @@
 <style>
   body { margin:0; background:#14122b; color:#f2f0ff; font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif; }
   main { max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px); }
-  a.back { color:#a9a3d6; text-decoration:none; font-size:.9rem; }
+  a.back { position:sticky; top:calc(env(safe-area-inset-top) + 6px); z-index:50; display:inline-block; color:#fff; background:#2d2957; border:1px solid #4a4580; border-radius:99px; padding:10px 18px; text-decoration:none; font-size:.95rem; -webkit-tap-highlight-color:transparent; }
   h1 { font-size:1.2rem; margin:10px 0 6px; }
   p.sub { color:#a9a3d6; font-size:.86rem; margin:0 0 16px; line-height:1.7; }
   h2 { font-size:1rem; margin:20px 0 4px; }
@@ -27,7 +27,7 @@
 </head>
 <body>
 <main>
-  <a class="back" href="/">‹ 回 Ukiyo</a>
+  <a class="back" href="/" onclick="event.preventDefault();location.replace('/')">‹ 回 Ukiyo</a>
   <h1>🔍 10 秒重點片段</h1>
   <p class="sub">從整首歌自動挑出最容易聽出壓縮差異的兩段，每個品質都切同一段 10 秒，<b>已放大到正常音量</b>（手機不用開很大格）。<br>
     片段用無損格式存，放大不會再多一次失真，聽到的差別就是各品質本身的差別。</p>
