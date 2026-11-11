@@ -68,10 +68,12 @@
   function paintStatus() {
     const s = status;
     const left = s.follow_left.length + s.free_left;
-    $('g-count').textContent = left;
-    $('g-info').innerHTML = `今天還可以抽 <b>${left}</b> 次・隨機抽 <b>${s.free_left}</b>／${s.free_daily}<br>再 <b>${s.pity_left}</b> 抽必出 SSR 以上`;
+    $('g-count').textContent = s.unlimited ? '∞' : left;
+    $('g-info').innerHTML = s.unlimited
+      ? `♾ 測試帳號：抽卡不限次數<br>再 <b>${s.pity_left}</b> 抽必出 SSR 以上`
+      : `今天還可以抽 <b>${left}</b> 次・隨機抽 <b>${s.free_left}</b>／${s.free_daily}<br>再 <b>${s.pity_left}</b> 抽必出 SSR 以上`;
     $('g-free').disabled = !s.free_left;
-    $('g-free').innerHTML = `🎲 隨機抽<small>全作品・剩 ${s.free_left} 次</small>`;
+    $('g-free').innerHTML = `🎲 隨機抽<small>全作品・${s.unlimited ? '不限次數' : `剩 ${s.free_left} 次`}</small>`;
     $('g-all').disabled = !s.follow_left.length;
     $('g-all').innerHTML = `⚡ 追的作品全抽<small>${s.follow_left.length ? `${s.follow_left.length} 部一次抽` : '今天都抽完了'}</small>`;
     const box = $('g-works');

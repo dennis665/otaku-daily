@@ -2,6 +2,7 @@
 import random
 from datetime import datetime, timedelta, timezone
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 
 from dramas.models import Follow, Work
@@ -26,9 +27,18 @@ def roll_rarity(rng=random, pity=False):
     return rng.choices(pool, weights=[RARITY_WEIGHT[r] for r in pool])[0]
 
 
+def unlimited(user):
+    """測試站的特別帳號：不限抽卡次數（設定見 settings.GACHA_UNLIMITED_USERS）"""
+    return user.username in getattr(settings, "GACHA_UNLIMITED_USERS", set())
+
+
 def status(user):
     """今天還能抽哪些：追的作品（尚未抽過的）與全作品隨機剩餘次數"""
     day = today()
+    if unlimited(user):
+        state = GachaState.objects.filter(user=user).first()
+        return {"day": day.isoformat(), "follow_left": list(Follow.objects.filter(user=user).values_list("work_id", flat=True)),
+                "free_left": 999, "pity_left": PITY_AT - (state.since_ssr if state else 0), "unlimited": True}
     done = set(Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FOLLOW).values_list("work_id", flat=True))
     followed = list(Follow.objects.filter(user=user).values_list("work_id", flat=True))
     free_used = Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FREE).count()
@@ -61,9 +71,10 @@ def pull(user, work_id=None, rng=random):
             if not Follow.objects.filter(user=user, work_id=work_id).exists():
                 raise PullError("只能抽你追的作品")
             work = Work.objects.get(pk=work_id)
-            pool = Pull.Pool.FOLLOW
+            # 不限次數的帳號記成隨機池，才不會被「同一部一天一次」擋下
+            pool = Pull.Pool.FREE if unlimited(user) else Pull.Pool.FOLLOW
         else:
-            if Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FREE).count() >= FREE_DAILY:
+            if not unlimited(user) and Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FREE).count() >= FREE_DAILY:
                 raise PullError("今天的隨機抽已經用完了，明天再來！")
             qs = Work.objects.exclude(images=[])
             n = qs.count()

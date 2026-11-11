@@ -76,3 +76,19 @@ class PullAllTests(TestCase):
         self.assertEqual(len(r["cards"]), 3)
         self.assertEqual(r["status"]["follow_left"], [])
         self.assertEqual(self.client.post("/gacha/api/pull-all/").status_code, 400)
+
+
+class UnlimitedUserTests(TestCase):
+    def test_unlimited_user_can_pull_repeatedly(self):
+        from django.test import override_settings
+        user = User.objects.create_user("dennis", password="pw-123456")
+        w = Work.objects.create(source_id=500, title="測試作品", images=["x.jpg"])
+        Follow.objects.create(user=user, work=w)
+        with override_settings(GACHA_UNLIMITED_USERS={"dennis"}):
+            for _ in range(FREE_DAILY + 2):
+                service.pull(user)
+                service.pull(user, w.id)
+            self.assertEqual(service.status(user)["follow_left"], [w.id])
+        with override_settings(GACHA_UNLIMITED_USERS=set()):
+            with self.assertRaises(service.PullError):
+                service.pull(user)
