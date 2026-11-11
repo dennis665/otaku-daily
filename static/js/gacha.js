@@ -44,7 +44,9 @@
   // ---------- 卡片 ----------
   function cardHTML(c, opts = {}) {
     if (!c) {
-      return `<div class="gcard is-missing r-${opts.rarity}"><div class="gcard-in"></div><div class="gcard-badge">${esc(LABEL[opts.rarity])}</div></div>`;
+      // 還沒收集到：剪影中間顯示卡號
+      const no = opts.no ? `<span class="gcard-missing-no">No.<b>${String(opts.no).padStart(3, '0')}</b></span>` : '';
+      return `<div class="gcard is-missing r-${opts.rarity}${no ? ' has-no' : ''}"><div class="gcard-in">${no}</div><div class="gcard-badge">${esc(LABEL[opts.rarity])}</div></div>`;
     }
     const hasBack = Boolean(c.back_image);
     const backStyle = hasBack ? ` style="background-image: url('${esc(c.back_image)}');"` : '';
@@ -450,7 +452,7 @@
       <div class="g-album-work">
         <header><b>${esc(w.title)}</b><span>${w.have}／${w.total}</span></header>
         <div class="g-progress"><i style="width:${(w.have / w.total) * 100}%"></i></div>
-        <div class="g-slots">${w.cards.map((c) => cardHTML(c.owned ? c : null, { rarity: c.rarity, count: true })).join('')}</div>
+        <div class="g-slots">${w.cards.map((c) => cardHTML(c.owned ? c : null, { rarity: c.rarity, no: c.no, count: true })).join('')}</div>
       </div>`).join('');
     $('g-more').hidden = list.length <= shown;
   }

@@ -209,3 +209,8 @@
 /* 卡號（同作品內編號） */
 .gcard-name { gap: 4%; }
 .gcard-no { margin-left: auto; flex: none; font-size: 4.6cqw; font-weight: 700; opacity: .8; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+
+/* 還沒收集到的卡：剪影中間顯示卡號 */
+.gcard.is-missing.has-no .gcard-in::after { content: none; }
+.gcard-missing-no { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #8a85c0; font-size: 7cqw; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.gcard-missing-no b { display: block; font-size: 18cqw; font-weight: 900; color: #b8b3e6; }
