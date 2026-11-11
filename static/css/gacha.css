@@ -205,3 +205,7 @@
 .g-pick-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .g-pick-btns .g-btn { padding: 12px 4px; font-size: .9rem; }
 .g-pick .g-info { margin: 0; }
+
+/* 卡號（同作品內編號） */
+.gcard-name { gap: 4%; }
+.gcard-no { margin-left: auto; flex: none; font-size: 4.6cqw; font-weight: 700; opacity: .8; letter-spacing: .02em; font-variant-numeric: tabular-nums; }

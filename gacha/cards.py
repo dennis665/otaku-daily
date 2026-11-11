@@ -110,7 +110,10 @@ def fetch_index():
 
 
 def apply_index(index):
-    """把索引同步成 Card：新的建立、改過的更新、不見的設成抽不到；回傳 (新增, 停用) 數"""
+    """
+    把索引同步成 Card：新的建立、改過的更新（含卡號）、索引裡不見的整張刪除（連同抽卡紀錄與卡冊裡的這張）；回傳 (新增, 刪除) 數
+    防呆：索引裡的卡少於目前卡片的一半時（可能讀到壞掉的索引），只停用不刪除
+    """
     entries = []
     for sid, cards in (index.get("works") or {}).items():
         for c in cards or []:
@@ -126,15 +129,22 @@ def apply_index(index):
                 continue   # 追劇庫還沒有這部作品
             seen.add(c["file"])
             name = (c.get("name") or "")[:100]
+            no = int(c.get("no") or 0)
             card = existing.get(c["file"])
             if card is None:
-                Card.objects.create(work_id=wid, rarity=c["rarity"], file=c["file"], name=name)
+                Card.objects.create(work_id=wid, rarity=c["rarity"], file=c["file"], name=name, no=no)
                 created += 1
-            elif (card.work_id, card.rarity, card.name, card.active) != (wid, c["rarity"], name, True):
-                card.work_id, card.rarity, card.name, card.active = wid, c["rarity"], name, True
+            elif (card.work_id, card.rarity, card.name, card.no, card.active) != (wid, c["rarity"], name, no, True):
+                card.work_id, card.rarity, card.name, card.no, card.active = wid, c["rarity"], name, no, True
                 card.save()
-        gone = [f for f, card in existing.items() if f not in seen and card.active]
-        Card.objects.filter(file__in=gone).update(active=False)
+        gone = [f for f in existing if f not in seen]
+        active_before = sum(1 for card in existing.values() if card.active)
+        if len(seen) >= active_before / 2:
+            Card.objects.filter(file__in=gone).delete()
+            Card.objects.filter(file="").delete()   # 早期沒有圖的舊卡
+        else:
+            logger.warning("卡片索引只有 %s 張（原本 %s 張），只停用不刪除", len(seen), active_before)
+            Card.objects.filter(file__in=gone).update(active=False)
     _state["card_backs"] = {
         str(sid): path for sid, path in (index.get("card_backs") or {}).items()
         if SAFE_FILE.match(path)

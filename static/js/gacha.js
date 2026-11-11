@@ -54,7 +54,7 @@
       : `<div class="gcard-noimg">${esc(c.title)}</div>`;
     return `<div class="gcard r-${c.rarity}${c.image ? '' : ' is-noimg'}" data-c="${c.card_id}">
       <div class="gcard-face">
-        <div class="gcard-in">${art}<div class="gcard-name">${esc(c.name || c.title)}</div></div>
+        <div class="gcard-in">${art}<div class="gcard-name">${esc(c.name || c.title)}${c.no ? `<span class="gcard-no">No.${String(c.no).padStart(3, '0')}</span>` : ''}</div></div>
         <div class="gcard-frame"></div><div class="gcard-holo"></div><div class="gcard-glare"></div>
         <div class="gcard-badge">${esc(LABEL[c.rarity])}</div>
         ${c.count > 1 && opts.count !== false ? `<div class="gcard-count">×${c.count}</div>` : ''}
@@ -466,7 +466,7 @@
   const detail = $('g-detail');
   function openDetail(c) {
     $('g-detail-card').innerHTML = cardHTML(c, { count: false });
-    $('g-detail-info').innerHTML = `<b>${esc(c.name || c.title)}</b><br>${c.name ? `${esc(c.title)}<br>` : ''}${esc(LABEL[c.rarity])}・持有 ${c.count} 張${c.first_at ? `・首次入手 ${esc(c.first_at)}` : ''}<br><small>手指在卡片上滑動可以傾斜欣賞</small>`;
+    $('g-detail-info').innerHTML = `<b>${esc(c.name || c.title)}</b><br>${c.name ? `${esc(c.title)}<br>` : ''}${c.no ? `No.${String(c.no).padStart(3, '0')}・` : ''}${esc(LABEL[c.rarity])}・持有 ${c.count} 張${c.first_at ? `・首次入手 ${esc(c.first_at)}` : ''}<br><small>手指在卡片上滑動可以傾斜欣賞</small>`;
     detail.hidden = false;
     document.body.classList.add('sheet-open');
   }

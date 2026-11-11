@@ -122,12 +122,24 @@ class GachaTests(TestCase):
 
     def test_apply_index_creates_and_deactivates(self):
         Work.objects.create(source_id=77, title="新作品")
-        created, gone = cards.apply_index({"works": {"77": [{"file": "77/SSR_abcdef12.webp", "rarity": "SSR", "name": "主角"}]}})
-        self.assertEqual(created, 1)
-        self.assertTrue(Card.objects.get(file="77/SSR_abcdef12.webp").active)
-        created, gone = cards.apply_index({"works": {}})
-        self.assertFalse(Card.objects.get(file="77/SSR_abcdef12.webp").active)
-        self.assertGreater(gone, 0)
+        Card.objects.all().delete()
+        Work.objects.create(source_id=78, title="另一部")
+        idx = {"works": {"77": [{"file": "77/SSR_abcdef12.webp", "rarity": "SSR", "name": "主角", "no": 3}],
+                         "78": [{"file": "78/N_abcdef12.webp", "rarity": "N", "name": "路人", "no": 1},
+                                {"file": "78/R_abcdef12.webp", "rarity": "R", "name": "配角", "no": 2}]}}
+        created, gone = cards.apply_index(idx)
+        self.assertEqual(created, 3)
+        self.assertEqual(Card.objects.get(file="77/SSR_abcdef12.webp").no, 3)
+        # 下架一張：整張刪除（連同卡冊）
+        OwnedCard.objects.create(user=self.user, card=Card.objects.get(file="78/R_abcdef12.webp"), work_id=Card.objects.get(file="78/R_abcdef12.webp").work_id, rarity="R")
+        idx["works"]["78"].pop()
+        cards.apply_index(idx)
+        self.assertFalse(Card.objects.filter(file="78/R_abcdef12.webp").exists())
+        self.assertFalse(OwnedCard.objects.exists())
+        # 讀到幾乎空的索引（可能壞掉）：只停用不刪除
+        cards.apply_index({"works": {}})
+        self.assertEqual(Card.objects.count(), 2)
+        self.assertFalse(Card.objects.filter(active=True).exists())
 
 
 class GachaApiTests(TestCase):

@@ -14,7 +14,7 @@ def _json(data, status=200):
 
 def _card(card, work_title, owned=None, new=False):
     title = card.work.franchise.name if (card.work and card.work.franchise) else work_title
-    return {"card_id": card.id, "work_id": card.work_id, "title": title, "name": card.name,
+    return {"card_id": card.id, "work_id": card.work_id, "title": title, "name": card.name, "no": card.no,
             "rarity": card.rarity, "rarity_label": RARITY_LABEL[card.rarity], "image": cards.image_url(card),
             "back_image": cards.card_back_url(card.work),
             "owned": owned is not None, "count": owned.count if owned else 0, "new": new,
@@ -116,7 +116,7 @@ def album(request):
     pool = {c.id: c for c in Card.objects.filter(work_id__in=work_ids, active=True).select_related("work", "work__franchise")}
     pool.update({cid: o.card for cid, o in owned.items() if o.card})
     groups = {}
-    for c in sorted(pool.values(), key=lambda c: (RARITIES.index(c.rarity), c.id)):
+    for c in sorted(pool.values(), key=lambda c: (c.no or 9999, c.id)):
         w = works.get(c.work_id) or c.work
         title = w.franchise.name if (w and w.franchise) else (w.title if w else "")
         groups.setdefault(c.work_id, []).append(_card(c, title, owned.get(c.id)))

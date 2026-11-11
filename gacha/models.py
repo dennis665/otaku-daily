@@ -28,12 +28,13 @@ class Card(models.Model):
     rarity = models.CharField(max_length=3, choices=[(r, RARITY_LABEL[r]) for r in RARITIES])
     file = models.CharField("卡面檔案", max_length=200, blank=True, db_index=True)
     name = models.CharField("卡片名稱", max_length=100, blank=True)
+    no = models.PositiveIntegerField("卡號（同作品內編號）", default=0)
     active = models.BooleanField("可以抽到", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = verbose_name_plural = "卡片"
-        ordering = ["work_id", "rarity", "id"]
+        ordering = ["work_id", "no", "id"]
 
     def __str__(self):
         return f"{self.work} {self.rarity} {self.name or self.file}"
