@@ -68,10 +68,16 @@ class GachaTests(TestCase):
         s1.save()
         s3 = Work.objects.create(source_id=21, title="第三季", franchise=fr)
         Follow.objects.create(user=self.user, work=s3)
-        self.assertIn(s3.id, service.status(self.user)["follow_left"])   # 追第三季也抽得到系列的卡
+        # 各系列作品只會有一種卡包沒有分各季：追第三季統一對應到該系列卡包（s1）
+        self.assertEqual(service.status(self.user)["follow_left"], [s1.id])
+        # 即使同時追了第一季與第三季，整個系列仍只會有一個卡包
+        Follow.objects.create(user=self.user, work=s1)
+        self.assertEqual(service.status(self.user)["follow_left"], [s1.id])
+        # 用 s3 或 s1 抽都算該系列卡包，抽完後該系列今天不可再抽
         p, _ = service.pull(self.user, s3.id)
         self.assertEqual(p.card.work_id, s1.id)
         self.assertEqual(OwnedCard.objects.get(user=self.user).work_id, s1.id)
+        self.assertEqual(service.status(self.user)["follow_left"], [])
 
     def test_free_pulls_limited_and_owned_counts(self):
         for _ in range(FREE_DAILY):
@@ -125,6 +131,41 @@ class GachaApiTests(TestCase):
         self.assertEqual(r["status"]["follow_left"], [])
         self.assertEqual(self.client.post("/gacha/api/pull-all/").status_code, 400)
 
+    def test_franchise_single_pack_and_card_back(self):
+        from dramas.models import Franchise
+        user = User.objects.create_user("david", password="pw-123456")
+        fr = Franchise.objects.create(name="藍色系列")
+        s1 = make_work(201, "藍色系列 第一季")
+        s1.franchise = fr
+        s1.save()
+        s2 = Work.objects.create(source_id=202, title="藍色系列 第二季", franchise=fr)
+        s3 = Work.objects.create(source_id=203, title="藍色系列 劇場版", franchise=fr)
+        cards._state["card_backs"]["201"] = "card_backs/card_back_201.webp"
+
+        # 使用者同時追了三季
+        Follow.objects.create(user=user, work=s1)
+        Follow.objects.create(user=user, work=s2)
+        Follow.objects.create(user=user, work=s3)
+
+        self.client.force_login(user)
+        s = self.client.get("/gacha/api/status/").json()
+        # 各系列作品只會有一種卡包沒有分各季
+        self.assertEqual(len(s["follow_left"]), 1)
+        self.assertEqual(s["follow_left"][0]["id"], s1.id)
+        self.assertEqual(s["follow_left"][0]["title"], "藍色系列")
+        # 套用作品卡圖（卡背/封面）
+        self.assertEqual(s["follow_left"][0]["image"], "/gacha/img/card_backs/card_back_201.webp")
+
+        # 抽卡時返回卡圖與專屬卡背
+        r = self.client.post("/gacha/api/pull/", {"work_id": s2.id}).json()
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["card"]["back_image"], "/gacha/img/card_backs/card_back_201.webp")
+        self.assertEqual(r["card"]["title"], "藍色系列")
+
+        # 抽完後該系列今天不可再抽
+        s_after = self.client.get("/gacha/api/status/").json()
+        self.assertEqual(len(s_after["follow_left"]), 0)
+
 
 class UnlimitedUserTests(TestCase):
     def test_unlimited_user_can_pull_repeatedly(self):
@@ -148,8 +189,11 @@ class CardImageTests(TestCase):
         from unittest import mock
         with tempfile.TemporaryDirectory() as d:
             os.makedirs(os.path.join(d, "5"))
+            os.makedirs(os.path.join(d, "card_backs"))
             with open(os.path.join(d, "5", "SSR_abcdef12.webp"), "wb") as f:
                 f.write(b"RIFFxxxxWEBP")
+            with open(os.path.join(d, "card_backs", "card_back_5.webp"), "wb") as f:
+                f.write(b"RIFFbackWEBP")
             with mock.patch.dict(os.environ, {"CARD_LOCAL_DIR": d}):
                 url = "/gacha/img/5/SSR_abcdef12.webp"
                 self.assertEqual(self.client.get(url).status_code, 302)   # 沒登入看不到
@@ -157,4 +201,8 @@ class CardImageTests(TestCase):
                 res = self.client.get(url)
                 self.assertEqual(res.status_code, 200)
                 self.assertEqual(res["Content-Type"], "image/webp")
+                # 測試卡背面圖也可由本站代為讀取
+                res_back = self.client.get("/gacha/img/card_backs/card_back_5.webp")
+                self.assertEqual(res_back.status_code, 200)
+                self.assertEqual(res_back.content, b"RIFFbackWEBP")
                 self.assertEqual(self.client.get("/gacha/img/../../settings.py").status_code, 404)

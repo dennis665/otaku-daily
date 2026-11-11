@@ -26,8 +26,8 @@ from .models import RARITIES, Card
 logger = logging.getLogger(__name__)
 
 SYNC_SECONDS = 600
-_state = {"at": 0.0}
-SAFE_FILE = re.compile(r"^\d+/[A-Z]{1,3}_[0-9a-f]{6,40}\.webp$")
+_state = {"at": 0.0, "card_backs": {}}
+SAFE_FILE = re.compile(r"^(?:\d+/[A-Z]{1,3}_[0-9a-f]{6,40}|card_backs/card_back_\d+)\.webp$")
 
 
 def _repo():
@@ -70,6 +70,37 @@ def image_url(card):
     return f"/gacha/img/{card.file}" if card.file else ""
 
 
+def _ensure_card_backs():
+    if not _state.get("card_backs"):
+        try:
+            idx = fetch_index()
+            _state["card_backs"] = {
+                str(sid): path for sid, path in (idx.get("card_backs") or {}).items()
+                if SAFE_FILE.match(path)
+            }
+        except Exception:
+            pass
+
+
+def card_back_url(work):
+    """回傳作品（或所屬系列）的專屬卡背圖網址（/gacha/img/card_backs/card_back_xxx.webp）"""
+    if work is None:
+        return ""
+    _ensure_card_backs()
+    backs = _state.get("card_backs") or {}
+    sid = str(getattr(work, "source_id", work))
+    if sid in backs:
+        return f"/gacha/img/{backs[sid]}"
+    franchise_id = getattr(work, "franchise_id", None)
+    if franchise_id:
+        from dramas.models import Work
+        sids = Work.objects.filter(franchise_id=franchise_id).values_list("source_id", flat=True)
+        for s in sids:
+            if str(s) in backs:
+                return f"/gacha/img/{backs[str(s)]}"
+    return ""
+
+
 def fetch_index():
     return json.loads(read_file("index.json").decode("utf-8"))
 
@@ -100,6 +131,10 @@ def apply_index(index):
                 card.save()
         gone = [f for f, card in existing.items() if f not in seen and card.active]
         Card.objects.filter(file__in=gone).update(active=False)
+    _state["card_backs"] = {
+        str(sid): path for sid, path in (index.get("card_backs") or {}).items()
+        if SAFE_FILE.match(path)
+    }
     return created, len(gone)
 
 

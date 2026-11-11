@@ -46,7 +46,9 @@
     if (!c) {
       return `<div class="gcard is-missing r-${opts.rarity}"><div class="gcard-in"></div><div class="gcard-badge">${esc(LABEL[opts.rarity])}</div></div>`;
     }
-    const back = opts.back ? '<div class="gcard-back">UKIYO</div>' : '';
+    const hasBack = Boolean(c.back_image);
+    const backStyle = hasBack ? ` style="background-image: url('${esc(c.back_image)}');"` : '';
+    const back = opts.back ? `<div class="gcard-back${hasBack ? ' has-art' : ''}"${backStyle}>${hasBack ? '' : 'UKIYO'}</div>` : '';
     const art = c.image
       ? `<img src="${esc(c.image)}" alt="" loading="lazy">`
       : `<div class="gcard-noimg">${esc(c.title)}</div>`;
@@ -262,7 +264,7 @@
     status = data.status;
     paintStatus();
     skipping = false;
-    saveImages(data.cards.map((c) => c.image));   // 抽到的卡面直接存到手機
+    saveImages(data.cards.flatMap((c) => [c.image, c.back_image]));   // 抽到的卡面與卡背直接存到手機
     albumStale = true;
     await perform(data.cards);
   }
@@ -296,7 +298,7 @@
       reveal.querySelector('.gcard').classList.add('flip');
     } else {
       reveal.classList.add('is-multi');
-      reveal.innerHTML = cards.sort((a, b) => rank(b.rarity) - rank(a.rarity)).map((c) => cardHTML(c, { isNew: true })).join('');
+      reveal.innerHTML = cards.sort((a, b) => rank(b.rarity) - rank(a.rarity)).map((c) => cardHTML(c, { back: true, isNew: true })).join('');
       const els = [...reveal.querySelectorAll('.gcard')];
       for (const el of els) {
         el.classList.add('flip');

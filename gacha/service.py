@@ -52,6 +52,14 @@ def drawable_work_ids(work_ids=None):
     return have | set(qs.filter(franchise_id__in=franchises).values_list("id", flat=True))
 
 
+def canonical_work(work):
+    """取得該作品在卡包所屬的系列代表作品（各系列作品只會有一種卡包，沒有分各季）"""
+    if not work or not work.franchise_id:
+        return work
+    cand = Work.objects.filter(franchise_id=work.franchise_id, gacha_cards__active=True).order_by("id").first()
+    return cand or work
+
+
 def cards_for(work):
     """這部作品抽得到的卡：自己的＋同系列的"""
     qs = Card.objects.filter(active=True)
@@ -61,19 +69,43 @@ def cards_for(work):
 
 
 def status(user):
-    """今天還能抽哪些：追的作品（有卡片、今天還沒抽的）與全作品隨機剩餘次數"""
+    """今天還能抽哪些：追的作品（各系列只會有一種卡包、今天還沒抽的）與全作品隨機剩餘次數"""
     cards.sync()
     day = today()
     follows = list(Follow.objects.filter(user=user).values_list("work_id", flat=True))
     drawable = drawable_work_ids(follows)
     followed = [w for w in follows if w in drawable]
+
+    # 各系列作品只會有一種卡包沒有分各季：追同系列任何一季，統一歸納為該系列的一個卡包
+    works_map = {w.id: w for w in Work.objects.filter(id__in=followed).select_related("franchise")}
+    canonical_order = []
+    seen = set()
+    for wid in followed:
+        w = works_map.get(wid)
+        c = canonical_work(w) if w else None
+        if c and c.id not in seen:
+            seen.add(c.id)
+            canonical_order.append(c.id)
+
     state = GachaState.objects.filter(user=user).first()
     base = {"day": day.isoformat(), "pity_left": PITY_AT - (state.since_ssr if state else 0), "pool_works": len(card_work_ids())}
     if unlimited(user):
-        return {**base, "follow_left": followed, "free_left": 999 if drawable else 0, "unlimited": True}
+        return {**base, "follow_left": canonical_order, "free_left": 999 if drawable else 0, "unlimited": True}
+
     done = set(Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FOLLOW).values_list("work_id", flat=True))
+    done_franchises = set(Work.objects.filter(id__in=done).exclude(franchise=None).values_list("franchise_id", flat=True))
+
+    left = []
+    for cid in canonical_order:
+        cw = works_map.get(cid) or Work.objects.select_related("franchise").filter(id=cid).first()
+        if not cw:
+            continue
+        if cw.id in done or (cw.franchise_id and cw.franchise_id in done_franchises):
+            continue
+        left.append(cid)
+
     free_used = Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FREE).count()
-    return {**base, "follow_left": [w for w in followed if w not in done], "free_left": max(0, FREE_DAILY - free_used) if drawable else 0}
+    return {**base, "follow_left": left, "free_left": max(0, FREE_DAILY - free_used) if drawable else 0}
 
 
 def pick_card(work, pity, rng):
@@ -112,11 +144,25 @@ def pull(user, work_id=None, rng=random):
         state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
         pity = state.since_ssr + 1 >= PITY_AT
         if work_id:
-            if not Follow.objects.filter(user=user, work_id=work_id).exists():
+            try:
+                raw_work = Work.objects.select_related("franchise").get(pk=work_id)
+            except Work.DoesNotExist:
+                raise PullError("找不到這部作品")
+            work = canonical_work(raw_work)
+            # 追了這部或同系列任何一部作品皆可抽卡
+            follows = Follow.objects.filter(user=user)
+            is_followed = follows.filter(work=raw_work).exists() or follows.filter(work=work).exists()
+            if not is_followed and work.franchise_id:
+                is_followed = follows.filter(work__franchise_id=work.franchise_id).exists()
+            if not is_followed:
                 raise PullError("只能抽你追的作品")
-            if work_id not in drawable_work_ids([work_id]):
+            if work.id not in drawable_work_ids([work.id]):
                 raise PullError("這部作品還沒有卡片")
-            work = Work.objects.get(pk=work_id)
+            # 檢查今天同系列是否已抽過（非無限次數帳號）
+            if not free:
+                done_qs = Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FOLLOW)
+                if done_qs.filter(work=work).exists() or (work.franchise_id and done_qs.filter(work__franchise_id=work.franchise_id).exists()):
+                    raise PullError("這部作品今天已經抽過了，明天再來！")
             # 不限次數的帳號記成隨機池，才不會被「同一部一天一次」擋下
             pool = Pull.Pool.FREE if free else Pull.Pool.FOLLOW
         else:
