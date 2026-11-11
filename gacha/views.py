@@ -19,16 +19,16 @@ def _card(card, work_title, owned=None, new=False):
             "first_at": owned.first_at.astimezone(service.TW).strftime("%Y/%m/%d") if owned else ""}
 
 
-def _cover(work_id):
-    """作品在抽卡畫面的封面：用這部作品稀有度最低的卡面"""
-    card = Card.objects.filter(work_id=work_id, active=True).order_by("id").first()
+def _cover(work):
+    """作品在抽卡畫面的封面：用這部作品（系列）最早加入的卡面"""
+    card = service.cards_for(work).order_by("id").first()
     return cards.image_url(card) if card else ""
 
 
 def _status_json(user):
     s = service.status(user)
-    works = Work.objects.filter(id__in=s["follow_left"]).only("id", "title")
-    s["follow_left"] = [{"id": w.id, "title": w.title, "image": _cover(w.id)} for w in works]
+    works = Work.objects.filter(id__in=s["follow_left"]).only("id", "title", "franchise_id")
+    s["follow_left"] = [{"id": w.id, "title": w.title, "image": _cover(w)} for w in works]
     s["free_daily"] = FREE_DAILY
     s["pity_at"] = PITY_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
@@ -56,7 +56,7 @@ def status(request):
 
 def _pulled(user, pairs):
     owned = {o.card_id: o for o in OwnedCard.objects.filter(user=user, card_id__in=[p.card_id for p, _ in pairs])}
-    return [{**_card(p.card, p.work.title, owned.get(p.card_id), new), "pity": p.pity} for p, new in pairs]
+    return [{**_card(p.card, p.card.work.title, owned.get(p.card_id), new), "pity": p.pity} for p, new in pairs]
 
 
 @login_required

@@ -53,12 +53,25 @@ class GachaTests(TestCase):
 
     def test_same_rarity_can_have_many_cards(self):
         w = make_work(9, "多卡作品", rarities=("N", "N", "N"))
-        got = {service.pick_card(w.id, False, random.Random(i)).id for i in range(60)}
+        got = {service.pick_card(w, False, random.Random(i)).id for i in range(60)}
         self.assertEqual(len(got), 3)   # 三張 N 都抽得到
 
     def test_missing_rarity_falls_back(self):
         w = make_work(8, "只有 R", rarities=("R",))
-        self.assertTrue(all(service.pick_card(w.id, False, random.Random(i)).rarity == "R" for i in range(30)))
+        self.assertTrue(all(service.pick_card(w, False, random.Random(i)).rarity == "R" for i in range(30)))
+
+    def test_cards_shared_within_franchise(self):
+        from dramas.models import Franchise
+        fr = Franchise.objects.create(name="系列")
+        s1 = make_work(20, "第一季", rarities=("N",))
+        s1.franchise = fr
+        s1.save()
+        s3 = Work.objects.create(source_id=21, title="第三季", franchise=fr)
+        Follow.objects.create(user=self.user, work=s3)
+        self.assertIn(s3.id, service.status(self.user)["follow_left"])   # 追第三季也抽得到系列的卡
+        p, _ = service.pull(self.user, s3.id)
+        self.assertEqual(p.card.work_id, s1.id)
+        self.assertEqual(OwnedCard.objects.get(user=self.user).work_id, s1.id)
 
     def test_free_pulls_limited_and_owned_counts(self):
         for _ in range(FREE_DAILY):
