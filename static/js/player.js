@@ -651,7 +651,9 @@
       if (!count.dataset.all) count.dataset.all = count.textContent;
       count.textContent = off ? songs.filter((s) => saved.has(s.audio)).length : count.dataset.all;
     }
-    if (off && !document.querySelector('.tab[data-tab="music"]').classList.contains('active')) tabBtnOf('music').click();
+    // 離線只留音樂與抽卡（卡冊）分頁
+    const active = document.querySelector('.tab.active');
+    if (off && !['music', 'gacha'].includes(active && active.dataset.tab)) tabBtnOf('music').click();
   }
   window.addEventListener('online', () => { applyOfflineMode(); refreshQueue(false); loadMyLists(); });
   window.addEventListener('offline', () => { applyOfflineMode(); refreshQueue(false); });

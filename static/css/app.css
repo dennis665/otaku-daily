@@ -390,7 +390,9 @@ body.sheet-open { overflow: hidden; }
 .m-list-bar .act { flex: none; white-space: nowrap; }
 .empty.sm { font-size: .85rem; margin: 6px 0 12px; }
 /* 離線模式：只留音樂分頁的歌單與存在手機的歌 */
-body.offline-mode .tabs .tab:not([data-tab="music"]),
+body.offline-mode .tabs .tab:not([data-tab="music"]):not([data-tab="gacha"]),
+body.offline-mode .tab[data-tab="gacha"] b, body.offline-mode #g-draw, body.offline-mode .g-views .chip[data-g="draw"],
+body.offline-mode #g-local-clear,
 body.offline-mode #s-open, body.offline-mode #n-open, body.offline-mode .topbar .user form,
 body.offline-mode #m-finder, body.offline-mode #m-dl,
 body.offline-mode #m-list-new, body.offline-mode #m-list-edit,

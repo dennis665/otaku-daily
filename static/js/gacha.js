@@ -415,20 +415,33 @@
 
   // ---------- 卡冊 ----------
   let album = null;
+  const ALBUM_KEY = 'gachaAlbum';   // 卡冊副本（離線時看）
   let albumStale = true;
   let filter = 'all';
   let shown = 20;
   async function loadAlbum() {
     if (!albumStale && album) { paintAlbum(); return; }
     try {
+      if (navigator.onLine === false) throw new Error('offline');
       const res = await fetch('/gacha/api/album/', { credentials: 'same-origin' });
+      if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) throw new Error('fail');
       album = await res.json();
       albumStale = false;
+      try { localStorage.setItem(ALBUM_KEY, JSON.stringify(album)); } catch { /* 空間不足：下次再存 */ }
       paintAlbum();
       // 卡冊裡的卡面也存一份（之前抽到但還沒存的）
       saveImages(album.works.flatMap((w) => w.cards.filter((c) => c.owned).map((c) => c.image)));
     } catch {
-      $('g-sum').textContent = '讀取失敗，請稍後再試';
+      // 離線或讀不到：用手機裡最近一次的卡冊副本（卡面圖片已存在手機）
+      let copy = null;
+      try { copy = JSON.parse(localStorage.getItem(ALBUM_KEY) || 'null'); } catch { copy = null; }
+      if (copy) {
+        album = copy;
+        paintAlbum();
+        $('g-sum').insertAdjacentHTML('afterbegin', '📴 離線中，顯示手機裡最近一次的卡冊<br>');
+      } else {
+        $('g-sum').textContent = navigator.onLine === false ? '📴 離線中，手機裡還沒有卡冊資料（連網打開一次卡冊就會存起來）' : '讀取失敗，請稍後再試';
+      }
     }
   }
   // 收集度：收集到幾 % 的卡（有收集就至少顯示 1%，全部收集才 100%）
@@ -491,7 +504,19 @@
     $('g-album').hidden = !isAlbum;
     if (isAlbum) loadAlbum();
   }));
-  if (tab) tab.addEventListener('click', () => { if (!status) loadStatus(); });
+  // 離線：抽卡分頁只能看卡冊
+  const albumChip = panel.querySelector('.g-views .chip[data-g="album"]');
+  function offlineAlbum() {
+    if (navigator.onLine !== false) return;
+    albumStale = true;
+    albumChip.click();
+  }
+  window.addEventListener('offline', offlineAlbum);
+  window.addEventListener('online', () => { albumStale = true; if (!$('g-album').hidden) loadAlbum(); });
+  // 登出：刪掉手機裡的卡冊副本（個人資料）
+  const logoutForm = document.querySelector('form[action$="/logout/"]');
+  if (logoutForm) logoutForm.addEventListener('submit', () => { try { localStorage.removeItem(ALBUM_KEY); } catch { /* 忽略 */ } });
+  if (tab) tab.addEventListener('click', () => { if (navigator.onLine === false) { offlineAlbum(); return; } if (!status) loadStatus(); });
   // 分頁上的數字：背景讀取今天剩幾抽
   if (tab && !tab.hidden) loadStatus(false);
 })();
