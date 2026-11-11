@@ -101,14 +101,28 @@
   }
   function picksLeft() { return status ? status.pick_left + status.bonus : 0; }
   function fmtTime(sec) { return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
+  // 在線時間：伺服器每 30 秒同步一次，中間畫面每秒自己往上跳（最多多算 35 秒，網路斷了就停住）
+  let task = null;
+  let taskAt = 0;
   function paintTask(t) {
     if (!t) return;
+    task = t;
+    taskAt = Date.now();
+    drawTask();
+  }
+  function drawTask() {
+    if (!task) return;
+    const t = task;
+    const running = !t.claimed && t.seconds < t.need && !document.hidden && navigator.onLine !== false;
+    const extra = running ? Math.min(35, Math.floor((Date.now() - taskAt) / 1000)) : 0;
+    const secs = Math.min(t.need, t.seconds + extra);
     $('g-task').hidden = false;
-    $('g-task-text').textContent = t.claimed ? '今天已領取 ✅' : `今天在線 ${fmtTime(t.seconds)}／${fmtTime(t.need)}`;
-    $('g-task-bar').style.width = `${Math.min(100, (t.seconds / t.need) * 100)}%`;
+    $('g-task-text').textContent = t.claimed ? '今天已領取 ✅' : `今天在線 ${fmtTime(secs)}／${fmtTime(t.need)}`;
+    $('g-task-bar').style.width = `${Math.min(100, (secs / t.need) * 100)}%`;
     $('g-task-claim').hidden = !t.claimable;
     $('g-task-claim').textContent = `🎁 領取 ${t.reward} 張自選抽卡券（可累積保留）`;
   }
+  setInterval(drawTask, 1000);
   function paintStatus() {
     const s = status;
     const left = picksLeft() + s.random_left;
@@ -193,8 +207,12 @@
     } catch { /* 網路不穩：下次再回報 */ }
   }
   beat();
-  setInterval(beat, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+  setInterval(beat, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { drawTask(); return; }
+    taskAt = Date.now();   // 從背景回來：背景的時間不算
+    beat();
+  });
 
   // ---------- 抽卡演出 ----------
   const stage = $('g-stage');

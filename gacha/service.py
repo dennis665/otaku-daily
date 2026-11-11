@@ -110,7 +110,8 @@ def status(user):
 
 
 # ---------- 每日任務：App 在線時間 ----------
-BEAT_MIN, BEAT_MAX = 50, 120   # 前端每 60 秒回報一次；間隔太短不算（防連按），太長代表中間離開了
+BEAT_EVERY = 30                 # 前端每 30 秒回報一次
+BEAT_MIN, BEAT_MAX = 20, 75     # 間隔太短不算（防連按）、太長代表中間離開了
 
 
 def heartbeat(user, now=None):
@@ -123,7 +124,7 @@ def heartbeat(user, now=None):
             if gap < BEAT_MIN:
                 return task_status(user)          # 太快，不算也不更新時間
             if gap <= BEAT_MAX:
-                d.online_seconds += int(min(gap, 60))
+                d.online_seconds += int(min(gap, BEAT_EVERY + 5))
         d.last_beat = now
         d.save()
     return task_status(user)

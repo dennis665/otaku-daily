@@ -65,10 +65,10 @@ class GachaTests(TestCase):
         from django.utils import timezone as tz
         now = tz.now()
         service.heartbeat(self.user, now)                      # 第一次只開始計時
-        for i in range(1, 6):
-            t = service.heartbeat(self.user, now + timedelta(seconds=60 * i))
+        for i in range(1, 11):
+            t = service.heartbeat(self.user, now + timedelta(seconds=30 * i))
         self.assertTrue(t["claimable"])
-        self.assertEqual(service.heartbeat(self.user, now + timedelta(seconds=310))["seconds"], 300)   # 太快不算
+        self.assertEqual(service.heartbeat(self.user, now + timedelta(seconds=305))["seconds"], 300)   # 太快不算
         self.assertEqual(service.claim_task(self.user), TASK_REWARD)
         with self.assertRaises(service.PullError):
             service.claim_task(self.user)                      # 一天只能領一次
