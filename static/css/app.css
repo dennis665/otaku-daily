@@ -420,3 +420,27 @@ body.offline-mode #m-off-get, body.offline-mode #m-off-del { display: none !impo
 .e-refresh.busy span { animation: e-spin .8s linear infinite; }
 @keyframes e-spin { to { transform: rotate(360deg); } }
 .e-flash { display: inline-block; color: var(--pink); font-weight: 700; margin-right: 6px; }
+
+/* 追劇：縮圖點了可以全螢幕看圖 */
+.d-cover.zoomable { cursor: zoom-in; }
+.d-imgs { position: absolute; right: 4px; bottom: 4px; font-size: .62rem; font-weight: 700; color: #fff; background: rgba(0, 0, 0, .6); border-radius: 99px; padding: 1px 6px; }
+
+/* 全螢幕看圖（static/js/viewer.js） */
+.iv { position: fixed; inset: 0; z-index: 220; background: rgba(4, 3, 12, .96); display: flex; flex-direction: column; touch-action: none; transition: opacity .2s; }
+.iv[hidden] { display: none; }
+.iv-top { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top) + 10px) 14px 10px; color: #fff; }
+.iv-title { flex: 1; min-width: 0; font-weight: 700; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iv-count { flex: none; color: var(--muted); font-size: .85rem; }
+.iv-close { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: #fff; font-size: 1.1rem; cursor: pointer; }
+.iv-stage { flex: 1; overflow: hidden; position: relative; user-select: none; -webkit-user-select: none; }
+.iv-track { display: flex; height: 100%; will-change: transform; }
+.iv-slide { flex: 0 0 100%; height: 100%; display: grid; place-items: center; padding: 8px 12px; box-sizing: border-box; }
+.iv-slide img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; pointer-events: none; }
+.iv-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, .1); color: #fff; font-size: 2rem; cursor: pointer; }
+.iv-nav.prev { left: 8px; }
+.iv-nav.next { right: 8px; }
+.iv-nav[hidden] { display: none; }
+@media (hover: none) { .iv-nav { display: none; } }
+.iv-dots { display: flex; justify-content: center; gap: 6px; padding: 10px 0 calc(env(safe-area-inset-bottom) + 14px); min-height: 8px; }
+.iv-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .3); }
+.iv-dots i.on { background: var(--pink); width: 18px; border-radius: 99px; }

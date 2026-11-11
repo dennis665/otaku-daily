@@ -45,6 +45,12 @@
       img.referrerPolicy = 'no-referrer';
       img.onerror = () => { cover.classList.add('empty'); img.remove(); };
       cover.append(img);
+      // 點縮圖：全螢幕看圖，有多張可以左右滑動
+      cover.classList.add('zoomable');
+      cover.setAttribute('role', 'button');
+      cover.setAttribute('aria-label', `放大看「${w.title}」的圖片`);
+      cover.addEventListener('click', () => window.ImageViewer.open(w.images, 0, w.title));
+      if (w.images.length > 1) cover.append(el('span', 'd-imgs', `🖼 ${w.images.length}`));
     } else cover.classList.add('empty');
     if (w.is_new) cover.append(el('span', 'd-new', 'NEW'));
 
