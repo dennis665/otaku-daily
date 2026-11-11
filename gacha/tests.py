@@ -115,7 +115,7 @@ class GachaApiTests(TestCase):
         self.assertEqual([x["id"] for x in s["follow_left"]], [w.id])
         r = self.client.post("/gacha/api/pull/", {"work_id": w.id}).json()
         self.assertTrue(r["ok"] and r["card"]["new"])
-        self.assertTrue(r["card"]["image"].endswith(".webp"))
+        self.assertIn(".webp?v=", r["card"]["image"])
         self.assertEqual(self.client.post("/gacha/api/pull/", {"work_id": w.id}).status_code, 400)
         album = self.client.get("/gacha/api/album/").json()
         self.assertEqual(album["works"][0]["have"], 1)

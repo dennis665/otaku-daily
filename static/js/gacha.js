@@ -210,6 +210,12 @@
     stage.style.setProperty('--glow', r === 'N' || r === 'R' ? '#9bd2ff' : c);
   }
 
+  // 抽卡舞台的卡包：選了作品就換成那部作品的卡背
+  function setStagePack(back) {
+    const pack = stage.querySelector('.g-stage-pack .g-pack');
+    pack.classList.toggle('has-art', Boolean(back));
+    pack.style.backgroundImage = back ? `url('${back}')` : '';
+  }
   function openStage() {
     fx.width = innerWidth * devicePixelRatio;
     fx.height = innerHeight * devicePixelRatio;
@@ -241,6 +247,8 @@
     busy = true;
     finished = false;
     skipping = false;
+    const picked = opts.work_id && status ? status.follow_left.find((w) => w.id === opts.work_id) : null;
+    setStagePack(picked ? picked.card_back : '');
     openStage();
     buzz(30);
     // 一邊蓄力一邊等伺服器結果

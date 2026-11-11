@@ -66,8 +66,12 @@ def image_bytes(file):
     return data
 
 
+# 卡面重新產生（同一個檔名、內容改了）時加 1，讓手機裡存的舊圖失效、重新讀取
+IMAGE_VERSION = 2
+
+
 def image_url(card):
-    return f"/gacha/img/{card.file}" if card.file else ""
+    return f"/gacha/img/{card.file}?v={IMAGE_VERSION}" if card.file else ""
 
 
 def _ensure_card_backs():

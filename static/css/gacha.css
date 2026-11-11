@@ -52,11 +52,11 @@
 .gcard { --c: var(--r-N); position: relative; width: 100%; aspect-ratio: 5 / 7; border-radius: 6% / 4.3%; transform-style: preserve-3d; }
 .gcard-in { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; background: #0d0c1e;
   box-shadow: 0 0 0 2px var(--c), 0 8px 22px rgba(0, 0, 0, .55); }
-.gcard-in img { position: absolute; inset: 7% 6% 17%; width: 88%; height: 76%; object-fit: cover; border-radius: 4px; }
+.gcard-in img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }   /* 卡面圖本身就是 5:7，整張顯示不再裁切 */
 .gcard-frame { position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(160deg, color-mix(in srgb, var(--c) 70%, #fff) 0%, var(--c) 30%, color-mix(in srgb, var(--c) 55%, #000) 100%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 4.5%; }
-.gcard-name { position: absolute; left: 6%; right: 6%; bottom: 4%; height: 12%; display: flex; align-items: center; font-size: clamp(.55rem, 3.2cqw, .95rem);
+.gcard-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 14% 7% 6%; background: linear-gradient(transparent, rgba(0, 0, 0, .8) 60%); display: flex; align-items: flex-end; font-size: clamp(.55rem, 3.2cqw, .95rem);
   font-weight: 700; color: #fff; line-height: 1.2; overflow: hidden; text-shadow: 0 1px 2px #000; }
 .gcard { container-type: inline-size; }
 .gcard-name { font-size: 6.2cqw; }
@@ -119,6 +119,8 @@
 .g-flash.go { animation: g-flash .7s ease-out; }
 .g-stage-pack { position: relative; z-index: 2; transition: transform .4s, opacity .4s; }
 .g-stage-pack .g-pack { width: 180px; height: 257px; }
+.g-stage-pack .g-pack.has-art { background-size: cover; background-position: center; }
+.g-stage-pack .g-pack.has-art::before, .g-stage-pack .g-pack.has-art::after, .g-stage-pack .g-pack.has-art .g-pack-logo { display: none; }
 .g-stage.is-charging .g-stage-pack .g-pack { animation: g-shake .14s linear infinite; box-shadow: 0 0 30px 6px var(--glow, #9bd2ff), 0 18px 40px rgba(0, 0, 0, .5); }
 .g-stage.is-charging.lv2 .g-stage-pack .g-pack { animation-duration: .09s; }
 .g-stage.is-open .g-stage-pack { transform: scale(1.4); opacity: 0; }
