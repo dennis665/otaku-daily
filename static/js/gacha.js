@@ -431,6 +431,12 @@
       $('g-sum').textContent = '讀取失敗，請稍後再試';
     }
   }
+  // 收集度：收集到幾 % 的卡（有收集就至少顯示 1%，全部收集才 100%）
+  function pct(w) {
+    if (!w.total) return 0;
+    const p = Math.floor((w.have / w.total) * 100);
+    return w.have && !p ? 1 : p;
+  }
   function paintAlbum() {
     const s = album.summary;
     $('g-album-n').textContent = s.kinds || '';
@@ -450,7 +456,7 @@
     const box = $('g-album-list');
     box.innerHTML = list.slice(0, shown).map((w) => `
       <div class="g-album-work">
-        <header><b>${esc(w.title)}</b><span>${w.have}／${w.total}</span></header>
+        <header><b>${esc(w.title)}</b><span>${w.have}／${w.total}・<em class="g-pct${w.have === w.total ? ' done' : ''}">${pct(w)}%</em></span></header>
         <div class="g-progress"><i style="width:${(w.have / w.total) * 100}%"></i></div>
         <div class="g-slots">${w.cards.map((c) => cardHTML(c.owned ? c : null, { rarity: c.rarity, no: c.no, count: true })).join('')}</div>
       </div>`).join('');

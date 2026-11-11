@@ -214,3 +214,8 @@
 .gcard.is-missing.has-no .gcard-in::after { content: none; }
 .gcard-missing-no { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #8a85c0; font-size: 7cqw; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .gcard-missing-no b { display: block; font-size: 18cqw; font-weight: 900; color: #b8b3e6; }
+
+/* 卡冊：每部作品收集度 */
+.g-pct { font-style: normal; font-weight: 800; color: var(--cyan); }
+.g-pct.done { color: #ffd166; }
+.g-pct.done::after { content: " 🏆"; }
