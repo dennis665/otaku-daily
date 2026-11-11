@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from dramas.models import Follow, Work
 
 from . import cards, service
-from .models import FREE_DAILY, PITY_AT, Card, GachaState, OwnedCard, Pull
+from .models import FREE_DAILY, PICK_DAILY, PITY_AT, TASK_REWARD, Card, GachaState, OwnedCard, Pull
 
 User = get_user_model()
 
@@ -38,18 +38,49 @@ class GachaTests(TestCase):
         self.assertAlmostEqual(c["SSR"] / 20000, 0.05, delta=0.01)
         self.assertTrue(all(service.roll_rarity(rng, pity=True) in service.HIGH for _ in range(200)))
 
-    def test_follow_pull_once_per_day_and_only_works_with_cards(self):
+    def test_pick_tickets_daily_then_bonus(self):
+        # 不用追也可以自選任何有卡片的作品；每天 PICK_DAILY 張
+        for _ in range(PICK_DAILY):
+            service.pull(self.user, self.w1.id)
+        self.assertEqual(service.status(self.user)["pick_left"], 0)
         with self.assertRaises(service.PullError):
-            service.pull(self.user, self.w1.id)            # 沒追不能抽
-        Follow.objects.create(user=self.user, work=self.w1)
-        Follow.objects.create(user=self.user, work=self.empty)
-        self.assertEqual(service.status(self.user)["follow_left"], [self.w1.id])   # 沒卡片的作品不列出
-        service.pull(self.user, self.w1.id)
+            service.pull(self.user, self.w2.id)                # 當天的券用完、也沒有保留券
+        GachaState.objects.filter(user=self.user).update(bonus_tickets=2)
+        p, _ = service.pull(self.user, self.w2.id)             # 用保留券
+        self.assertEqual(p.ticket, "bonus")
+        self.assertEqual(service.status(self.user)["bonus"], 1)
         with self.assertRaises(service.PullError):
-            service.pull(self.user, self.w1.id)            # 同一天不能再抽
+            service.pull(self.user, self.empty.id)             # 沒卡片的作品不能抽
+
+    def test_pull_many_stops_when_tickets_run_out(self):
+        GachaState.objects.create(user=self.user, bonus_tickets=1)
+        got = service.pull_many(self.user, self.w1.id, 10)
+        self.assertEqual(len(got), 10)
+        got = service.pull_many(self.user, self.w1.id, 10)    # 只剩 1 張保留券
+        self.assertEqual(len(got), 1)
+
+    def test_online_task_reward_once_per_day(self):
+        from datetime import timedelta
+
+        from django.utils import timezone as tz
+        now = tz.now()
+        service.heartbeat(self.user, now)                      # 第一次只開始計時
+        for i in range(1, 6):
+            t = service.heartbeat(self.user, now + timedelta(seconds=60 * i))
+        self.assertTrue(t["claimable"])
+        self.assertEqual(service.heartbeat(self.user, now + timedelta(seconds=310))["seconds"], 300)   # 太快不算
+        self.assertEqual(service.claim_task(self.user), TASK_REWARD)
         with self.assertRaises(service.PullError):
-            service.pull(self.user, self.empty.id)
-        self.assertEqual(service.status(self.user)["follow_left"], [])
+            service.claim_task(self.user)                      # 一天只能領一次
+
+    def test_online_task_ignores_long_gap(self):
+        from datetime import timedelta
+
+        from django.utils import timezone as tz
+        now = tz.now()
+        service.heartbeat(self.user, now)
+        t = service.heartbeat(self.user, now + timedelta(minutes=30))   # 中間離開 30 分鐘不算在線
+        self.assertEqual(t["seconds"], 0)
 
     def test_same_rarity_can_have_many_cards(self):
         w = make_work(9, "多卡作品", rarities=("N", "N", "N"))
@@ -68,16 +99,10 @@ class GachaTests(TestCase):
         s1.save()
         s3 = Work.objects.create(source_id=21, title="第三季", franchise=fr)
         Follow.objects.create(user=self.user, work=s3)
-        # 各系列作品只會有一種卡包沒有分各季：追第三季統一對應到該系列卡包（s1）
-        self.assertEqual(service.status(self.user)["follow_left"], [s1.id])
-        # 即使同時追了第一季與第三季，整個系列仍只會有一個卡包
-        Follow.objects.create(user=self.user, work=s1)
-        self.assertEqual(service.status(self.user)["follow_left"], [s1.id])
-        # 用 s3 或 s1 抽都算該系列卡包，抽完後該系列今天不可再抽
-        p, _ = service.pull(self.user, s3.id)
+        works = service.pick_works(self.user)
+        self.assertEqual(works[0], (s1, True))                 # 系列只有一個卡包，有追的排前面
+        p, _ = service.pull(self.user, s3.id)                  # 用第三季抽也是系列的卡
         self.assertEqual(p.card.work_id, s1.id)
-        self.assertEqual(OwnedCard.objects.get(user=self.user).work_id, s1.id)
-        self.assertEqual(service.status(self.user)["follow_left"], [])
 
     def test_free_pulls_limited_and_owned_counts(self):
         for _ in range(FREE_DAILY):
@@ -109,62 +134,27 @@ class GachaApiTests(TestCase):
     def test_pull_and_album(self):
         user = User.objects.create_user("bob", password="pw-123456")
         w = make_work(10, "葬送的芙莉蓮")
-        Follow.objects.create(user=user, work=w)
         self.client.force_login(user)
         s = self.client.get("/gacha/api/status/").json()
-        self.assertEqual([x["id"] for x in s["follow_left"]], [w.id])
-        r = self.client.post("/gacha/api/pull/", {"work_id": w.id}).json()
+        self.assertEqual([x["id"] for x in s["works"]], [w.id])
+        self.assertEqual((s["pick_left"], s["random_left"], s["bonus"]), (PICK_DAILY, FREE_DAILY, 0))
+        r = self.client.post("/gacha/api/pull/", {"work_id": w.id, "count": 3}).json()
         self.assertTrue(r["ok"] and r["card"]["new"])
+        self.assertEqual(len(r["cards"]), 3)
+        self.assertEqual(r["status"]["pick_left"], PICK_DAILY - 3)
         self.assertIn(".webp?v=", r["card"]["image"])
-        self.assertEqual(self.client.post("/gacha/api/pull/", {"work_id": w.id}).status_code, 400)
         album = self.client.get("/gacha/api/album/").json()
-        self.assertEqual(album["works"][0]["have"], 1)
         self.assertEqual(album["works"][0]["total"], 4)   # 這部作品的所有卡都列出（沒抽到的顯示剪影）
 
-    def test_pull_all_follows_once(self):
+    def test_task_claim_api(self):
         user = User.objects.create_user("cat", password="pw-123456")
-        for i in range(3):
-            Follow.objects.create(user=user, work=make_work(100 + i, f"作品{i}"))
         self.client.force_login(user)
-        r = self.client.post("/gacha/api/pull-all/").json()
-        self.assertEqual(len(r["cards"]), 3)
-        self.assertEqual(r["status"]["follow_left"], [])
-        self.assertEqual(self.client.post("/gacha/api/pull-all/").status_code, 400)
-
-    def test_franchise_single_pack_and_card_back(self):
-        from dramas.models import Franchise
-        user = User.objects.create_user("david", password="pw-123456")
-        fr = Franchise.objects.create(name="藍色系列")
-        s1 = make_work(201, "藍色系列 第一季")
-        s1.franchise = fr
-        s1.save()
-        s2 = Work.objects.create(source_id=202, title="藍色系列 第二季", franchise=fr)
-        s3 = Work.objects.create(source_id=203, title="藍色系列 劇場版", franchise=fr)
-        cards._state["card_backs"]["201"] = "card_backs/card_back_201.webp"
-
-        # 使用者同時追了三季
-        Follow.objects.create(user=user, work=s1)
-        Follow.objects.create(user=user, work=s2)
-        Follow.objects.create(user=user, work=s3)
-
-        self.client.force_login(user)
-        s = self.client.get("/gacha/api/status/").json()
-        # 各系列作品只會有一種卡包沒有分各季
-        self.assertEqual(len(s["follow_left"]), 1)
-        self.assertEqual(s["follow_left"][0]["id"], s1.id)
-        self.assertEqual(s["follow_left"][0]["title"], "藍色系列")
-        # 套用作品卡圖（卡背/封面）
-        self.assertEqual(s["follow_left"][0]["image"], "/gacha/img/card_backs/card_back_201.webp")
-
-        # 抽卡時返回卡圖與專屬卡背
-        r = self.client.post("/gacha/api/pull/", {"work_id": s2.id}).json()
-        self.assertTrue(r["ok"])
-        self.assertEqual(r["card"]["back_image"], "/gacha/img/card_backs/card_back_201.webp")
-        self.assertEqual(r["card"]["title"], "藍色系列")
-
-        # 抽完後該系列今天不可再抽
-        s_after = self.client.get("/gacha/api/status/").json()
-        self.assertEqual(len(s_after["follow_left"]), 0)
+        self.assertEqual(self.client.post("/gacha/api/task/claim/").status_code, 400)   # 還沒達成
+        from .models import GachaDay
+        GachaDay.objects.create(user=user, day=service.today(), online_seconds=300)
+        r = self.client.post("/gacha/api/task/claim/").json()
+        self.assertEqual(r["status"]["bonus"], TASK_REWARD)
+        self.assertTrue(r["status"]["task"]["claimed"])
 
 
 class UnlimitedUserTests(TestCase):
@@ -173,10 +163,10 @@ class UnlimitedUserTests(TestCase):
         w = make_work(500, "測試作品")
         Follow.objects.create(user=user, work=w)
         with override_settings(GACHA_UNLIMITED_USERS={"dennis"}):
-            for _ in range(FREE_DAILY + 2):
+            for _ in range(PICK_DAILY + 2):
                 service.pull(user)
                 service.pull(user, w.id)
-            self.assertEqual(service.status(user)["follow_left"], [w.id])
+            self.assertEqual(service.status(user)["pick_left"], 999)
         with override_settings(GACHA_UNLIMITED_USERS=set()):
             with self.assertRaises(service.PullError):
                 service.pull(user)

@@ -1,5 +1,8 @@
 """
-抽卡邏輯：機率、保底、每日次數（台灣時間 00:00 重置）
+抽卡邏輯：機率、保底、抽卡券、每日任務（台灣時間 00:00 重置）
+- 自選抽卡券：每天 PICK_DAILY 張（當天有效），自己選有卡片的任何作品抽
+- 隨機抽卡券：每天 FREE_DAILY 張（當天有效），從全部作品的大混池抽
+- 保留券：每日任務（當天 App 累積在線 TASK_SECONDS 秒）送 TASK_REWARD 張自選券，不會過期、可累積；自選抽時先用當天的券再用保留券
 - 卡片以「作品系列」共用：卡掛在系列裡任何一部（通常是第一季），追同系列的任何一季都抽得到整個系列的卡
 - 只有「本身或同系列有卡片」的作品抽得到
 """
@@ -8,11 +11,13 @@ from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
 from django.db import IntegrityError, models, transaction
+from django.utils import timezone as dj_tz
 
 from dramas.models import Follow, Work
 
 from . import cards
-from .models import FREE_DAILY, PITY_AT, RARITIES, RARITY_WEIGHT, Card, GachaState, OwnedCard, Pull
+from .models import (FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_WEIGHT, TASK_REWARD, TASK_SECONDS, Card, GachaDay,
+                     GachaState, OwnedCard, Pull)
 
 TW = timezone(timedelta(hours=8))
 HIGH = {"SSR", "UR", "LR"}
@@ -68,44 +73,76 @@ def cards_for(work):
     return qs.filter(work=work)
 
 
+def pick_works(user):
+    """可以自選的卡包：每個有卡片的系列一個（追的作品排前面）；回傳 [(Work, 是否有追)]"""
+    reps = {}
+    for w in Work.objects.filter(id__in=card_work_ids()).select_related("franchise"):
+        c = canonical_work(w)
+        reps[c.id] = c
+    follows = set(Follow.objects.filter(user=user).values_list("work_id", flat=True))
+    follow_fr = set(Work.objects.filter(id__in=follows).exclude(franchise=None).values_list("franchise_id", flat=True))
+    out = [(w, w.id in follows or (w.franchise_id in follow_fr if w.franchise_id else False)) for w in reps.values()]
+    return sorted(out, key=lambda x: (not x[1], (x[0].franchise.name if x[0].franchise else x[0].title)))
+
+
+def task_status(user, day=None):
+    d = GachaDay.objects.filter(user=user, day=day or today()).first()
+    secs = d.online_seconds if d else 0
+    claimed = bool(d and d.task_claimed)
+    return {"seconds": min(secs, TASK_SECONDS), "need": TASK_SECONDS, "reward": TASK_REWARD,
+            "claimed": claimed, "claimable": secs >= TASK_SECONDS and not claimed}
+
+
 def status(user):
-    """今天還能抽哪些：追的作品（各系列只會有一種卡包、今天還沒抽的）與全作品隨機剩餘次數"""
+    """今天剩幾張券、保留券、任務進度"""
     cards.sync()
     day = today()
-    follows = list(Follow.objects.filter(user=user).values_list("work_id", flat=True))
-    drawable = drawable_work_ids(follows)
-    followed = [w for w in follows if w in drawable]
-
-    # 各系列作品只會有一種卡包沒有分各季：追同系列任何一季，統一歸納為該系列的一個卡包
-    works_map = {w.id: w for w in Work.objects.filter(id__in=followed).select_related("franchise")}
-    canonical_order = []
-    seen = set()
-    for wid in followed:
-        w = works_map.get(wid)
-        c = canonical_work(w) if w else None
-        if c and c.id not in seen:
-            seen.add(c.id)
-            canonical_order.append(c.id)
-
     state = GachaState.objects.filter(user=user).first()
-    base = {"day": day.isoformat(), "pity_left": PITY_AT - (state.since_ssr if state else 0), "pool_works": len(card_work_ids())}
+    has_cards = bool(card_work_ids())
+    base = {"day": day.isoformat(), "pity_left": PITY_AT - (state.since_ssr if state else 0),
+            "pool_works": len(card_work_ids()), "bonus": state.bonus_tickets if state else 0, "task": task_status(user, day)}
     if unlimited(user):
-        return {**base, "follow_left": canonical_order, "free_left": 999 if drawable else 0, "unlimited": True}
+        return {**base, "pick_left": 999, "random_left": 999 if has_cards else 0, "unlimited": True}
+    used = Pull.objects.filter(user=user, day=day)
+    return {**base,
+            "pick_left": max(0, PICK_DAILY - used.filter(pool=Pull.Pool.PICK, ticket="daily").count()),
+            "random_left": max(0, FREE_DAILY - used.filter(pool=Pull.Pool.FREE).count()) if has_cards else 0}
 
-    done = set(Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FOLLOW).values_list("work_id", flat=True))
-    done_franchises = set(Work.objects.filter(id__in=done).exclude(franchise=None).values_list("franchise_id", flat=True))
 
-    left = []
-    for cid in canonical_order:
-        cw = works_map.get(cid) or Work.objects.select_related("franchise").filter(id=cid).first()
-        if not cw:
-            continue
-        if cw.id in done or (cw.franchise_id and cw.franchise_id in done_franchises):
-            continue
-        left.append(cid)
+# ---------- 每日任務：App 在線時間 ----------
+BEAT_MIN, BEAT_MAX = 50, 120   # 前端每 60 秒回報一次；間隔太短不算（防連按），太長代表中間離開了
 
-    free_used = Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FREE).count()
-    return {**base, "follow_left": left, "free_left": max(0, FREE_DAILY - free_used) if drawable else 0}
+
+def heartbeat(user, now=None):
+    """App 在前景時每分鐘呼叫一次，累積當天在線時間；回傳任務狀態"""
+    now = now or dj_tz.now()
+    with transaction.atomic():
+        d, _ = GachaDay.objects.select_for_update().get_or_create(user=user, day=today())
+        if d.last_beat:
+            gap = (now - d.last_beat).total_seconds()
+            if gap < BEAT_MIN:
+                return task_status(user)          # 太快，不算也不更新時間
+            if gap <= BEAT_MAX:
+                d.online_seconds += int(min(gap, 60))
+        d.last_beat = now
+        d.save()
+    return task_status(user)
+
+
+def claim_task(user):
+    """領取在線任務獎勵：自選抽卡券 TASK_REWARD 張（保留券）"""
+    with transaction.atomic():
+        d = GachaDay.objects.select_for_update().filter(user=user, day=today()).first()
+        if not d or d.online_seconds < TASK_SECONDS:
+            raise PullError(f"今天在線還不到 {TASK_SECONDS // 60} 分鐘")
+        if d.task_claimed:
+            raise PullError("今天的任務獎勵已經領過了")
+        d.task_claimed = True
+        d.save(update_fields=["task_claimed"])
+        state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
+        state.bonus_tickets += TASK_REWARD
+        state.save(update_fields=["bonus_tickets"])
+    return state.bonus_tickets
 
 
 def pick_card(work, pity, rng):
@@ -124,50 +161,49 @@ def pick_card(work, pity, rng):
     return rng.choice(by_rarity[rarity])
 
 
-def pull_all(user, rng=random):
-    """追的作品今天還沒抽的全部抽一次；回傳 [(Pull, 是否新卡)]"""
+def pull_many(user, work_id=None, count=1, rng=random):
+    """連抽：有 work_id＝自選該作品；沒有＝隨機大混池。券不夠就抽到用完為止；回傳 [(Pull, 是否新卡)]"""
     out = []
-    for wid in status(user)["follow_left"]:
+    for i in range(max(1, min(int(count), 10))):
         try:
-            out.append(pull(user, wid, rng))
+            out.append(pull(user, work_id, rng))
         except PullError:
-            pass   # 同時在別的裝置抽過了
+            if not out:
+                raise
+            break
     return out
 
 
 def pull(user, work_id=None, rng=random):
-    """抽一張：有 work_id＝追的作品那部；沒有＝全作品隨機池。回傳 (Pull, 是否新卡)"""
+    """抽一張：有 work_id＝用自選抽卡券抽該作品（系列）；沒有＝用隨機抽卡券從大混池抽。回傳 (Pull, 是否新卡)"""
     cards.sync()
     day = today()
     free = unlimited(user)
     with transaction.atomic():
         state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
         pity = state.since_ssr + 1 >= PITY_AT
+        ticket = ""
         if work_id:
             try:
                 raw_work = Work.objects.select_related("franchise").get(pk=work_id)
             except Work.DoesNotExist:
                 raise PullError("找不到這部作品")
             work = canonical_work(raw_work)
-            # 追了這部或同系列任何一部作品皆可抽卡
-            follows = Follow.objects.filter(user=user)
-            is_followed = follows.filter(work=raw_work).exists() or follows.filter(work=work).exists()
-            if not is_followed and work.franchise_id:
-                is_followed = follows.filter(work__franchise_id=work.franchise_id).exists()
-            if not is_followed:
-                raise PullError("只能抽你追的作品")
             if work.id not in drawable_work_ids([work.id]):
                 raise PullError("這部作品還沒有卡片")
-            # 檢查今天同系列是否已抽過（非無限次數帳號）
             if not free:
-                done_qs = Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FOLLOW)
-                if done_qs.filter(work=work).exists() or (work.franchise_id and done_qs.filter(work__franchise_id=work.franchise_id).exists()):
-                    raise PullError("這部作品今天已經抽過了，明天再來！")
-            # 不限次數的帳號記成隨機池，才不會被「同一部一天一次」擋下
-            pool = Pull.Pool.FREE if free else Pull.Pool.FOLLOW
+                used = Pull.objects.filter(user=user, day=day, pool=Pull.Pool.PICK, ticket="daily").count()
+                if used < PICK_DAILY:
+                    ticket = "daily"
+                elif state.bonus_tickets > 0:
+                    ticket = "bonus"
+                    state.bonus_tickets -= 1
+                else:
+                    raise PullError("自選抽卡券用完了！完成每日任務可以拿到更多，或明天再來")
+            pool = Pull.Pool.PICK
         else:
             if not free and Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FREE).count() >= FREE_DAILY:
-                raise PullError("今天的隨機抽已經用完了，明天再來！")
+                raise PullError("今天的隨機抽卡券用完了，明天再來！")
             candidates = sorted(card_work_ids())
             if pity:
                 high = sorted(set(Card.objects.filter(active=True, rarity__in=HIGH).values_list("work_id", flat=True)))
@@ -177,11 +213,13 @@ def pull(user, work_id=None, rng=random):
             work = Work.objects.get(pk=rng.choice(candidates))
             pool = Pull.Pool.FREE
         card = pick_card(work, pity, rng)
+        if card is None:
+            raise PullError("這部作品還沒有卡片")
         try:
             with transaction.atomic():
-                p = Pull.objects.create(user=user, work=work, card=card, rarity=card.rarity, pool=pool, day=day, pity=pity)
+                p = Pull.objects.create(user=user, work=work, card=card, rarity=card.rarity, pool=pool, ticket=ticket, day=day, pity=pity)
         except IntegrityError:
-            raise PullError("這部作品今天已經抽過了，明天再來！")
+            raise PullError("抽卡失敗，請再試一次")
         state.total += 1
         state.since_ssr = 0 if card.rarity in HIGH else state.since_ssr + 1
         state.save()

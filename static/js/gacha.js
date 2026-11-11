@@ -99,37 +99,102 @@
       $('g-info').textContent = '讀取失敗，請稍後再試';
     }
   }
+  function picksLeft() { return status ? status.pick_left + status.bonus : 0; }
+  function fmtTime(sec) { return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
+  function paintTask(t) {
+    if (!t) return;
+    $('g-task').hidden = false;
+    $('g-task-text').textContent = t.claimed ? '今天已領取 ✅' : `今天在線 ${fmtTime(t.seconds)}／${fmtTime(t.need)}`;
+    $('g-task-bar').style.width = `${Math.min(100, (t.seconds / t.need) * 100)}%`;
+    $('g-task-claim').hidden = !t.claimable;
+    $('g-task-claim').textContent = `🎁 領取 ${t.reward} 張自選抽卡券（可累積保留）`;
+  }
   function paintStatus() {
     const s = status;
-    const left = s.follow_left.length + s.free_left;
+    const left = picksLeft() + s.random_left;
     $('g-count').textContent = s.unlimited ? '∞' : left;
     $('g-info').innerHTML = s.unlimited
-      ? `♾ 測試帳號：抽卡不限次數<br>再 <b>${s.pity_left}</b> 抽必出 SSR 以上`
-      : `今天還可以抽 <b>${left}</b> 次・隨機抽 <b>${s.free_left}</b>／${s.free_daily}<br>再 <b>${s.pity_left}</b> 抽必出 SSR 以上`;
-    $('g-free').disabled = !s.free_left;
-    $('g-free').innerHTML = `🎲 隨機抽<small>全作品・${s.unlimited ? '不限次數' : `剩 ${s.free_left} 次`}</small>`;
-    $('g-all').disabled = !s.follow_left.length;
-    $('g-all').innerHTML = `⚡ 追的作品全抽<small>${s.follow_left.length ? `${s.follow_left.length} 部一次抽` : '今天都抽完了'}</small>`;
+      ? `♾ 測試帳號：抽卡不限次數・再 <b>${s.pity_left}</b> 抽必出 SSR 以上`
+      : `再 <b>${s.pity_left}</b> 抽必出 SSR 以上・每天 00:00 補券`;
+    $('g-tickets').innerHTML = s.unlimited ? '' : `
+      <div class="g-ticket">🎟 自選抽卡券<b>${s.pick_left}／${s.pick_daily}${s.bonus ? ` <em>＋保留 ${s.bonus}</em>` : ''}</b>自己選作品抽</div>
+      <div class="g-ticket">🎲 隨機抽卡券<b>${s.random_left}／${s.free_daily}</b>全作品大混池</div>`;
+    paintTask(s.task);
+    $('g-free').disabled = !s.random_left;
+    $('g-all').disabled = s.random_left < 2;
+    const n = Math.min(s.random_left, 5);
+    $('g-all').innerHTML = `🎲 隨機連抽${n > 1 ? ` ×${n}` : ''}<small>${s.unlimited ? '一次 5 張' : '把隨機券一次用完'}</small>`;
     const box = $('g-works');
     box.innerHTML = '';
     if (!s.pool_works) {
       box.innerHTML = '<p class="g-empty">🎴 卡片製作中，還沒有可以抽的卡，敬請期待！</p>';
-    } else if (!s.follow_left.length) {
-      box.innerHTML = '<p class="g-empty">今天追的作品都抽完了，或你追的作品還沒有卡片（到「📺 追劇」按 ⭐ 追有卡片的作品）。明天 00:00 重置！</p>';
     }
-    s.follow_left.forEach((w) => {
+    s.works.forEach((w) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'g-work';
+      b.className = `g-work${w.followed ? ' is-followed' : ''}`;
       b.innerHTML = `${w.image ? `<img src="${esc(w.image)}" alt="" loading="lazy">` : '<i class="g-work-noimg"></i>'}<span>${esc(w.title)}</span>`;
-      b.addEventListener('click', () => draw({ work_id: w.id }));
+      b.addEventListener('click', () => openPick(w));
       box.appendChild(b);
     });
     $('g-rates').innerHTML = `<table>${s.rates.map((r) => `<tr><td><b style="color:${COLOR[r.rarity]}">${esc(r.label)}</b></td><td>${r.percent}%</td></tr>`).join('')}</table>
-      <p>・每天台灣時間 00:00 重置：追的作品每部 1 抽，另送 ${s.free_daily} 次全作品隨機抽。<br>・連續 ${s.pity_at} 抽沒有 SSR 以上，下一抽必定 SSR 以上。<br>・抽卡結果由伺服器決定並記錄，重新整理也不會改變。</p>`;
+      <p>・每天台灣時間 00:00 補券：自選抽卡券 ${s.pick_daily} 張（自己選作品抽）、隨機抽卡券 ${s.free_daily} 張（全作品大混池），當天沒用完不保留。<br>
+      ・每日任務：當天 App 累積在線 5 分鐘，可領自選抽卡券 5 張；這是保留券，不會過期、可以累積。自選抽時先用當天的券，再用保留券。<br>
+      ・連續 ${s.pity_at} 抽沒有 SSR 以上，下一抽必定 SSR 以上。<br>・抽卡結果由伺服器決定並記錄，重新整理也不會改變。</p>`;
   }
-  $('g-free').addEventListener('click', () => draw({}));
-  $('g-all').addEventListener('click', () => draw({ all: true }));
+  $('g-free').addEventListener('click', () => draw({ count: 1 }));
+  $('g-all').addEventListener('click', () => draw({ count: Math.min(status ? status.random_left : 1, 5) }));
+
+  // 選作品後選張數
+  let pickWork = null;
+  function openPick(w) {
+    pickWork = w;
+    const left = status.unlimited ? 99 : picksLeft();
+    const art = w.card_back || w.image;
+    $('g-pick-title').textContent = w.title;
+    $('g-pick-back').style.backgroundImage = art ? `url('${art}')` : '';
+    $('g-pick-info').textContent = status.unlimited ? '測試帳號不限張數' : left ? `可用自選抽卡券 ${left} 張（券不夠時抽到用完為止）` : '自選抽卡券用完了，完成每日任務或明天再來';
+    $('g-pick').querySelectorAll('[data-n]').forEach((b) => { b.disabled = !left; });
+    $('g-pick').hidden = false;
+    document.body.classList.add('sheet-open');
+  }
+  const closePick = () => { $('g-pick').hidden = true; document.body.classList.remove('sheet-open'); };
+  $('g-pick-close').addEventListener('click', closePick);
+  $('g-pick').addEventListener('click', (e) => { if (e.target.id === 'g-pick') closePick(); });
+  $('g-pick').querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => {
+    const w = pickWork;
+    closePick();
+    if (w) draw({ work_id: w.id, count: Number(b.dataset.n) });
+  }));
+
+  // 每日任務：領獎
+  $('g-task-claim').addEventListener('click', async () => {
+    $('g-task-claim').disabled = true;
+    try {
+      const res = await fetch('/gacha/api/task/claim/', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrf() } });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error);
+      status = j.status;
+      paintStatus();
+      alert(`🎁 領到 ${status.task.reward} 張自選抽卡券！（保留券不會過期）`);
+    } catch (err) { alert(err.message || '領取失敗，請稍後再試'); }
+    $('g-task-claim').disabled = false;
+  });
+
+  // 在線時間：App 在前景時每 60 秒回報一次（背景、離線不算）
+  async function beat() {
+    if (document.hidden || navigator.onLine === false) return;
+    try {
+      const res = await fetch('/gacha/api/heartbeat/', { method: 'POST', credentials: 'same-origin', loading: false, headers: { 'X-CSRFToken': csrf() } });
+      const j = await res.json();
+      if (!j.ok) return;
+      if (status) status.task = j.task;
+      paintTask(j.task);
+    } catch { /* 網路不穩：下次再回報 */ }
+  }
+  beat();
+  setInterval(beat, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
 
   // ---------- 抽卡演出 ----------
   const stage = $('g-stage');
@@ -247,15 +312,15 @@
     busy = true;
     finished = false;
     skipping = false;
-    const picked = opts.work_id && status ? status.follow_left.find((w) => w.id === opts.work_id) : null;
+    const picked = opts.work_id && status ? status.works.find((w) => w.id === opts.work_id) : null;
     setStagePack(picked ? picked.card_back : '');
     openStage();
     buzz(30);
     // 一邊蓄力一邊等伺服器結果
     let data;
     try {
-      const url = opts.all ? '/gacha/api/pull-all/' : '/gacha/api/pull/';
-      const body = new URLSearchParams(opts.work_id ? { work_id: opts.work_id } : {});
+      const url = '/gacha/api/pull/';
+      const body = new URLSearchParams({ count: opts.count || 1, ...(opts.work_id ? { work_id: opts.work_id } : {}) });
       const [res] = await Promise.all([
         fetch(url, { method: 'POST', credentials: 'same-origin', loading: false, headers: { 'X-CSRFToken': csrf() }, body }),
         new Promise((r) => setTimeout(r, 900)),

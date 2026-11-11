@@ -168,11 +168,18 @@
       <div class="g-pack"><div class="g-pack-shine"></div><div class="g-pack-logo"><small>UKIYO</small>ANIME<br>CARDS<em>★ DAILY ★</em></div></div>
     </div>
     <p class="g-info" id="g-info">讀取中…</p>
-    <div class="g-actions">
-      <button class="g-btn" id="g-free" type="button">🎲 隨機抽</button>
-      <button class="g-btn alt" id="g-all" type="button">⚡ 追的作品全抽</button>
+    <div class="g-tickets" id="g-tickets"></div>
+    {# 每日任務：App 累積在線 5 分鐘送自選抽卡券（保留券可累積） #}
+    <div class="g-task" id="g-task" hidden>
+      <div class="g-task-top"><b>📋 每日任務</b><span id="g-task-text"></span></div>
+      <div class="g-progress"><i id="g-task-bar"></i></div>
+      <button class="g-btn sm" id="g-task-claim" type="button" hidden>🎁 領取 5 張自選抽卡券</button>
     </div>
-    <h3 class="g-h">追的作品・今天各 1 抽</h3>
+    <div class="g-actions">
+      <button class="g-btn" id="g-free" type="button">🎲 隨機抽 ×1</button>
+      <button class="g-btn alt" id="g-all" type="button">🎲 隨機連抽</button>
+    </div>
+    <h3 class="g-h">🎟 自選作品抽卡（點卡包選張數）</h3>
     <div class="g-works" id="g-works"></div>
     <details class="g-rates"><summary>📊 出貨機率與規則</summary><div id="g-rates"></div></details>
   </div>
@@ -328,6 +335,19 @@
   <div class="g-reveal" id="g-reveal"></div>
   <div class="g-stamp" id="g-stamp"></div>
   <p class="g-tip" id="g-tip">點一下跳過</p>
+</div>
+<div class="g-pick" id="g-pick" hidden>
+  <div class="g-pick-box">
+    <div class="g-pick-back" id="g-pick-back"></div>
+    <b id="g-pick-title"></b>
+    <p class="g-info" id="g-pick-info"></p>
+    <div class="g-pick-btns">
+      <button class="g-btn" data-n="1" type="button">抽 1 張</button>
+      <button class="g-btn" data-n="5" type="button">抽 5 張</button>
+      <button class="g-btn alt" data-n="10" type="button">抽 10 張</button>
+    </div>
+    <button class="btn ghost" id="g-pick-close" type="button">取消</button>
+  </div>
 </div>
 <div class="g-detail" id="g-detail" hidden>
   <div class="g-detail-card" id="g-detail-card"></div>

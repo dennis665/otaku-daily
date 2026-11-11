@@ -5,7 +5,7 @@ from django.views.decorators.http import require_GET, require_POST
 from dramas.models import Work
 
 from . import cards, service
-from .models import FREE_DAILY, PITY_AT, RARITIES, RARITY_LABEL, RARITY_WEIGHT, Card, OwnedCard
+from .models import FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_LABEL, RARITY_WEIGHT, Card, OwnedCard
 
 
 def _json(data, status=200):
@@ -32,17 +32,12 @@ def _cover(work):
 
 def _status_json(user):
     s = service.status(user)
-    works = {w.id: w for w in Work.objects.filter(id__in=s["follow_left"]).select_related("franchise")}
-    s["follow_left"] = [
-        {
-            "id": wid,
-            "title": works[wid].franchise.name if works[wid].franchise else works[wid].title,
-            "image": _cover(works[wid]),
-            "card_back": cards.card_back_url(works[wid]),
-        }
-        for wid in s["follow_left"] if wid in works
-    ]
+    # 可以自選的卡包（每個系列一個，追的作品排前面）
+    s["works"] = [{"id": w.id, "title": w.franchise.name if w.franchise else w.title, "image": _cover(w),
+                   "card_back": cards.card_back_url(w), "followed": followed}
+                  for w, followed in service.pick_works(user)]
     s["free_daily"] = FREE_DAILY
+    s["pick_daily"] = PICK_DAILY
     s["pity_at"] = PITY_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
     return s
@@ -75,25 +70,35 @@ def _pulled(user, pairs):
 @login_required
 @require_POST
 def pull(request):
+    """抽卡：work_id＝自選作品（用自選券），沒有＝隨機大混池（用隨機券）；count＝連抽張數（1～10，券不夠抽到用完）"""
     try:
         work_id = int(request.POST.get("work_id") or 0) or None
-        p, new = service.pull(request.user, work_id)
+        count = int(request.POST.get("count") or 1)
+        pairs = service.pull_many(request.user, work_id, count)
     except (ValueError, Work.DoesNotExist):
         return _json({"ok": False, "error": "找不到這部作品"}, 400)
     except service.PullError as e:
         return _json({"ok": False, "error": str(e)}, 400)
-    out = _pulled(request.user, [(p, new)])
-    return _json({"ok": True, "card": out[0], "cards": out, "pity": p.pity, "status": _status_json(request.user)})
+    out = _pulled(request.user, pairs)
+    return _json({"ok": True, "card": out[0], "cards": out, "pity": any(c["pity"] for c in out), "status": _status_json(request.user)})
 
 
 @login_required
 @require_POST
-def pull_all(request):
-    """追的作品今天還沒抽的一次全抽"""
-    pairs = service.pull_all(request.user)
-    if not pairs:
-        return _json({"ok": False, "error": "今天追的作品都抽過了，明天再來！"}, 400)
-    return _json({"ok": True, "cards": _pulled(request.user, pairs), "status": _status_json(request.user)})
+def heartbeat(request):
+    """App 在前景時每分鐘回報一次，累積當天在線時間（每日任務用）"""
+    return _json({"ok": True, "task": service.heartbeat(request.user)})
+
+
+@login_required
+@require_POST
+def claim_task(request):
+    """領取每日在線任務獎勵"""
+    try:
+        service.claim_task(request.user)
+    except service.PullError as e:
+        return _json({"ok": False, "error": str(e)}, 400)
+    return _json({"ok": True, "status": _status_json(request.user)})
 
 
 @login_required

@@ -16,7 +16,10 @@ RARITY_LABEL = {"N": "N", "R": "R", "SR": "SR", "SSR": "SSR", "UR": "UR", "LR": 
 # 機率（萬分比，合計 10000）
 RARITY_WEIGHT = {"N": 5500, "R": 2700, "SR": 1200, "SSR": 500, "UR": 90, "LR": 10}
 PITY_AT = 50          # 連續 50 抽沒有 SSR 以上，下一抽必定 SSR 以上
-FREE_DAILY = 3        # 每天全作品隨機池的次數
+FREE_DAILY = 5        # 每天「隨機抽卡券」（全作品大混池）張數，當天有效
+PICK_DAILY = 10       # 每天「自選抽卡券」（自己選作品抽）張數，當天有效
+TASK_SECONDS = 300    # 每日任務：當天 App 累積在線 5 分鐘
+TASK_REWARD = 5       # 任務獎勵：自選抽卡券 5 張（保留券，不會過期，可累積）
 
 
 class Card(models.Model):
@@ -38,14 +41,16 @@ class Card(models.Model):
 
 class Pull(models.Model):
     class Pool(models.TextChoices):
-        FOLLOW = "follow", "追的作品"
+        FOLLOW = "follow", "追的作品（舊制）"
         FREE = "free", "全作品隨機"
+        PICK = "pick", "自選作品"
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gacha_pulls")
     work = models.ForeignKey(Work, on_delete=models.CASCADE, related_name="+")
     rarity = models.CharField(max_length=3, choices=[(r, RARITY_LABEL[r]) for r in RARITIES])
     card = models.ForeignKey(Card, on_delete=models.CASCADE, null=True, related_name="+")
     pool = models.CharField(max_length=10, choices=Pool.choices)
+    ticket = models.CharField("使用的券", max_length=10, blank=True)   # daily＝當天的自選券、bonus＝任務送的保留券
     day = models.DateField("台灣日期", db_index=True)
     pity = models.BooleanField("保底出貨", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -79,6 +84,20 @@ class GachaState(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gacha_state")
     since_ssr = models.PositiveIntegerField("距離上次 SSR 以上的抽數", default=0)
     total = models.PositiveIntegerField("總抽數", default=0)
+    bonus_tickets = models.PositiveIntegerField("保留的自選抽卡券", default=0)   # 任務獎勵，不會過期
 
     class Meta:
         verbose_name = verbose_name_plural = "抽卡狀態"
+
+
+class GachaDay(models.Model):
+    """每個帳號每天的在線時間與任務領取狀態"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gacha_days")
+    day = models.DateField("台灣日期")
+    online_seconds = models.PositiveIntegerField("在線秒數", default=0)
+    last_beat = models.DateTimeField("上次在線回報", null=True, blank=True)
+    task_claimed = models.BooleanField("在線任務已領取", default=False)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "每日在線與任務"
+        constraints = [models.UniqueConstraint(fields=["user", "day"], name="gacha_day_unique")]

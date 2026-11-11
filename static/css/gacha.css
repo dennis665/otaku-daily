@@ -183,3 +183,25 @@
   .tabs .tab b { position: absolute; top: 3px; left: 50%; margin-left: 6px; font-size: .58rem; line-height: 1.4; padding: 0 4px; min-width: 14px; text-align: center; background: var(--pink); color: #fff; }
   .tabs .tab:not(.active) b { background: var(--line); color: var(--text); }
 }
+
+/* 抽卡券、每日任務、自選張數 */
+.g-tickets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+.g-ticket { background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; font-size: .8rem; color: var(--muted); }
+.g-ticket b { display: block; font-size: 1.15rem; color: var(--text); }
+.g-ticket em { font-style: normal; color: var(--pink); font-weight: 700; font-size: .85rem; }
+.g-task { background: linear-gradient(135deg, rgba(255, 111, 174, .12), rgba(94, 231, 255, .1)); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; font-size: .82rem; }
+.g-task[hidden] { display: none; }
+.g-task-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: var(--muted); }
+.g-task-top b { color: var(--text); }
+.g-task .g-progress { margin-bottom: 0; }
+.g-task .g-btn { width: 100%; margin-top: 8px; }
+.g-btn.sm { padding: 10px; font-size: .9rem; }
+.g-btn[hidden] { display: none; }
+.g-work.is-followed::before { content: "⭐"; position: absolute; top: 6px; left: 6px; z-index: 2; font-size: .85rem; text-shadow: 0 1px 3px #000; }
+.g-pick { position: fixed; inset: 0; z-index: 205; background: rgba(5, 4, 14, .8); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(4px); }
+.g-pick[hidden] { display: none; }
+.g-pick-box { width: min(340px, 100%); background: var(--bg2); border: 1px solid var(--line); border-radius: 18px; padding: 16px; text-align: center; display: grid; gap: 10px; }
+.g-pick-back { width: 120px; aspect-ratio: 5 / 7; margin: 0 auto; border-radius: 10px; background: linear-gradient(160deg, #2b1f63, #c2367e) center / cover; box-shadow: 0 8px 22px rgba(0, 0, 0, .5); }
+.g-pick-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.g-pick-btns .g-btn { padding: 12px 4px; font-size: .9rem; }
+.g-pick .g-info { margin: 0; }
