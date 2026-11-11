@@ -1,14 +1,21 @@
 """
-卡面圖片與卡片清單：讀 GitHub 影音庫的 cards/index.json，同步成資料庫裡的卡片（Card）
-- 圖片：https://raw.githubusercontent.com/dennis665/fenglan-media-assets/main/cards/<file>
-- index.json：{"works": {"<youranimes 作品編號>": [{"file": "123/SSR_ab12cd34.webp", "rarity": "SSR", "name": "卡名"}]}}
-- 每 10 分鐘最多讀一次；索引裡不見的卡改成抽不到（已經抽到的人卡冊照樣保留）
-- 新增卡面：在影音庫用 card_import.py 匯入並推送，App 約 10 分鐘內自動出現
+卡面圖片與卡片清單（卡面放在「不公開」的 GitHub 儲存庫，只有登入的人透過本站看得到）
+- 儲存庫：環境變數 CARD_REPO（預設 dennis665/fenglan-card-images），讀取用的金鑰 CARD_REPO_TOKEN
+  （GitHub fine-grained token，只給這個儲存庫 Contents 讀取權限；在 Render 測試站與正式站都要設定）
+- 本機開發可以設定 CARD_LOCAL_DIR 指到卡面庫的本機資料夾，不用金鑰
+- 圖片網址：/gacha/img/<file>（本站代為讀取，需要登入）；索引：index.json
+  {"works": {"<youranimes 作品編號>": [{"file": "123/SSR_ab12cd34.webp", "rarity": "SSR", "name": "卡名"}]}}
+- 每 10 分鐘最多讀一次索引；索引裡不見的卡改成抽不到（已經抽到的人卡冊照樣保留）
+- 新增卡面：在卡面庫用 card_import.py 匯入並推送，App 約 10 分鐘內自動出現
 """
 import json
 import logging
+import os
+import re
 import time
 import urllib.request
+from collections import OrderedDict
+from pathlib import Path
 
 from django.db import transaction
 
@@ -18,19 +25,53 @@ from .models import RARITIES, Card
 
 logger = logging.getLogger(__name__)
 
-RAW = "https://raw.githubusercontent.com/dennis665/fenglan-media-assets/main/cards/"
 SYNC_SECONDS = 600
 _state = {"at": 0.0}
+SAFE_FILE = re.compile(r"^\d+/[A-Z]{1,3}_[0-9a-f]{6,40}\.webp$")
+
+
+def _repo():
+    return os.environ.get("CARD_REPO", "dennis665/fenglan-card-images")
+
+
+def read_file(path):
+    """從卡面庫讀一個檔案（bytes）；失敗丟出例外"""
+    local = os.environ.get("CARD_LOCAL_DIR")
+    if local:
+        return (Path(local) / path).read_bytes()
+    headers = {"User-Agent": "otaku-daily"}
+    token = os.environ.get("CARD_REPO_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(f"https://raw.githubusercontent.com/{_repo()}/main/{path}", headers=headers)
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return r.read()
+
+
+# 最近讀過的卡面放在記憶體（約 300 張、20MB 以內），同一張不用每次都向 GitHub 要
+_images = OrderedDict()
+MAX_IMAGES = 300
+
+
+def image_bytes(file):
+    if not SAFE_FILE.match(file or ""):
+        raise FileNotFoundError(file)
+    if file in _images:
+        _images.move_to_end(file)
+        return _images[file]
+    data = read_file(file)
+    _images[file] = data
+    while len(_images) > MAX_IMAGES:
+        _images.popitem(last=False)
+    return data
 
 
 def image_url(card):
-    return RAW + card.file if card.file else ""
+    return f"/gacha/img/{card.file}" if card.file else ""
 
 
 def fetch_index():
-    req = urllib.request.Request(RAW + "index.json", headers={"User-Agent": "otaku-daily", "Cache-Control": "no-cache"})
-    with urllib.request.urlopen(req, timeout=8) as r:
-        return json.loads(r.read().decode("utf-8"))
+    return json.loads(read_file("index.json").decode("utf-8"))
 
 
 def apply_index(index):
@@ -38,7 +79,7 @@ def apply_index(index):
     entries = []
     for sid, cards in (index.get("works") or {}).items():
         for c in cards or []:
-            if c.get("file") and c.get("rarity") in RARITIES:
+            if c.get("file") and c.get("rarity") in RARITIES and SAFE_FILE.match(c["file"]):
                 entries.append((int(sid), c))
     works = dict(Work.objects.filter(source_id__in={sid for sid, _ in entries}).values_list("source_id", "id"))
     existing = {c.file: c for c in Card.objects.exclude(file="")}
@@ -49,12 +90,13 @@ def apply_index(index):
             if not wid:
                 continue   # 追劇庫還沒有這部作品
             seen.add(c["file"])
+            name = (c.get("name") or "")[:100]
             card = existing.get(c["file"])
             if card is None:
-                Card.objects.create(work_id=wid, rarity=c["rarity"], file=c["file"], name=(c.get("name") or "")[:100])
+                Card.objects.create(work_id=wid, rarity=c["rarity"], file=c["file"], name=name)
                 created += 1
-            elif (card.work_id, card.rarity, card.name, card.active) != (wid, c["rarity"], (c.get("name") or "")[:100], True):
-                card.work_id, card.rarity, card.name, card.active = wid, c["rarity"], (c.get("name") or "")[:100], True
+            elif (card.work_id, card.rarity, card.name, card.active) != (wid, c["rarity"], name, True):
+                card.work_id, card.rarity, card.name, card.active = wid, c["rarity"], name, True
                 card.save()
         gone = [f for f, card in existing.items() if f not in seen and card.active]
         Card.objects.filter(file__in=gone).update(active=False)
@@ -62,7 +104,7 @@ def apply_index(index):
 
 
 def sync(force=False):
-    """每 10 分鐘最多讀一次 GitHub 索引；失敗就沿用資料庫裡現有的卡片"""
+    """每 10 分鐘最多讀一次卡面庫索引；失敗就沿用資料庫裡現有的卡片"""
     now = time.time()
     if not force and now - _state["at"] < SYNC_SECONDS:
         return

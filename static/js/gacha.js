@@ -21,9 +21,9 @@
       const cache = await caches.open(CARD_CACHE);
       for (const url of [...new Set(urls)].filter(Boolean)) {
         if (await cache.match(url, { ignoreVary: true })) continue;
-        if (!url.startsWith('https://raw.githubusercontent.com/')) continue;
-        const res = await fetch(url, { mode: 'cors', loading: false }).catch(() => null);
-        if (res && res.ok) await cache.put(url, res);
+        if (!url.startsWith('/gacha/img/')) continue;
+        const res = await fetch(url, { credentials: 'same-origin', loading: false }).catch(() => null);
+        if (res && res.ok && (res.headers.get('content-type') || '').startsWith('image/')) await cache.put(url, res);
       }
     } catch { /* 手機空間不足或無痕模式：照常從網路讀 */ }
     paintLocal();

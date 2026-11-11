@@ -1,5 +1,5 @@
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
 from dramas.models import Work
@@ -33,6 +33,19 @@ def _status_json(user):
     s["pity_at"] = PITY_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
     return s
+
+
+@login_required
+@require_GET
+def image(request, file):
+    """卡面圖片（卡面庫不公開，由本站代為讀取；只有登入的人看得到）。檔名含內容指紋，內容不會變，可以長期快取"""
+    try:
+        data = cards.image_bytes(file)
+    except Exception:
+        raise Http404
+    res = HttpResponse(data, content_type="image/webp")
+    res["Cache-Control"] = "private, max-age=31536000, immutable"
+    return res
 
 
 @login_required

@@ -78,11 +78,11 @@ class GachaTests(TestCase):
 
     def test_apply_index_creates_and_deactivates(self):
         Work.objects.create(source_id=77, title="新作品")
-        created, gone = cards.apply_index({"works": {"77": [{"file": "77/SSR_a.webp", "rarity": "SSR", "name": "主角"}]}})
+        created, gone = cards.apply_index({"works": {"77": [{"file": "77/SSR_abcdef12.webp", "rarity": "SSR", "name": "主角"}]}})
         self.assertEqual(created, 1)
-        self.assertTrue(Card.objects.get(file="77/SSR_a.webp").active)
+        self.assertTrue(Card.objects.get(file="77/SSR_abcdef12.webp").active)
         created, gone = cards.apply_index({"works": {}})
-        self.assertFalse(Card.objects.get(file="77/SSR_a.webp").active)
+        self.assertFalse(Card.objects.get(file="77/SSR_abcdef12.webp").active)
         self.assertGreater(gone, 0)
 
 
@@ -126,3 +126,22 @@ class UnlimitedUserTests(TestCase):
         with override_settings(GACHA_UNLIMITED_USERS=set()):
             with self.assertRaises(service.PullError):
                 service.pull(user)
+
+
+class CardImageTests(TestCase):
+    def test_image_needs_login_and_serves_from_card_repo(self):
+        import os
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "5"))
+            with open(os.path.join(d, "5", "SSR_abcdef12.webp"), "wb") as f:
+                f.write(b"RIFFxxxxWEBP")
+            with mock.patch.dict(os.environ, {"CARD_LOCAL_DIR": d}):
+                url = "/gacha/img/5/SSR_abcdef12.webp"
+                self.assertEqual(self.client.get(url).status_code, 302)   # 沒登入看不到
+                self.client.force_login(User.objects.create_user("eve", password="pw-123456"))
+                res = self.client.get(url)
+                self.assertEqual(res.status_code, 200)
+                self.assertEqual(res["Content-Type"], "image/webp")
+                self.assertEqual(self.client.get("/gacha/img/../../settings.py").status_code, 404)

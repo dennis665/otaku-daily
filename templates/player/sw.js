@@ -14,7 +14,7 @@ const HOME_URL = '/';
 // 抽到的卡面圖片（頁面存進來，這裡只負責優先從手機提供；抽卡分頁可一鍵清除）
 const CARD_CACHE = 'ukiyo-cards';
 const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE, PAGE_CACHE, SONG_CACHE, CARD_CACHE];
-const isCardImage = (url) => url.origin === 'https://raw.githubusercontent.com' && url.pathname.includes('/fenglan-media-assets/main/cards/');
+const isCardImage = (url) => url.origin === self.location.origin && url.pathname.startsWith('/gacha/img/');
 async function serveCard(req) {
   const cached = await caches.match(req.url, { cacheName: CARD_CACHE, ignoreVary: true });
   return cached || fetch(req);
