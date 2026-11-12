@@ -109,6 +109,20 @@ def fetch_index():
     return json.loads(read_file("index.json").decode("utf-8"))
 
 
+def refund_removed(cards_qs):
+    """卡片下架前：持有這些卡的帳號，每張依稀有度退還分解價值的星塵，並留一則通知"""
+    from .models import DUST_VALUE, GachaState, OwnedCard
+    gain = {}
+    for o in OwnedCard.objects.filter(card__in=cards_qs).select_related("card"):
+        gain[o.user_id] = gain.get(o.user_id, 0) + DUST_VALUE.get(o.card.rarity, 1) * o.count
+    for uid, dust in gain.items():
+        state, _ = GachaState.objects.get_or_create(user_id=uid)
+        state.stardust += dust
+        state.notice = f"有卡片下架了，已退還 ✨ {dust} 星塵給你"
+        state.save(update_fields=["stardust", "notice"])
+    return gain
+
+
 def apply_index(index):
     """
     把索引同步成 Card：新的建立、改過的更新（含卡號）、索引裡不見的整張刪除（連同抽卡紀錄與卡冊裡的這張）；回傳 (新增, 刪除) 數
@@ -140,6 +154,7 @@ def apply_index(index):
         gone = [f for f in existing if f not in seen]
         active_before = sum(1 for card in existing.values() if card.active)
         if len(seen) >= active_before / 2:
+            refund_removed(Card.objects.filter(file__in=gone))
             Card.objects.filter(file__in=gone).delete()
             Card.objects.filter(file="").delete()   # 早期沒有圖的舊卡
         else:

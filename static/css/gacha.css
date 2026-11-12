@@ -219,3 +219,20 @@
 .g-pct { font-style: normal; font-weight: 800; color: var(--cyan); }
 .g-pct.done { color: #ffd166; }
 .g-pct.done::after { content: " 🏆"; }
+
+/* ✨ 星塵與商店 */
+.g-dust-box { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, rgba(255, 209, 102, .16), rgba(155, 123, 255, .14)); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 6px; }
+.g-dust-box b { font-size: 1.6rem; color: #ffd166; }
+.g-shop-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.g-shop-btns .g-btn { padding: 12px 4px; font-size: .9rem; }
+.g-info.g-left { text-align: left; }
+.g-dust-table { width: 100%; border-collapse: collapse; font-size: .85rem; color: var(--muted); }
+.g-dust-table th, .g-dust-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: center; }
+.g-dust-table th { color: var(--text); font-weight: 700; }
+.g-dust-all { width: 100%; margin: 0 0 12px; }
+.g-dust-all[hidden] { display: none; }
+.g-detail-acts { display: grid; gap: 8px; width: min(78vw, 340px); }
+.g-detail-acts:empty { display: none; }
+.g-slots .gcard.is-missing { cursor: pointer; }
+.g-toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 90px); transform: translateX(-50%); z-index: 230; background: rgba(20, 18, 43, .95); border: 1px solid #ffd166; color: #fff; border-radius: 99px; padding: 10px 18px; font-size: .9rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); white-space: nowrap; }
+body.offline-mode .g-views .chip[data-g="shop"], body.offline-mode #g-dust-all, body.offline-mode #g-detail-acts { display: none !important; }

@@ -161,6 +161,7 @@
   <div class="chips g-views" role="group" aria-label="抽卡">
     <button class="chip active" data-g="draw" type="button">🎰 抽卡</button>
     <button class="chip" data-g="album" type="button">📖 我的卡冊 <b id="g-album-n"></b></button>
+    <button class="chip" data-g="shop" type="button">🛒 星塵商店</button>
   </div>
   <div id="g-draw">
     <div class="g-machine" id="g-machine" aria-hidden="true">
@@ -185,6 +186,7 @@
   </div>
   <div id="g-album" hidden>
     <p class="g-info" id="g-sum"></p>
+    <button class="g-btn sm g-dust-all" id="g-dust-all" type="button" hidden></button>
     <div class="chips" id="g-filter" role="group" aria-label="依稀有度篩選"></div>
     <div id="g-album-list"></div>
     <button class="btn ghost g-more" id="g-more" type="button" hidden>顯示更多</button>
@@ -192,6 +194,16 @@
       <span id="g-local-info"></span>
       <button class="act" id="g-local-clear" type="button">🗑 清除手機裡的卡面</button>
     </div>
+  </div>
+  {# 星塵商店：重複卡分解得到星塵，星塵兌換自選抽卡券或指定卡 #}
+  <div id="g-shop" hidden>
+    <div class="g-dust-box"><span>✨ 我的星塵</span><b id="g-dust">0</b></div>
+    <h3 class="g-h">🎟 兌換自選抽卡券（保留券，不會過期）</h3>
+    <div class="g-shop-btns" id="g-shop-tickets"></div>
+    <h3 class="g-h">🃏 兌換指定卡</h3>
+    <p class="g-info g-left">到「📖 我的卡冊」點還沒收集到的卡（顯示卡號的剪影），就能用星塵直接兌換那一張。</p>
+    <h3 class="g-h">📊 星塵價目表</h3>
+    <div id="g-dust-table"></div>
   </div>
 </section>
 
@@ -352,6 +364,7 @@
 <div class="g-detail" id="g-detail" hidden>
   <div class="g-detail-card" id="g-detail-card"></div>
   <p class="g-detail-info" id="g-detail-info"></p>
+  <div class="g-detail-acts" id="g-detail-acts"></div>
   <button class="btn ghost" id="g-detail-close" type="button">關閉</button>
 </div>
 

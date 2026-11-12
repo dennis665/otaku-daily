@@ -21,6 +21,11 @@ PICK_DAILY = 10       # 每天「自選抽卡券」（自己選作品抽）張�
 TASK_SECONDS = 300    # 每日任務：當天 App 累積在線 5 分鐘
 TASK_REWARD = 5       # 任務獎勵：自選抽卡券 5 張（保留券，不會過期，可累積）
 
+# ✨ 星塵：重複的卡分解（至少保留 1 張）可以拿到星塵；🛒 星塵可以兌換自選抽卡券或還沒收集到的指定卡
+DUST_VALUE = {"N": 1, "R": 3, "SR": 10, "SSR": 30, "UR": 80, "LR": 200}       # 分解 1 張得到的星塵
+CARD_PRICE = {"N": 15, "R": 40, "SR": 120, "SSR": 350, "UR": 900, "LR": 2500}  # 兌換 1 張指定卡要的星塵
+TICKET_PRICE = 30     # 兌換 1 張自選抽卡券（保留券）要的星塵
+
 
 class Card(models.Model):
     """一張卡：作品 × 稀有度 × 卡面圖片（file 是 cards/ 底下的路徑；空白＝早期沒有圖的舊卡，不會再被抽到）"""
@@ -86,6 +91,8 @@ class GachaState(models.Model):
     since_ssr = models.PositiveIntegerField("距離上次 SSR 以上的抽數", default=0)
     total = models.PositiveIntegerField("總抽數", default=0)
     bonus_tickets = models.PositiveIntegerField("保留的自選抽卡券", default=0)   # 任務獎勵，不會過期
+    stardust = models.PositiveIntegerField("星塵", default=0)
+    notice = models.CharField("要告訴使用者的訊息（顯示一次）", max_length=200, blank=True)   # 例：卡片下架退還星塵
 
     class Meta:
         verbose_name = verbose_name_plural = "抽卡狀態"

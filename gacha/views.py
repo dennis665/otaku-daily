@@ -5,7 +5,8 @@ from django.views.decorators.http import require_GET, require_POST
 from dramas.models import Work
 
 from . import cards, service
-from .models import FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_LABEL, RARITY_WEIGHT, Card, OwnedCard
+from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_LABEL, RARITY_WEIGHT,
+                     TICKET_PRICE, Card, OwnedCard)
 
 
 def _json(data, status=200):
@@ -38,6 +39,9 @@ def _status_json(user):
                   for w, followed in service.pick_works(user)]
     s["free_daily"] = FREE_DAILY
     s["pick_daily"] = PICK_DAILY
+    s["dust_value"] = DUST_VALUE
+    s["card_price"] = CARD_PRICE
+    s["ticket_price"] = TICKET_PRICE
     s["pity_at"] = PITY_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
     return s
@@ -99,6 +103,39 @@ def claim_task(request):
     except service.PullError as e:
         return _json({"ok": False, "error": str(e)}, 400)
     return _json({"ok": True, "status": _status_json(request.user)})
+
+
+@login_required
+@require_POST
+def dismantle(request):
+    """分解重複卡：card_id＋n＝分解這張 n 張；all=1＝所有重複卡全部分解（每張保留 1 張）"""
+    try:
+        card_id = None if request.POST.get("all") else int(request.POST.get("card_id") or 0)
+        gain, cnt = service.dismantle(request.user, card_id, int(request.POST.get("n") or 1))
+    except ValueError:
+        return _json({"ok": False, "error": "資料格式錯誤"}, 400)
+    except service.PullError as e:
+        return _json({"ok": False, "error": str(e)}, 400)
+    return _json({"ok": True, "gain": gain, "count": cnt, "status": _status_json(request.user)})
+
+
+@login_required
+@require_POST
+def shop(request):
+    """星塵兌換：kind=ticket＋n＝自選抽卡券；kind=card＋card_id＝指定的卡"""
+    try:
+        if request.POST.get("kind") == "card":
+            card = service.buy_card(request.user, int(request.POST.get("card_id") or 0))
+            bought = {"card_id": card.id, "rarity": card.rarity, "name": card.name}
+        else:
+            n = int(request.POST.get("n") or 1)
+            service.buy_tickets(request.user, n)
+            bought = {"tickets": n}
+    except ValueError:
+        return _json({"ok": False, "error": "資料格式錯誤"}, 400)
+    except service.PullError as e:
+        return _json({"ok": False, "error": str(e)}, 400)
+    return _json({"ok": True, "bought": bought, "status": _status_json(request.user)})
 
 
 @login_required

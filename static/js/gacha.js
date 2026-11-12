@@ -46,7 +46,7 @@
     if (!c) {
       // 還沒收集到：剪影中間顯示卡號
       const no = opts.no ? `<span class="gcard-missing-no">No.<b>${String(opts.no).padStart(3, '0')}</b></span>` : '';
-      return `<div class="gcard is-missing r-${opts.rarity}${no ? ' has-no' : ''}"><div class="gcard-in">${no}</div><div class="gcard-badge">${esc(LABEL[opts.rarity])}</div></div>`;
+      return `<div class="gcard is-missing r-${opts.rarity}${no ? ' has-no' : ''}"${opts.cardId ? ` data-c="${opts.cardId}"` : ''}><div class="gcard-in">${no}</div><div class="gcard-badge">${esc(LABEL[opts.rarity])}</div></div>`;
     }
     const hasBack = Boolean(c.back_image);
     const backStyle = hasBack ? ` style="background-image: url('${esc(c.back_image)}');"` : '';
@@ -131,11 +131,13 @@
     $('g-count').textContent = s.unlimited ? '∞' : left;
     $('g-info').innerHTML = s.unlimited
       ? `♾ 測試帳號：抽卡不限次數・再 <b>${s.pity_left}</b> 抽必出 SSR 以上`
-      : `再 <b>${s.pity_left}</b> 抽必出 SSR 以上・每天 00:00 補券`;
+      : `再 <b>${s.pity_left}</b> 抽必出 SSR 以上・每天 00:00 補券・✨ 星塵 <b>${s.stardust}</b>`;
     $('g-tickets').innerHTML = s.unlimited ? '' : `
       <div class="g-ticket">🎟 自選抽卡券<b>${s.pick_left}／${s.pick_daily}${s.bonus ? ` <em>＋保留 ${s.bonus}</em>` : ''}</b>自己選作品抽</div>
       <div class="g-ticket">🎲 隨機抽卡券<b>${s.random_left}／${s.free_daily}</b>全作品大混池</div>`;
     paintTask(s.task);
+    if (s.notice) toast(s.notice);
+    if (!$('g-shop').hidden) paintShop();
     $('g-free').disabled = !s.random_left;
     $('g-all').disabled = s.random_left < 2;
     const n = Math.min(s.random_left, 5);
@@ -452,6 +454,10 @@
   }
   function paintAlbum() {
     const s = album.summary;
+    const dup = album.works.flatMap((w) => w.cards).filter((c) => c.owned && c.count > 1);
+    const gain = status ? dup.reduce((n, c) => n + status.dust_value[c.rarity] * (c.count - 1), 0) : 0;
+    $('g-dust-all').hidden = !dup.length || !status;
+    $('g-dust-all').textContent = `✨ 一鍵分解重複卡 ${dup.reduce((n, c) => n + c.count - 1, 0)} 張（+${gain} 星塵）`;
     $('g-album-n').textContent = s.kinds || '';
     $('g-sum').innerHTML = s.works ? `收集了 <b>${s.works}</b> 部作品・<b>${s.kinds}</b> 種卡・總共抽了 <b>${s.pulls}</b> 張` : '卡冊還是空的，先去抽一張吧！';
     const fbox = $('g-filter');
@@ -471,14 +477,14 @@
       <div class="g-album-work">
         <header><b>${esc(w.title)}</b><span>${w.have}／${w.total}・<em class="g-pct${w.have === w.total ? ' done' : ''}">${pct(w)}%</em></span></header>
         <div class="g-progress"><i style="width:${(w.have / w.total) * 100}%"></i></div>
-        <div class="g-slots">${w.cards.map((c) => cardHTML(c.owned ? c : null, { rarity: c.rarity, no: c.no, count: true })).join('')}</div>
+        <div class="g-slots">${w.cards.map((c) => cardHTML(c.owned ? c : null, { rarity: c.rarity, no: c.no, cardId: c.card_id, count: true })).join('')}</div>
       </div>`).join('');
     $('g-more').hidden = list.length <= shown;
   }
   $('g-more').addEventListener('click', () => { shown += 20; paintAlbum(); });
   $('g-album-list').addEventListener('click', (e) => {
-    const el = e.target.closest('.gcard:not(.is-missing)');
-    if (!el) return;
+    const el = e.target.closest('.gcard');
+    if (!el || !el.dataset.c) return;
     const c = album.works.flatMap((w) => w.cards).find((x) => String(x.card_id) === el.dataset.c);
     if (c) openDetail(c);
   });
@@ -486,12 +492,94 @@
   // ---------- 卡片大圖 ----------
   const detail = $('g-detail');
   function openDetail(c) {
-    $('g-detail-card').innerHTML = cardHTML(c, { count: false });
-    $('g-detail-info').innerHTML = `<b>${esc(c.name || c.title)}</b><br>${c.name ? `${esc(c.title)}<br>` : ''}${c.no ? `No.${String(c.no).padStart(3, '0')}・` : ''}${esc(LABEL[c.rarity])}・持有 ${c.count} 張${c.first_at ? `・首次入手 ${esc(c.first_at)}` : ''}<br><small>手指在卡片上滑動可以傾斜欣賞</small>`;
+    const noText = c.no ? `No.${String(c.no).padStart(3, '0')}・` : '';
+    const acts = $('g-detail-acts');
+    acts.innerHTML = '';
+    const dust = status ? status.stardust : 0;
+    if (c.owned) {
+      $('g-detail-card').innerHTML = cardHTML(c, { count: false });
+      $('g-detail-info').innerHTML = `<b>${esc(c.name || c.title)}</b><br>${c.name ? `${esc(c.title)}<br>` : ''}${noText}${esc(LABEL[c.rarity])}・持有 ${c.count} 張${c.first_at ? `・首次入手 ${esc(c.first_at)}` : ''}<br><small>手指在卡片上滑動可以傾斜欣賞</small>`;
+      if (c.count > 1 && status) {
+        const v = status.dust_value[c.rarity];
+        addAct(acts, `✨ 分解 1 張（+${v} 星塵）`, () => doDismantle({ card_id: c.card_id, n: 1 }));
+        if (c.count > 2) addAct(acts, `✨ 分解全部重複 ${c.count - 1} 張（+${v * (c.count - 1)} 星塵）`, () => doDismantle({ card_id: c.card_id, n: c.count - 1 }));
+      }
+    } else {
+      // 還沒收集到：剪影＋星塵兌換
+      $('g-detail-card').innerHTML = cardHTML(null, { rarity: c.rarity, no: c.no });
+      const price = status ? status.card_price[c.rarity] : 0;
+      $('g-detail-info').innerHTML = `<b>${esc(c.title)}</b><br>${noText}${esc(LABEL[c.rarity])}・還沒收集到<br><small>目前星塵 ✨ ${dust}</small>`;
+      if (status) {
+        const b = addAct(acts, dust >= price ? `🛒 用 ${price} 星塵兌換這張` : `🛒 兌換需要 ${price} 星塵（還差 ${price - dust}）`, () => doShop({ kind: 'card', card_id: c.card_id }));
+        b.disabled = dust < price;
+      }
+    }
     detail.hidden = false;
     document.body.classList.add('sheet-open');
   }
   const closeDetail = () => { detail.hidden = true; document.body.classList.remove('sheet-open'); };
+
+  // ---------- ✨ 星塵：分解、兌換 ----------
+  function addAct(box, text, fn) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'g-btn sm';
+    b.textContent = text;
+    b.addEventListener('click', fn);
+    box.appendChild(b);
+    return b;
+  }
+  function toast(msg) {
+    const el = document.createElement('div');
+    el.className = 'g-toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+  async function postForm(url, data) {
+    const res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrf() }, body: new URLSearchParams(data) });
+    const j = await res.json().catch(() => ({ ok: false, error: '連線失敗，請稍後再試' }));
+    if (!j.ok) throw new Error(j.error || '操作失敗');
+    return j;
+  }
+  async function doDismantle(data) {
+    try {
+      const j = await postForm('/gacha/api/dismantle/', data);
+      status = j.status;
+      paintStatus();
+      closeDetail();
+      albumStale = true;
+      await loadAlbum();
+      toast(`✨ 分解 ${j.count} 張，得到 ${j.gain} 星塵`);
+    } catch (err) { alert(err.message); }
+  }
+  async function doShop(data) {
+    try {
+      const j = await postForm('/gacha/api/shop/', data);
+      status = j.status;
+      paintStatus();
+      closeDetail();
+      if (data.kind === 'card') { albumStale = true; await loadAlbum(); toast('🛒 兌換成功，已收進卡冊！'); }
+      else toast(`🎟 兌換了 ${data.n} 張自選抽卡券（保留券）`);
+    } catch (err) { alert(err.message); }
+  }
+  $('g-dust-all').addEventListener('click', () => {
+    if (window.confirm('把所有重複的卡都分解成星塵嗎？（每張卡會保留 1 張）')) doDismantle({ all: 1 });
+  });
+  function paintShop() {
+    if (!status) return;
+    $('g-dust').textContent = status.stardust;
+    const box = $('g-shop-tickets');
+    box.innerHTML = '';
+    [1, 5, 10].forEach((n) => {
+      const cost = status.ticket_price * n;
+      const b = addAct(box, `${n} 張\n✨ ${cost}`, () => doShop({ kind: 'ticket', n }));
+      b.style.whiteSpace = 'pre-line';
+      b.disabled = status.stardust < cost;
+    });
+    $('g-dust-table').innerHTML = `<table class="g-dust-table"><tr><th>稀有度</th><th>分解得到</th><th>兌換指定卡</th></tr>${RAR.map((r) => `<tr><td style="color:${COLOR[r]};font-weight:700">${esc(LABEL[r])}</td><td>✨ ${status.dust_value[r]}</td><td>✨ ${status.card_price[r]}</td></tr>`).join('')}</table>
+      <p class="g-info g-left">・只有重複的卡可以分解，每張卡至少會保留 1 張。<br>・自選抽卡券 1 張 ✨ ${status.ticket_price}，兌換的是保留券，不會過期。<br>・卡片下架時，你持有的那張會自動依上表退還星塵。</p>`;
+  }
   $('g-detail-close').addEventListener('click', closeDetail);
   detail.addEventListener('click', (e) => { if (e.target === detail) closeDetail(); });
   tilt($('g-detail-card'));
@@ -499,10 +587,12 @@
   // ---------- 切換：抽卡／卡冊 ----------
   panel.querySelectorAll('.g-views .chip').forEach((b) => b.addEventListener('click', () => {
     panel.querySelectorAll('.g-views .chip').forEach((x) => x.classList.toggle('active', x === b));
-    const isAlbum = b.dataset.g === 'album';
-    $('g-draw').hidden = isAlbum;
-    $('g-album').hidden = !isAlbum;
-    if (isAlbum) loadAlbum();
+    const v = b.dataset.g;
+    $('g-draw').hidden = v !== 'draw';
+    $('g-album').hidden = v !== 'album';
+    $('g-shop').hidden = v !== 'shop';
+    if (v === 'album') loadAlbum();
+    if (v === 'shop') { if (status) paintShop(); else loadStatus().then(paintShop); }
   }));
   // 離線：抽卡分頁只能看卡冊
   const albumChip = panel.querySelector('.g-views .chip[data-g="album"]');

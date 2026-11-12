@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from dramas.models import Follow, Work
 
 from . import cards, service
-from .models import FREE_DAILY, PICK_DAILY, PITY_AT, TASK_REWARD, Card, GachaState, OwnedCard, Pull
+from .models import CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, TASK_REWARD, TICKET_PRICE, Card, GachaState, OwnedCard, Pull
 
 User = get_user_model()
 
@@ -208,3 +208,61 @@ class CardImageTests(TestCase):
                 self.assertEqual(res_back.status_code, 200)
                 self.assertEqual(res_back.content, b"RIFFbackWEBP")
                 self.assertEqual(self.client.get("/gacha/img/../../settings.py").status_code, 404)
+
+
+class StardustTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("dust", password="pw-123456")
+        self.w = make_work(900, "星塵作品")
+        self.n = Card.objects.get(work=self.w, rarity="N")
+        self.sr = Card.objects.get(work=self.w, rarity="SR")
+
+    def own(self, card, count):
+        return OwnedCard.objects.create(user=self.user, card=card, work=self.w, rarity=card.rarity, count=count)
+
+    def test_only_duplicates_can_be_dismantled(self):
+        self.own(self.n, 1)
+        with self.assertRaises(service.PullError):
+            service.dismantle(self.user, self.n.id, 1)          # 只有 1 張不能分解
+        o = self.own(self.sr, 3)
+        gain, cnt = service.dismantle(self.user, self.sr.id, 5)  # 最多分解到剩 1 張
+        self.assertEqual((gain, cnt), (DUST_VALUE["SR"] * 2, 2))
+        o.refresh_from_db()
+        self.assertEqual(o.count, 1)
+        self.assertEqual(GachaState.objects.get(user=self.user).stardust, DUST_VALUE["SR"] * 2)
+
+    def test_dismantle_all_keeps_one_each(self):
+        self.own(self.n, 4)
+        self.own(self.sr, 2)
+        gain, cnt = service.dismantle(self.user)
+        self.assertEqual(cnt, 4)
+        self.assertEqual(gain, DUST_VALUE["N"] * 3 + DUST_VALUE["SR"])
+        self.assertTrue(all(o.count == 1 for o in OwnedCard.objects.filter(user=self.user)))
+
+    def test_shop_tickets_and_card(self):
+        GachaState.objects.create(user=self.user, stardust=TICKET_PRICE * 2 + CARD_PRICE["SR"])
+        service.buy_tickets(self.user, 2)
+        service.buy_card(self.user, self.sr.id)
+        st = GachaState.objects.get(user=self.user)
+        self.assertEqual((st.stardust, st.bonus_tickets), (0, 2))
+        with self.assertRaises(service.PullError):
+            service.buy_card(self.user, self.sr.id)             # 已經有了
+        with self.assertRaises(service.PullError):
+            service.buy_tickets(self.user, 1)                   # 星塵不夠
+
+    def test_removed_cards_refund_stardust(self):
+        self.own(self.n, 2)
+        self.own(self.sr, 1)
+        Card.objects.filter(work=self.w).update(file="x")       # 讓檔名不同，模擬已有的卡
+        for i, c in enumerate(Card.objects.filter(work=self.w)):
+            c.file = f"900/{c.rarity}_abcdef{i:02d}.webp"
+            c.save()
+        keep = [{"file": c.file, "rarity": c.rarity, "name": "", "no": i + 1}
+                for i, c in enumerate(Card.objects.filter(work=self.w).exclude(id__in=[self.n.id, self.sr.id]))]
+        cards.apply_index({"works": {"900": keep}})
+        st = GachaState.objects.get(user=self.user)
+        self.assertEqual(st.stardust, DUST_VALUE["N"] * 2 + DUST_VALUE["SR"])
+        self.assertIn("退還", st.notice)
+        s = service.status(self.user)
+        self.assertIn("退還", s["notice"])
+        self.assertEqual(service.status(self.user)["notice"], "")   # 只顯示一次

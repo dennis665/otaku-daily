@@ -16,8 +16,8 @@ from django.utils import timezone as dj_tz
 from dramas.models import Follow, Work
 
 from . import cards
-from .models import (FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_WEIGHT, TASK_REWARD, TASK_SECONDS, Card, GachaDay,
-                     GachaState, OwnedCard, Pull)
+from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_WEIGHT, TASK_REWARD, TASK_SECONDS,
+                     TICKET_PRICE, Card, GachaDay, GachaState, OwnedCard, Pull)
 
 TW = timezone(timedelta(hours=8))
 HIGH = {"SSR", "UR", "LR"}
@@ -100,7 +100,10 @@ def status(user):
     state = GachaState.objects.filter(user=user).first()
     has_cards = bool(card_work_ids())
     base = {"day": day.isoformat(), "pity_left": PITY_AT - (state.since_ssr if state else 0),
-            "pool_works": len(card_work_ids()), "bonus": state.bonus_tickets if state else 0, "task": task_status(user, day)}
+            "pool_works": len(card_work_ids()), "bonus": state.bonus_tickets if state else 0, "task": task_status(user, day),
+            "stardust": state.stardust if state else 0, "notice": state.notice if state else ""}
+    if state and state.notice:   # 通知只顯示一次
+        GachaState.objects.filter(pk=state.pk).update(notice="")
     if unlimited(user):
         return {**base, "pick_left": 999, "random_left": 999 if has_cards else 0, "unlimited": True}
     used = Pull.objects.filter(user=user, day=day)
@@ -229,3 +232,61 @@ def pull(user, work_id=None, rng=random):
             owned.count += 1
             owned.save(update_fields=["count", "last_at"])
     return p, created
+
+
+# ---------- ✨ 星塵：分解重複卡、🛒 兌換 ----------
+def dismantle(user, card_id=None, n=1):
+    """分解重複的卡（每張卡至少保留 1 張）：card_id＝分解這張的 n 張；沒有 card_id＝所有重複卡全部分解。回傳 (得到星塵, 分解張數)"""
+    with transaction.atomic():
+        state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
+        qs = OwnedCard.objects.select_for_update().filter(user=user, count__gt=1).select_related("card")
+        if card_id:
+            qs = qs.filter(card_id=card_id)
+            if not qs.exists():
+                raise PullError("只有重複的卡才能分解（每張至少保留 1 張）")
+        gain = cnt = 0
+        for o in qs:
+            k = (o.count - 1) if not card_id else min(int(n), o.count - 1)
+            if k <= 0:
+                continue
+            o.count -= k
+            o.save(update_fields=["count"])
+            gain += DUST_VALUE.get(o.card.rarity, 1) * k
+            cnt += k
+        if not cnt:
+            raise PullError("目前沒有重複的卡可以分解")
+        state.stardust += gain
+        state.save(update_fields=["stardust"])
+    return gain, cnt
+
+
+def buy_tickets(user, n=1):
+    """星塵兌換自選抽卡券（保留券，不會過期）"""
+    n = max(1, min(int(n), 50))
+    with transaction.atomic():
+        state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
+        cost = TICKET_PRICE * n
+        if state.stardust < cost:
+            raise PullError(f"星塵不夠：需要 {cost}，目前 {state.stardust}")
+        state.stardust -= cost
+        state.bonus_tickets += n
+        state.save(update_fields=["stardust", "bonus_tickets"])
+    return state
+
+
+def buy_card(user, card_id):
+    """星塵兌換一張還沒收集到的指定卡"""
+    with transaction.atomic():
+        state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
+        card = Card.objects.filter(id=card_id, active=True).first()
+        if not card:
+            raise PullError("找不到這張卡")
+        if OwnedCard.objects.filter(user=user, card=card).exists():
+            raise PullError("這張卡你已經有了")
+        cost = CARD_PRICE[card.rarity]
+        if state.stardust < cost:
+            raise PullError(f"星塵不夠：需要 {cost}，目前 {state.stardust}")
+        state.stardust -= cost
+        state.save(update_fields=["stardust"])
+        OwnedCard.objects.create(user=user, card=card, work_id=card.work_id, rarity=card.rarity)
+    return card
