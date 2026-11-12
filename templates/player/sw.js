@@ -80,7 +80,8 @@ async function openPage(req) {
     return fallback(err);
   }
   if (res === 'slow' && (await serverAwake())) return network.catch(fallback);   // 主機醒著，只是頁面比較慢：繼續等
-  if (res === 'slow' || res.status === 503) {
+  // 503＝主機睡著；502／504＝換版重啟中（Render 免費方案換版那幾十秒）：都顯示等待畫面，主機好了自動重新載入
+  if (res === 'slow' || (res.status >= 502 && res.status <= 504)) {
     const wake = await caches.match(WAKE_URL, { ignoreSearch: true });
     if (wake) return wake;
     if (res === 'slow') return network.catch(fallback);
