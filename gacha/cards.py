@@ -7,6 +7,7 @@
   {"works": {"<youranimes 作品編號>": [{"file": "123/SSR_ab12cd34.webp", "rarity": "SSR", "name": "卡名"}]}}
 - 每 10 分鐘最多讀一次索引；索引裡不見的卡改成抽不到（已經抽到的人卡冊照樣保留）
 - 新增卡面：在卡面庫用 card_import.py 匯入並推送，App 約 10 分鐘內自動出現
+- 新作品第一次有卡片時，所有帳號每部送自選抽卡券（gift_new_works）
 """
 import json
 import logging
@@ -118,9 +119,52 @@ def refund_removed(cards_qs):
     for uid, dust in gain.items():
         state, _ = GachaState.objects.get_or_create(user_id=uid)
         state.stardust += dust
-        state.notice = f"有卡片下架了，已退還 ✨ {dust} 星塵給你"
+        state.notice = _add_notice(state.notice, f"有卡片下架了，已退還 ✨ {dust} 星塵給你")
         state.save(update_fields=["stardust", "notice"])
     return gain
+
+
+def _add_notice(old, msg):
+    return ("；".join(x for x in (old, msg) if x))[:200]
+
+
+def _carded_works():
+    """目前抽得到的作品：{作品代號: 名稱}（同系列算同一部）"""
+    out = {}
+    rows = (Card.objects.filter(active=True).exclude(file="")
+            .values_list("work_id", "work__franchise_id", "work__title").distinct())
+    for wid, fid, title in rows:
+        out.setdefault(f"f{fid}" if fid else f"w{wid}", title)
+    return out
+
+
+def gift_new_works(before):
+    """
+    有新作品上架（第一次有卡片）時，所有帳號每部送自選抽卡券 NEW_WORK_GIFT 張並通知；同一部只送一次
+    before：這次同步前已經抽得到的作品代號
+    第一次使用（還沒有任何紀錄）時，把同步前就有的作品記成已送過；資料庫原本完全沒卡片（全新環境）則全部記成已送過、不發
+    """
+    from django.contrib.auth import get_user_model
+
+    from .models import NEW_WORK_GIFT, GachaState, GiftedWork
+    now = _carded_works()
+    if not GiftedWork.objects.exists():
+        seed = set(now) if not before else set(before)
+        GiftedWork.objects.bulk_create([GiftedWork(key=k) for k in seed], ignore_conflicts=True)
+    done = set(GiftedWork.objects.values_list("key", flat=True))
+    new = {k: t for k, t in now.items() if k not in done}
+    if not new:
+        return {}
+    GiftedWork.objects.bulk_create([GiftedWork(key=k) for k in new], ignore_conflicts=True)
+    tickets = NEW_WORK_GIFT * len(new)
+    msg = f"🎉 新作品上架：{'、'.join(new.values())}，送你 🎫 自選抽卡券 {tickets} 張"
+    for uid in get_user_model().objects.filter(is_active=True).values_list("id", flat=True):
+        state, _ = GachaState.objects.get_or_create(user_id=uid)
+        state.bonus_tickets += tickets
+        state.notice = _add_notice(state.notice, msg)
+        state.save(update_fields=["bonus_tickets", "notice"])
+    logger.info("新作品上架送券：%s", "、".join(new.values()))
+    return new
 
 
 def apply_index(index):
@@ -137,6 +181,7 @@ def apply_index(index):
     existing = {c.file: c for c in Card.objects.exclude(file="")}
     seen, created = set(), 0
     with transaction.atomic():
+        before = set(_carded_works())
         for sid, c in entries:
             wid = works.get(sid)
             if not wid:
@@ -160,6 +205,7 @@ def apply_index(index):
         else:
             logger.warning("卡片索引只有 %s 張（原本 %s 張），只停用不刪除", len(seen), active_before)
             Card.objects.filter(file__in=gone).update(active=False)
+        gift_new_works(before)
     _state["card_backs"] = {
         str(sid): path for sid, path in (index.get("card_backs") or {}).items()
         if SAFE_FILE.match(path)

@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from dramas.models import Follow, Work
 
 from . import cards, service
-from .models import CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, TASK_REWARD, TICKET_PRICE, Card, GachaState, OwnedCard, Pull
+from .models import CARD_PRICE, DUST_VALUE, FREE_DAILY, NEW_WORK_GIFT, PICK_DAILY, PITY_AT, TASK_REWARD, TICKET_PRICE, Card, GachaState, OwnedCard, Pull
 
 User = get_user_model()
 
@@ -266,3 +266,33 @@ class StardustTests(TestCase):
         s = service.status(self.user)
         self.assertIn("退還", s["notice"])
         self.assertEqual(service.status(self.user)["notice"], "")   # 只顯示一次
+
+
+class NewWorkGiftTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("gift", password="pw-123456")
+        self.w = make_work(950, "舊作品")
+        self.old = [{"file": c.file, "rarity": c.rarity, "name": "", "no": i + 1}
+                    for i, c in enumerate(Card.objects.filter(work=self.w))]
+        Work.objects.create(source_id=951, title="新作品")
+
+    def sync(self, new_cards=()):
+        cards.apply_index({"works": {"950": self.old, "951": list(new_cards)}})
+        return GachaState.objects.get_or_create(user=self.user)[0]
+
+    def test_new_work_gives_tickets_once(self):
+        st = self.sync()                                        # 第一次：舊作品記成已送過，不發
+        self.assertEqual(st.bonus_tickets, 0)
+        new = [{"file": "951/N_abcdef01.webp", "rarity": "N", "name": "a", "no": 1}]
+        st = self.sync(new)
+        self.assertEqual(st.bonus_tickets, NEW_WORK_GIFT)
+        self.assertIn("新作品", st.notice)
+        new.append({"file": "951/R_abcdef02.webp", "rarity": "R", "name": "b", "no": 2})
+        st = self.sync(new)                                     # 同一部再加卡不重複送
+        self.assertEqual(st.bonus_tickets, NEW_WORK_GIFT)
+
+    def test_fresh_database_gives_nothing(self):
+        Card.objects.all().delete()
+        st = self.sync([{"file": "951/N_abcdef01.webp", "rarity": "N", "name": "a", "no": 1}])
+        self.assertEqual(st.bonus_tickets, 0)
+

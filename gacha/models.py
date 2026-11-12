@@ -25,6 +25,7 @@ TASK_REWARD = 5       # 任務獎勵：自選抽卡券 5 張（保留券，不�
 DUST_VALUE = {"N": 1, "R": 3, "SR": 10, "SSR": 30, "UR": 80, "LR": 200}       # 分解 1 張得到的星塵
 CARD_PRICE = {"N": 15, "R": 40, "SR": 120, "SSR": 350, "UR": 900, "LR": 2500}  # 兌換 1 張指定卡要的星塵
 TICKET_PRICE = 30     # 兌換 1 張自選抽卡券（保留券）要的星塵
+NEW_WORK_GIFT = 10    # 新作品上架：每部送所有帳號自選抽卡券 10 張（保留券）
 
 
 class Card(models.Model):
@@ -109,3 +110,13 @@ class GachaDay(models.Model):
     class Meta:
         verbose_name = verbose_name_plural = "每日在線與任務"
         constraints = [models.UniqueConstraint(fields=["user", "day"], name="gacha_day_unique")]
+
+
+class GiftedWork(models.Model):
+    """已經發過「新作品上架」禮物的作品（以系列為單位，同一部只送一次）"""
+    key = models.CharField("作品代號", max_length=40, unique=True)   # f<系列 id> 或 w<作品 id>
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "新作品上架禮物"
+
