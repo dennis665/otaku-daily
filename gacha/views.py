@@ -10,7 +10,9 @@ from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, QU
 
 
 def _json(data, status=200):
-    return JsonResponse(data, status=status, json_dumps_params={"ensure_ascii": False})
+    res = JsonResponse(data, status=status, json_dumps_params={"ensure_ascii": False})
+    res["Cache-Control"] = "no-store"   # 抽卡狀態、問答等每次都要最新，不讓瀏覽器或中間層沿用舊回應
+    return res
 
 
 def _card(card, work_title, owned=None, new=False):
