@@ -45,7 +45,7 @@
   function cardHTML(c, opts = {}) {
     if (!c) {
       // 還沒收集到：剪影中間顯示卡號
-      const no = opts.no ? `<span class="gcard-missing-no">No.<b>${String(opts.no).padStart(3, '0')}</b></span>` : '';
+      const no = opts.no ? `<span class="gcard-missing-no">No.<b>${String(opts.no).padStart(3, '0')}</b><em>${esc(LABEL[opts.rarity])}</em></span>` : '';
       return `<div class="gcard is-missing r-${opts.rarity}${no ? ' has-no' : ''}"${opts.cardId ? ` data-c="${opts.cardId}"` : ''}><div class="gcard-in">${no}</div><div class="gcard-badge">${esc(LABEL[opts.rarity])}</div></div>`;
     }
     const hasBack = Boolean(c.back_image);

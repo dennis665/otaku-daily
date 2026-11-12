@@ -96,7 +96,8 @@
 /* 沒收集到：剪影 */
 .gcard.is-missing .gcard-in { background: repeating-linear-gradient(135deg, #1b1936 0 8px, #17152e 8px 16px); box-shadow: 0 0 0 1px var(--line); }
 .gcard.is-missing .gcard-in::after { content: "?"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 30cqw; font-weight: 900; color: #2c2858; }
-.gcard.is-missing .gcard-badge { background: #2c2858; color: #8f8ac4; box-shadow: none; }
+.gcard.is-missing .gcard-badge { background: rgba(0, 0, 0, .35); color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }   /* 沒收集到也看得出稀有度 */
+.gcard.is-missing .gcard-in { box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); }
 /* 卡背 */
 .gcard-back { position: absolute; inset: 0; border-radius: inherit; backface-visibility: hidden; transform: rotateY(180deg);
   background: radial-gradient(circle at 50% 50%, #ff6fae 0, transparent 30%), repeating-conic-gradient(from 0deg, #2b1f63 0 15deg, #3a2a86 15deg 30deg);
@@ -214,6 +215,7 @@
 .gcard.is-missing.has-no .gcard-in::after { content: none; }
 .gcard-missing-no { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #8a85c0; font-size: 7cqw; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .gcard-missing-no b { display: block; font-size: 18cqw; font-weight: 900; color: #b8b3e6; }
+.gcard-missing-no em { display: block; margin-top: 3cqw; font-style: normal; font-size: 9cqw; font-weight: 900; letter-spacing: .04em; color: var(--c); }
 
 /* 卡冊：每部作品收集度 */
 .g-pct { font-style: normal; font-weight: 800; color: var(--cyan); }
