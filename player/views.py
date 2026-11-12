@@ -141,7 +141,7 @@ def events_api(request):
 @never_cache
 def version(request):
     """目前部署的版本，App 切回前景時用來檢查有沒有新版本"""
-    return JsonResponse({"version": settings.APP_VERSION})
+    return JsonResponse({"version": settings.APP_VERSION, "built": settings.APP_BUILT})
 
 
 @login_required

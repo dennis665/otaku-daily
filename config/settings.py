@@ -111,6 +111,12 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# 這次部署的建置時間（建置時 collectstatic 產生的靜態檔清單時間）：
+# Render 換版時新舊機器會並行幾分鐘，App 只在伺服器的建置時間比自己新的時候才自動更新，不會被舊機器拉回舊版
+try:
+    APP_BUILT = int((STATIC_ROOT / "staticfiles.json").stat().st_mtime)
+except OSError:
+    APP_BUILT = 0
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},

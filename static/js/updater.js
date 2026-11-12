@@ -6,6 +6,8 @@
   const meta = document.querySelector('meta[name="app-version"]');
   if (!meta) return;
   const current = meta.content;
+  // 這個頁面的建置時間：換版時新舊機器並行，只在伺服器比自己新的時候才更新（不會被舊機器拉回舊版）
+  const currentBuilt = Number((document.querySelector('meta[name="app-built"]') || {}).content || 0);
   const INTERVAL_MS = 5 * 60 * 1000;
   const MIN_GAP_MS = 30 * 1000;   // 短時間內切來切去不重複檢查
   let lastCheck = Date.now();
@@ -37,8 +39,9 @@
     try {
       // loading:false → 背景檢查，不顯示載入遮罩
       const res = await fetch('/version.json', { loading: false, cache: 'no-store', credentials: 'same-origin' });
-      const { version } = await res.json();
-      if (version && version !== current) {
+      const { version, built } = await res.json();
+      const newer = !currentBuilt || (Number(built) || 0) > currentBuilt;   // 舊機器回的版本（建置時間較早或沒有）就忽略
+      if (version && version !== current && newer) {
         if (busy()) showToast(); else location.reload();
       }
     } catch { /* 離線或伺服器休眠中：下次再檢查 */ }
