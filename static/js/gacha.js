@@ -315,6 +315,9 @@
     stamp.className = 'g-stamp';
     stamp.innerHTML = '';
     tip.textContent = '';
+    $('g-cutin').hidden = true;
+    $('g-spot').hidden = true;
+    $('g-skip').textContent = '略過 ⏭';
     setGlow('N');
     stage.hidden = false;
     document.body.classList.add('sheet-open');
@@ -325,10 +328,55 @@
     document.body.classList.remove('sheet-open');
     busy = false;
   }
-  stage.addEventListener('click', () => {
-    if (!finished) { skipping = true; if (skip) skip(); return; }
-    closeStage();
+  let lastCards = [];
+  stage.addEventListener('click', (e) => {
+    if (!finished) { if (skip) skip(); return; }   // 播放中：點一下快轉目前這一步
+    const el = e.target.closest('#g-reveal .gcard');
+    if (el && el.dataset.c) {
+      const c = lastCards.find((x) => String(x.card_id) === el.dataset.c);
+      if (c) openDetail({ ...c, owned: true });
+      return;
+    }
+    closeStage();   // 點空白處返回抽卡頁
   });
+  // 右上角：播放中「略過」（整段跳到結果）；播完「返回」
+  $('g-skip').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (finished) { closeStage(); return; }
+    skipping = true;
+    if (skip) skip();
+  });
+  const charName = (c) => (c.name || c.title || '').split(' ')[0];
+  // SSR 以上：角色名稱滑過畫面
+  async function cutIn(c) {
+    if (skipping) return;
+    const box = $('g-cutin');
+    $('g-cutin-name').textContent = charName(c);
+    $('g-cutin-sub').textContent = `${LABEL[c.rarity]}・${c.title}`;
+    box.style.setProperty('--cc', COLOR[c.rarity]);
+    box.className = `g-cutin r-${c.rarity}`;
+    box.hidden = false;
+    void box.offsetWidth;
+    box.classList.add('go');
+    buzz([40, 30, 90]);
+    await wait(1600);
+    box.hidden = true;
+  }
+  // 新卡：全畫面展示，點一下或 1.5 秒（SR 以上 2.6 秒）後繼續
+  async function spotlight(c) {
+    if (skipping) return;
+    const box = $('g-spot');
+    $('g-spot-card').innerHTML = cardHTML(c, { count: false });
+    $('g-spot-tag').innerHTML = `✨ 新卡入手！<small>${esc(c.name || c.title)}・${esc(LABEL[c.rarity])}</small>`;
+    box.style.setProperty('--sc', COLOR[c.rarity]);
+    box.hidden = false;
+    box.classList.remove('go');
+    void box.offsetWidth;
+    box.classList.add('go');
+    burst(rank(c.rarity) >= 2 ? c.rarity : 'R');
+    await wait(rank(c.rarity) >= 2 ? 2600 : 1500);   // N／R 新卡短一點，十連抽不會拖太久
+    box.hidden = true;
+  }
 
   async function draw(opts) {
     if (busy) return;
@@ -368,7 +416,7 @@
   async function perform(cards) {
     const best = cards.reduce((m, c) => (rank(c.rarity) > rank(m) ? c.rarity : m), 'N');
     const lv = rank(best);
-    tip.textContent = '點一下跳過';
+    tip.textContent = '點一下快轉・右上角可整段略過';
     // 蓄力：光芒逐級升級（藍 → 金 → 粉 → 彩虹 → 黑金），越稀有越久
     const steps = ['R', 'SR', 'SSR', 'UR', 'LR'].filter((r) => rank(r) <= lv && rank(r) >= 2);
     await wait(500);
@@ -387,21 +435,35 @@
     flash.classList.add('go');
     burst(best);
     buzz(lv >= 3 ? [80, 50, 120] : 50);
-    // 翻卡
+    // 翻卡：單抽＝SSR 以上先播角色名特效再翻；連抽＝全部翻開後，依稀有度高到低播角色名特效與新卡展示
+    lastCards = cards;
     if (cards.length === 1) {
-      reveal.innerHTML = cardHTML(cards[0], { back: true, isNew: true });
+      const c = cards[0];
+      if (rank(c.rarity) >= 3) await cutIn(c);
+      reveal.innerHTML = cardHTML(c, { back: true, isNew: true });
       await wait(250);
       reveal.querySelector('.gcard').classList.add('flip');
+      await wait(800);
+      if (c.new) await spotlight(c);
     } else {
       reveal.classList.add('is-multi');
-      reveal.innerHTML = cards.sort((a, b) => rank(b.rarity) - rank(a.rarity)).map((c) => cardHTML(c, { back: true, isNew: true })).join('');
+      cards.sort((a, b) => rank(b.rarity) - rank(a.rarity));
+      reveal.innerHTML = cards.map((c) => cardHTML(c, { back: true, isNew: true })).join('');
       const els = [...reveal.querySelectorAll('.gcard')];
       for (const el of els) {
         el.classList.add('flip');
         await wait(110);
       }
+      await wait(500);
+      for (const c of cards) {
+        if (skipping) break;
+        if (rank(c.rarity) >= 3) await cutIn(c);
+        if (c.new) await spotlight(c);
+      }
     }
-    await wait(450);
+    $('g-cutin').hidden = true;
+    $('g-spot').hidden = true;
+    await wait(300);
     if (lv >= 2) {
       stamp.style.setProperty('--sc', COLOR[best]);
       stamp.innerHTML = `${esc(LABEL[best])}<small>${lv >= 5 ? 'LEGEND' : lv >= 4 ? 'ULTRA RARE' : lv >= 3 ? 'SUPER SPECIAL' : 'SUPER RARE'}</small>`;
@@ -409,10 +471,11 @@
     }
     // 跳過時把所有東西直接放到最後狀態
     reveal.querySelectorAll('.gcard').forEach((el) => el.classList.add('flip'));
-    if (cards.length === 1) tip.textContent = `${cards[0].new ? '🆕 新卡入手！' : `已收進卡冊（×${cards[0].count}）`}・點一下關閉`;
-    else tip.textContent = `${cards.length} 張・新卡 ${cards.filter((c) => c.new).length} 張・點一下關閉`;
+    if (cards.length === 1) tip.textContent = `${cards[0].new ? '🆕 新卡入手！' : `已收進卡冊（×${cards[0].count}）`}・點卡片看大圖・點空白處返回`;
+    else tip.textContent = `${cards.length} 張・新卡 ${cards.filter((c) => c.new).length} 張・點卡片看大圖・點空白處返回`;
     skip = null;
     finished = true;
+    $('g-skip').textContent = '返回 ↩';
   }
   tilt(reveal);
 

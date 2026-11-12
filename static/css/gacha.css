@@ -126,7 +126,10 @@
 .g-stage.is-charging.lv2 .g-stage-pack .g-pack { animation-duration: .09s; }
 .g-stage.is-open .g-stage-pack { transform: scale(1.4); opacity: 0; }
 .g-reveal { position: absolute; z-index: 5; width: min(72vw, 300px); perspective: 1200px; }
-.g-reveal.is-multi { width: min(94vw, 560px); max-height: 82vh; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; padding: 8px; perspective: none; }
+/* 連抽：卡片區放在稀有度印章與下方說明文字之間，不擋字；手機一排 4 張 */
+.g-reveal.is-multi { width: min(94vw, 560px); top: calc(env(safe-area-inset-top) + 21vh); bottom: calc(env(safe-area-inset-bottom) + 62px); left: 50%; transform: translateX(-50%);
+  overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); align-content: center; gap: 8px; padding: 8px; perspective: none; }
+.g-reveal.is-multi .gcard { cursor: pointer; }
 .g-reveal .gcard { transform: rotateY(180deg); transition: transform .9s cubic-bezier(.2, .9, .3, 1.2); }
 .g-reveal .gcard.flip { transform: rotateY(0deg); }
 .g-reveal.is-multi .gcard { opacity: 0; transform: translateY(30px) scale(.8); transition: opacity .4s, transform .5s cubic-bezier(.2, .9, .3, 1.3); }
@@ -136,7 +139,7 @@
   background: linear-gradient(180deg, #fff, var(--sc, #ffd166)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 12px var(--sc, #ffd166)); }
 .g-stamp.go { animation: g-stamp .55s cubic-bezier(.2, 1.4, .4, 1) forwards; }
 .g-stamp small { display: block; font-size: .9rem; text-align: center; letter-spacing: .3em; }
-.g-tip { position: absolute; z-index: 7; bottom: calc(env(safe-area-inset-bottom) + 22px); left: 0; right: 0; text-align: center; color: rgba(255, 255, 255, .7); font-size: .85rem; animation: g-blink 1.6s ease-in-out infinite; }
+.g-tip { position: absolute; z-index: 9; padding: 0 16px; bottom: calc(env(safe-area-inset-bottom) + 22px); left: 0; right: 0; text-align: center; color: rgba(255, 255, 255, .7); font-size: .85rem; animation: g-blink 1.6s ease-in-out infinite; }
 
 /* ---------- 卡冊 ---------- */
 .g-filter-wrap { margin-bottom: 10px; }
@@ -292,4 +295,32 @@ body.offline-mode .g-views .chip[data-g="shop"], body.offline-mode #g-dust-all, 
 .g-quiz-result.ok { background: rgba(94, 231, 255, .14); border: 1px solid rgba(94, 231, 255, .5); }
 .g-quiz-result.ng { background: rgba(255, 111, 174, .12); border: 1px solid rgba(255, 111, 174, .45); }
 body.offline-mode .g-views .chip[data-g="ach"], body.offline-mode .g-views .chip[data-g="quiz"] { display: none !important; }
+
+/* ---------- 抽卡演出：略過／返回、角色名滑過、新卡全畫面 ---------- */
+.g-skip { position: absolute; z-index: 12; top: calc(env(safe-area-inset-top) + 14px); right: 14px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .45);
+  color: #fff; font-weight: 800; font-size: .85rem; border-radius: 99px; padding: 8px 14px; cursor: pointer; backdrop-filter: blur(4px); }
+.g-reveal:not(.is-multi) .gcard { cursor: pointer; }
+.g-cutin { position: absolute; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; --cc: #ff6fae; }
+.g-cutin[hidden] { display: none; }
+.g-cutin-band { position: absolute; left: -10%; right: -10%; top: 40%; height: 120px; transform: skewY(-8deg) scaleX(0); transform-origin: left;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cc) 75%, #000) 15%, var(--cc) 50%, color-mix(in srgb, var(--cc) 75%, #000) 85%, transparent),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .25) 0 2px, transparent 2px 26px);
+  box-shadow: 0 0 40px var(--cc); display: grid; align-items: center; }
+.g-cutin.go .g-cutin-band { animation: g-band 1.6s cubic-bezier(.3, .8, .3, 1) forwards; }
+.g-cutin-text { transform: skewY(8deg); white-space: nowrap; text-align: center; color: #fff; }
+.g-cutin.go .g-cutin-text { animation: g-swipe 1.6s cubic-bezier(.2, .9, .8, .1) forwards; }
+.g-cutin-text b { display: block; font-size: 2.6rem; font-weight: 900; letter-spacing: .12em; text-shadow: 0 0 12px var(--cc), 0 3px 0 rgba(0, 0, 0, .5); }
+.g-cutin-text small { display: block; font-size: .85rem; letter-spacing: .3em; opacity: .9; }
+@keyframes g-band { 0% { transform: skewY(-8deg) scaleX(0); opacity: 1; } 18% { transform: skewY(-8deg) scaleX(1); } 82% { transform: skewY(-8deg) scaleX(1); opacity: 1; } 100% { transform: skewY(-8deg) scaleX(1); opacity: 0; } }
+@keyframes g-swipe { 0% { transform: skewY(8deg) translateX(110vw); } 30% { transform: skewY(8deg) translateX(4vw); } 70% { transform: skewY(8deg) translateX(-4vw); } 100% { transform: skewY(8deg) translateX(-120vw); } }
+.g-spot { position: absolute; inset: 0; z-index: 11; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--sc, #9bd2ff) 30%, #07060f) 0%, #07060f 65%); --sc: #9bd2ff; }
+.g-spot[hidden] { display: none; }
+.g-spot-card { width: min(70vw, 300px, 52vh); }
+.g-spot-card .gcard-glare { opacity: 1; }
+.g-spot.go .g-spot-card { animation: g-spot-in .6s cubic-bezier(.2, 1.3, .4, 1) both; }
+.g-spot-tag { margin: 0; text-align: center; font-size: 1.4rem; font-weight: 900; color: #fff; text-shadow: 0 0 14px var(--sc); }
+.g-spot-tag small { display: block; font-size: .85rem; font-weight: 700; margin-top: 4px; opacity: .9; }
+.g-spot-hint { margin: 0; color: rgba(255, 255, 255, .6); font-size: .8rem; animation: g-blink 1.6s ease-in-out infinite; }
+@keyframes g-spot-in { 0% { transform: scale(.4) rotate(-8deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
 

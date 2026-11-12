@@ -380,7 +380,12 @@
   <div class="g-stage-pack"><div class="g-pack"><div class="g-pack-shine"></div><div class="g-pack-logo"><small>UKIYO</small>ANIME<br>CARDS<em>★ DAILY ★</em></div></div></div>
   <div class="g-reveal" id="g-reveal"></div>
   <div class="g-stamp" id="g-stamp"></div>
-  <p class="g-tip" id="g-tip">點一下跳過</p>
+  {# SSR 以上：角色名稱滑過畫面 #}
+  <div class="g-cutin" id="g-cutin" hidden><div class="g-cutin-band"><div class="g-cutin-text"><b id="g-cutin-name"></b><small id="g-cutin-sub"></small></div></div></div>
+  {# 抽到新卡：全畫面展示 #}
+  <div class="g-spot" id="g-spot" hidden><p class="g-spot-tag" id="g-spot-tag"></p><div class="g-spot-card" id="g-spot-card"></div><p class="g-spot-hint">點一下繼續</p></div>
+  <button class="g-skip" id="g-skip" type="button">略過 ⏭</button>
+  <p class="g-tip" id="g-tip">點一下快轉</p>
 </div>
 <div class="g-pick" id="g-pick" hidden>
   <div class="g-pick-box">
