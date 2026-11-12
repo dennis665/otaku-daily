@@ -130,7 +130,9 @@ def shop(request):
     try:
         if request.POST.get("kind") == "card":
             card = service.buy_card(request.user, int(request.POST.get("card_id") or 0))
-            bought = {"card_id": card.id, "rarity": card.rarity, "name": card.name}
+            owned = OwnedCard.objects.filter(user=request.user, card=card).first()
+            bought = {"card_id": card.id, "rarity": card.rarity, "name": card.name,
+                      "card": _card(card, card.work.title, owned, new=True)}   # 前端播新卡演出用
         else:
             n = int(request.POST.get("n") or 1)
             service.buy_tickets(request.user, n)

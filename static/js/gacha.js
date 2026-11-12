@@ -413,13 +413,14 @@
     await perform(data.cards);
   }
 
-  async function perform(cards) {
+  async function perform(cards, opts = {}) {
     const best = cards.reduce((m, c) => (rank(c.rarity) > rank(m) ? c.rarity : m), 'N');
     const lv = rank(best);
     tip.textContent = '點一下快轉・右上角可整段略過';
-    // 蓄力：光芒逐級升級（藍 → 金 → 粉 → 彩虹 → 黑金），越稀有越久
-    const steps = ['R', 'SR', 'SSR', 'UR', 'LR'].filter((r) => rank(r) <= lv && rank(r) >= 2);
-    await wait(500);
+    // 蓄力：光芒逐級升級（藍 → 金 → 粉 → 彩虹 → 黑金），越稀有越久；星塵兌換不用蓄力
+    const steps = opts.exchange ? [] : ['R', 'SR', 'SSR', 'UR', 'LR'].filter((r) => rank(r) <= lv && rank(r) >= 2);
+    if (opts.exchange) setGlow(best);
+    await wait(opts.exchange ? 200 : 500);
     for (const r of steps) {
       setGlow(r);
       stage.classList.add('lv2');
@@ -471,7 +472,8 @@
     }
     // 跳過時把所有東西直接放到最後狀態
     reveal.querySelectorAll('.gcard').forEach((el) => el.classList.add('flip'));
-    if (cards.length === 1) tip.textContent = `${cards[0].new ? '🆕 新卡入手！' : `已收進卡冊（×${cards[0].count}）`}・點卡片看大圖・點空白處返回`;
+    if (opts.exchange) tip.textContent = '🛒 星塵兌換成功，已收進卡冊・點卡片看大圖・點空白處返回';
+    else if (cards.length === 1) tip.textContent = `${cards[0].new ? '🆕 新卡入手！' : `已收進卡冊（×${cards[0].count}）`}・點卡片看大圖・點空白處返回`;
     else tip.textContent = `${cards.length} 張・新卡 ${cards.filter((c) => c.new).length} 張・點卡片看大圖・點空白處返回`;
     skip = null;
     finished = true;
@@ -627,8 +629,21 @@
       status = j.status;
       paintStatus();
       closeDetail();
-      if (data.kind === 'card') { albumStale = true; await loadAlbum(); toast('🛒 兌換成功，已收進卡冊！'); }
-      else toast(`🎟 兌換了 ${data.n} 張自選抽卡券（保留券）`);
+      if (data.kind === 'card') {
+        albumStale = true;
+        loadAlbum();
+        const c = j.bought.card;
+        if (c) {
+          // 和抽到新卡一樣的演出：SSR 以上角色名滑過、新卡全畫面展示
+          saveImages([c.image, c.back_image]);
+          busy = true;
+          finished = false;
+          skipping = false;
+          setStagePack(c.back_image || '');
+          openStage();
+          await perform([c], { exchange: true });
+        } else toast('🛒 兌換成功，已收進卡冊！');
+      } else toast(`🎟 兌換了 ${data.n} 張自選抽卡券（保留券）`);
     } catch (err) { alert(err.message); }
   }
   $('g-dust-all').addEventListener('click', () => {
