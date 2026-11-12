@@ -164,6 +164,12 @@ def gift_new_works(before):
         state.notice = _add_notice(state.notice, msg)
         state.save(update_fields=["bonus_tickets", "notice"])
     logger.info("新作品上架送券：%s", "、".join(new.values()))
+    try:   # 推播通知（有開通知的裝置）
+        from notifications.push import send_to_users
+        send_to_users(get_user_model().objects.filter(is_active=True), "🎉 新作品上架",
+                      f"{'、'.join(new.values())} 的卡片上架了！送你 🎫 自選抽卡券 {tickets} 張", url="/?tab=gacha", tag="gacha-new-work")
+    except Exception as exc:
+        logger.warning("新作品上架推播失敗：%s", exc)
     return new
 
 
@@ -210,7 +216,19 @@ def apply_index(index):
         str(sid): path for sid, path in (index.get("card_backs") or {}).items()
         if SAFE_FILE.match(path)
     }
+    _state["combos"] = {str(k): v for k, v in (index.get("combos") or {}).items() if isinstance(v, list)}
+    _state["titles"] = {str(k): v for k, v in (index.get("titles") or {}).items() if isinstance(v, dict)}
     return created, len(gone)
+
+
+def combos():
+    """組合羈絆設定（卡面庫 index.json 的 combos）：{作品編號: [{"name": 組合名, "chars": [角色名…]}]}"""
+    return _state.get("combos") or {}
+
+
+def work_titles():
+    """收集稱號設定（index.json 的 titles）：{作品編號: {"50": 稱號, "100": 稱號}}"""
+    return _state.get("titles") or {}
 
 
 def sync(force=False):

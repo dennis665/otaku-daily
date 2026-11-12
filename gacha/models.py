@@ -26,6 +26,12 @@ DUST_VALUE = {"N": 1, "R": 3, "SR": 10, "SSR": 30, "UR": 80, "LR": 200}       # 
 CARD_PRICE = {"N": 15, "R": 40, "SR": 120, "SSR": 350, "UR": 900, "LR": 2500}  # 兌換 1 張指定卡要的星塵
 TICKET_PRICE = 30     # 兌換 1 張自選抽卡券（保留券）要的星塵
 NEW_WORK_GIFT = 10    # 新作品上架：每部送所有帳號自選抽卡券 10 張（保留券）
+COMBO_DUST_PER_MEMBER = 20   # 🏆 組合羈絆：集齊一組（每位角色至少 1 張卡）送 成員數 × 20 星塵（每組只送一次）
+SHOWCASE_MAX = 3             # ⭐ 展示櫃最多放 3 張
+QUIZ_DAILY = 3               # 問答（🎵 聽歌猜作品、💬 名言猜猜看）：每種每天 3 題
+QUIZ_REWARD = 10             # 答對 1 題送 10 星塵
+# 🏅 收集稱號：全部作品合計收集到幾種卡
+KIND_TITLES = [(10, "收藏新手"), (50, "資深收藏家"), (150, "傳說收藏家")]
 
 
 class Card(models.Model):
@@ -94,6 +100,9 @@ class GachaState(models.Model):
     bonus_tickets = models.PositiveIntegerField("保留的自選抽卡券", default=0)   # 任務獎勵，不會過期
     stardust = models.PositiveIntegerField("星塵", default=0)
     notice = models.CharField("要告訴使用者的訊息（顯示一次）", max_length=200, blank=True)   # 例：卡片下架退還星塵
+    titles = models.JSONField("已解鎖的稱號", default=list, blank=True)         # 解鎖後永久保留
+    title = models.CharField("顯示中的稱號", max_length=60, blank=True)
+    showcase = models.JSONField("展示櫃（卡片 id，最多 3 張）", default=list, blank=True)
 
     class Meta:
         verbose_name = verbose_name_plural = "抽卡狀態"
@@ -119,4 +128,34 @@ class GiftedWork(models.Model):
 
     class Meta:
         verbose_name = verbose_name_plural = "新作品上架禮物"
+
+
+class ComboReward(models.Model):
+    """已經領過獎勵的組合羈絆（每個帳號每組只送一次）"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gacha_combos")
+    key = models.CharField("組合代號", max_length=120)   # <作品編號>:<組合名稱>
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "組合羈絆獎勵"
+        constraints = [models.UniqueConstraint(fields=["user", "key"], name="gacha_combo_unique")]
+
+
+class QuizQuestion(models.Model):
+    """問答：🎵 聽歌猜作品（song）、💬 名言猜猜看（quote）；每題由伺服器出題並記錄答案（每種每天 QUIZ_DAILY 題）"""
+    KINDS = ("song", "quote")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gacha_quiz")
+    day = models.DateField("台灣日期")
+    kind = models.CharField("題型", max_length=10, default="song")
+    song_url = models.URLField("歌曲網址", max_length=500, blank=True)
+    prompt = models.CharField("題目文字（名言）", max_length=300, blank=True)
+    answer = models.CharField("正確作品", max_length=255)
+    options = models.JSONField("選項", default=list)
+    picked = models.CharField("回答", max_length=255, blank=True)
+    correct = models.BooleanField(null=True)
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "聽歌猜作品"
+        ordering = ["id"]
 

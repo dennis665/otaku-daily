@@ -136,7 +136,8 @@
       <div class="g-ticket">🎟 自選抽卡券<b>${s.pick_left}／${s.pick_daily}${s.bonus ? ` <em>＋保留 ${s.bonus}</em>` : ''}</b>自己選作品抽</div>
       <div class="g-ticket">🎲 隨機抽卡券<b>${s.random_left}／${s.free_daily}</b>全作品大混池</div>`;
     paintTask(s.task);
-    if (s.notice) toast(s.notice);
+    paintShowcase();
+    if (s.notice) { toast(s.notice); s.notice = ''; }   // 通知只顯示一次
     if (!$('g-shop').hidden) paintShop();
     $('g-free').disabled = !s.random_left;
     $('g-all').disabled = s.random_left < 2;
@@ -499,6 +500,10 @@
     if (c.owned) {
       $('g-detail-card').innerHTML = cardHTML(c, { count: false });
       $('g-detail-info').innerHTML = `<b>${esc(c.name || c.title)}</b><br>${c.name ? `${esc(c.title)}<br>` : ''}${noText}${esc(LABEL[c.rarity])}・持有 ${c.count} 張${c.first_at ? `・首次入手 ${esc(c.first_at)}` : ''}<br><small>手指在卡片上滑動可以傾斜欣賞</small>`;
+      if (status) {
+        const on = (status.showcase || []).some((x) => x.card_id === c.card_id);
+        addAct(acts, on ? '⭐ 從展示櫃拿出來' : '⭐ 放進展示櫃', () => toggleShowcase(c.card_id));
+      }
       if (c.count > 1 && status) {
         const v = status.dust_value[c.rarity];
         addAct(acts, `✨ 分解 1 張（+${v} 星塵）`, () => doDismantle({ card_id: c.card_id, n: 1 }));
@@ -534,7 +539,7 @@
     el.className = 'g-toast';
     el.textContent = msg;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 2600);
+    setTimeout(() => el.remove(), Math.max(2600, msg.length * 110));   // 長訊息（例如多則通知）顯示久一點
   }
   async function postForm(url, data) {
     const res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrf() }, body: new URLSearchParams(data) });
@@ -584,6 +589,183 @@
   detail.addEventListener('click', (e) => { if (e.target === detail) closeDetail(); });
   tilt($('g-detail-card'));
 
+  // ---------- ⭐ 展示櫃 ----------
+  function paintShowcase() {
+    if (!status) return;
+    const list = status.showcase || [];
+    const max = status.showcase_max || 3;
+    const badge = $('g-title-badge');
+    badge.hidden = !status.title;
+    badge.textContent = status.title ? `🏅 ${status.title}` : '';
+    $('g-show-slots').innerHTML = Array.from({ length: max }, (_, i) => (list[i]
+      ? cardHTML(list[i], { count: false })
+      : '<div class="g-show-empty">＋<small>到卡冊點卡片<br>放進展示櫃</small></div>')).join('');
+    saveImages(list.map((c) => c.image));
+  }
+  $('g-show-slots').addEventListener('click', (e) => {
+    const el = e.target.closest('.gcard');
+    if (el && el.dataset.c) {
+      const c = (status.showcase || []).find((x) => String(x.card_id) === el.dataset.c);
+      if (c) openDetail({ ...c, owned: true });
+      return;
+    }
+    if (e.target.closest('.g-show-empty')) albumChip.click();
+  });
+  async function toggleShowcase(cardId) {
+    try {
+      const j = await postForm('/gacha/api/showcase/', { card_id: cardId });
+      status = j.status;
+      paintStatus();
+      closeDetail();
+      toast(j.on ? '⭐ 已放進展示櫃（在「🎰 抽卡」最上面）' : '已從展示櫃拿出來');
+    } catch (err) { alert(err.message); }
+  }
+
+  // ---------- 🏅 收集稱號、🏆 組合羈絆 ----------
+  async function loadAch() {
+    try {
+      const res = await fetch('/gacha/api/achievements/', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error();
+      paintAch(await res.json());
+    } catch { $('g-combos').innerHTML = '<p class="g-info">讀取失敗，請稍後再試</p>'; }
+  }
+  function paintAch(a) {
+    const tbox = $('g-titles');
+    tbox.innerHTML = '';
+    a.titles.sort((x, y) => Number(y.unlocked) - Number(x.unlocked)).forEach((t) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `g-title${t.unlocked ? '' : ' is-locked'}${t.name === a.title ? ' is-on' : ''}`;
+      b.disabled = !t.unlocked;
+      b.innerHTML = `${t.unlocked ? '🏅' : '🔒'} ${esc(t.name)}${t.unlocked ? '' : `<small>${esc(t.rule)}</small>`}`;
+      b.addEventListener('click', async () => {
+        const next = t.name === a.title ? '' : t.name;
+        try {
+          await postForm('/gacha/api/title/', { title: next });
+          a.title = next;
+          if (status) { status.title = next; paintShowcase(); }
+          paintAch(a);
+          toast(next ? `🏅 顯示稱號「${next}」` : '不顯示稱號');
+        } catch (err) { alert(err.message); }
+      });
+      tbox.appendChild(b);
+    });
+    const groups = {};
+    a.combos.forEach((c) => { (groups[c.work] = groups[c.work] || []).push(c); });
+    const works = Object.keys(groups);
+    $('g-combos').innerHTML = works.length ? works.map((w) => `
+      <div class="g-album-work">
+        <header><b>${esc(w)}</b><span>${groups[w].filter((c) => c.done).length}／${groups[w].length} 組</span></header>
+        ${groups[w].map((c) => {
+          const have = c.chars.filter((x) => x.have).length;
+          return `<div class="g-combo${c.done ? ' is-done' : ''}">
+            <div class="g-combo-top"><b>${c.done ? '🏆' : '🔗'} ${esc(c.name)}</b><span>${c.claimed ? '✅ 已領取' : c.done ? '集齊！' : `${have}／${c.chars.length}`}・✨ ${c.reward}</span></div>
+            <div class="g-combo-chars">${c.chars.map((x) => `<span class="${x.have ? 'on' : ''}">${x.have ? '✓ ' : ''}${esc(x.name)}</span>`).join('')}</div>
+          </div>`;
+        }).join('')}
+      </div>`).join('') : '<p class="g-info">目前還沒有組合，敬請期待！</p>';
+  }
+
+  // ---------- 🎵 聽歌猜作品 ----------
+  const qAudio = $('q-audio');
+  let quiz = null;
+  let quizKind = 'song';
+  let qTimer = 0;
+  const SNIPPET = 15;
+  function stopQuizAudio() {
+    clearTimeout(qTimer);
+    if (!qAudio.paused) qAudio.pause();
+    $('q-disc').classList.remove('is-playing');
+  }
+  async function loadQuiz() {
+    try {
+      const res = await fetch(`/gacha/api/quiz/?kind=${quizKind}`, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error();
+      const j = await res.json();
+      if (j.kind !== quizKind) return;   // 已經切到另一種題型：這個舊回應不用畫
+      quiz = j;
+      paintQuiz();
+    } catch { $('q-info').textContent = '讀取失敗，請稍後再試'; }
+  }
+  function paintQuiz(result) {
+    const q = quiz.question;
+    const isSong = quiz.kind !== 'quote';
+    const left = quiz.unlimited ? '∞' : quiz.left;
+    $('q-disc').hidden = !isSong;
+    $('q-quote').hidden = !(q && !isSong);
+    $('q-quote').textContent = q && !isSong ? `「${q.prompt.replace(/^「|」$/g, '')}」` : '';
+    $('q-info').innerHTML = q
+      ? `${isSong ? '聽一段動畫歌，猜猜是哪部作品？' : '這句經典台詞是哪部作品的誰說的？'}答對送 ✨ <b>${quiz.reward}</b> 星塵<br>今天剩 <b>${left}</b> 題`
+      : quiz.left
+        ? `每天 ${quiz.daily} 題，答對 1 題送 ✨ <b>${quiz.reward}</b> 星塵<br>今天答對 <b>${quiz.right}</b>／${quiz.answered} 題・還剩 <b>${left}</b> 題`
+        : `今天的 ${quiz.daily} 題答完了（答對 <b>${quiz.right}</b> 題），明天再來！`;
+    $('q-play').hidden = !q || !isSong;
+    $('q-next').hidden = Boolean(q) || !quiz.left;
+    $('q-next').textContent = quiz.answered ? '下一題' : '開始答題';
+    const box = $('q-opts');
+    box.innerHTML = '';
+    if (q) {
+      if (isSong && qAudio.dataset.id !== String(q.id)) { stopQuizAudio(); qAudio.src = q.url; qAudio.dataset.id = q.id; }
+      q.options.forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'g-quiz-opt';
+        b.textContent = o;
+        b.addEventListener('click', () => answerQuiz(q, o));
+        box.appendChild(b);
+      });
+    }
+    $('q-result').hidden = !result;
+    if (result) {
+      $('q-result').className = `g-quiz-result ${result.correct ? 'ok' : 'ng'}`;
+      $('q-result').innerHTML = result.correct ? `⭕ 答對了！<b>${esc(result.answer)}</b><br>✨ +${result.gain} 星塵` : `❌ 答錯了，正確答案是<br><b>${esc(result.answer)}</b>`;
+    }
+  }
+  $('q-play').addEventListener('click', () => {
+    const q = quiz && quiz.question;
+    if (!q) return;
+    const main = document.getElementById('audio');
+    if (main && !main.paused) main.pause();   // 先停掉音樂分頁正在播的歌
+    clearTimeout(qTimer);
+    const done = AppLoading.start();
+    const start = () => {
+      const d = qAudio.duration;
+      // 從歌曲前段（約 25% 或第 30 秒）開始播 15 秒
+      if (Number.isFinite(d) && d > SNIPPET * 2) qAudio.currentTime = Math.min(30, d * 0.25);
+    };
+    if (qAudio.readyState >= 1) start(); else qAudio.addEventListener('loadedmetadata', start, { once: true });
+    qAudio.addEventListener('playing', () => {
+      done();
+      $('q-disc').classList.add('is-playing');
+      clearTimeout(qTimer);
+      qTimer = setTimeout(stopQuizAudio, SNIPPET * 1000);
+    }, { once: true });
+    qAudio.play().catch(() => { done(); alert('播放失敗，請再按一次'); });
+    setTimeout(done, 12000);
+  });
+  $('q-next').addEventListener('click', async () => {
+    try {
+      quiz = await postForm('/gacha/api/quiz/next/', { kind: quizKind });
+      paintQuiz();
+    } catch (err) { alert(err.message); }
+  });
+  $('q-kinds').querySelectorAll('[data-k]').forEach((b) => b.addEventListener('click', () => {
+    quizKind = b.dataset.k;
+    $('q-kinds').querySelectorAll('[data-k]').forEach((x) => x.classList.toggle('active', x === b));
+    stopQuizAudio();
+    $('q-result').hidden = true;
+    loadQuiz();
+  }));
+  async function answerQuiz(q, pick) {
+    stopQuizAudio();
+    try {
+      const j = await postForm('/gacha/api/quiz/answer/', { id: q.id, pick });
+      quiz = j;
+      paintQuiz({ correct: j.correct, answer: j.answer, gain: j.gain });
+      if (j.gain && status) { status.stardust += j.gain; paintStatus(); }
+    } catch (err) { alert(err.message); }
+  }
+
   // ---------- 切換：抽卡／卡冊 ----------
   panel.querySelectorAll('.g-views .chip').forEach((b) => b.addEventListener('click', () => {
     panel.querySelectorAll('.g-views .chip').forEach((x) => x.classList.toggle('active', x === b));
@@ -591,6 +773,11 @@
     $('g-draw').hidden = v !== 'draw';
     $('g-album').hidden = v !== 'album';
     $('g-shop').hidden = v !== 'shop';
+    $('g-ach').hidden = v !== 'ach';
+    $('g-quiz').hidden = v !== 'quiz';
+    if (v !== 'quiz') stopQuizAudio();
+    if (v === 'ach') loadAch();
+    if (v === 'quiz') loadQuiz();
     if (v === 'album') loadAlbum();
     if (v === 'shop') { if (status) paintShop(); else loadStatus().then(paintShop); }
   }));

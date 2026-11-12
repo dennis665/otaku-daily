@@ -296,3 +296,100 @@ class NewWorkGiftTests(TestCase):
         st = self.sync([{"file": "951/N_abcdef01.webp", "rarity": "N", "name": "a", "no": 1}])
         self.assertEqual(st.bonus_tickets, 0)
 
+
+
+class ExtrasTests(TestCase):
+    """🏆 組合羈絆、🏅 收集稱號、⭐ 展示櫃、🎵 聽歌猜作品"""
+    def setUp(self):
+        from . import extras
+        self.extras = extras
+        self.user = User.objects.create_user("fan", password="pw-123456")
+        self.w = Work.objects.create(source_id=970, title="兄弟作品")
+        self.c = {n: Card.objects.create(work=self.w, rarity="N", file=f"970/N_{i:02d}abcdef.webp", name=f"{n} 便服", no=i + 1)
+                  for i, n in enumerate(["一郎", "二郎", "三郎", "路人"])}
+        cards._state["combos"] = {"970": [{"name": "三兄弟", "chars": ["一郎", "二郎", "三郎"]}]}
+        cards._state["titles"] = {"970": {"50": "見習兄弟", "100": "兄弟全制霸"}}
+
+    def tearDown(self):
+        cards._state.pop("combos", None)
+        cards._state.pop("titles", None)
+
+    def own(self, *names):
+        for n in names:
+            OwnedCard.objects.create(user=self.user, card=self.c[n], work=self.w, rarity="N")
+
+    def test_combo_reward_once_and_titles(self):
+        from .models import COMBO_DUST_PER_MEMBER
+        self.own("一郎", "二郎")
+        s = service.status(self.user)
+        self.assertEqual(s["stardust"], 0)
+        self.assertEqual(s["title"], "見習兄弟")                 # 收集 50% 解鎖並自動顯示第一個稱號
+        self.own("三郎")
+        s = service.status(self.user)
+        self.assertEqual(s["stardust"], COMBO_DUST_PER_MEMBER * 3)
+        self.assertIn("三兄弟", s["notice"])
+        service.status(self.user)
+        self.assertEqual(GachaState.objects.get(user=self.user).stardust, COMBO_DUST_PER_MEMBER * 3)   # 只送一次
+        self.client.force_login(self.user)
+        res = self.client.get("/gacha/api/achievements/")
+        combo = res.json()["combos"][0]
+        self.assertTrue(combo["done"] and combo["claimed"])
+        with self.assertRaises(self.extras.ExtraError):
+            self.extras.set_title(self.user, "兄弟全制霸")         # 還沒 100%
+
+    def test_showcase_limit_and_owned_only(self):
+        self.own("一郎", "二郎", "三郎", "路人")
+        with self.assertRaises(self.extras.ExtraError):
+            self.extras.toggle_showcase(self.user, 999999)
+        for n in ["一郎", "二郎", "三郎"]:
+            self.assertTrue(self.extras.toggle_showcase(self.user, self.c[n].id))
+        with self.assertRaises(self.extras.ExtraError):
+            self.extras.toggle_showcase(self.user, self.c["路人"].id)
+        self.assertFalse(self.extras.toggle_showcase(self.user, self.c["一郎"].id))   # 再按一次拿出來
+        self.assertEqual(len(self.extras.showcase_cards(self.user)), 2)
+
+    def test_quiz_flow(self):
+        from unittest import mock
+        from .models import QUIZ_DAILY, QUIZ_REWARD
+        pool = {f"作品{i}": [f"https://example.com/{i}.m4a"] for i in "ABCDEF"}
+        day = service.today()
+        with mock.patch.object(self.extras, "quiz_pool", return_value=pool):
+            q = self.extras.quiz_next(self.user, day)
+            self.assertEqual(self.extras.quiz_next(self.user, day).id, q.id)   # 沒回答前同一題
+            self.assertEqual(len(q.options), 4)
+            self.assertIn(q.answer, q.options)
+            _, gain = self.extras.quiz_answer(self.user, q.id, q.answer)
+            self.assertEqual(gain, QUIZ_REWARD)
+            with self.assertRaises(self.extras.ExtraError):
+                self.extras.quiz_answer(self.user, q.id, q.answer)           # 不能重複回答
+            for _ in range(QUIZ_DAILY - 1):
+                q = self.extras.quiz_next(self.user, day)
+                wrong = next(o for o in q.options if o != q.answer)
+                self.assertEqual(self.extras.quiz_answer(self.user, q.id, wrong)[1], 0)
+            with self.assertRaises(self.extras.ExtraError):
+                self.extras.quiz_next(self.user, day)                         # 今天答完了
+        self.assertEqual(GachaState.objects.get(user=self.user).stardust, QUIZ_REWARD)
+
+    def test_new_work_sends_push(self):
+        from unittest import mock
+        old = [{"file": c.file, "rarity": "N", "name": c.name, "no": c.no} for c in self.c.values()]
+        Work.objects.create(source_id=971, title="新番")
+        cards.apply_index({"works": {"970": old}})
+        with mock.patch("notifications.push.send_to_users") as send:
+            cards.apply_index({"works": {"970": old, "971": [{"file": "971/N_abcdef01.webp", "rarity": "N", "name": "x", "no": 1}]}})
+        send.assert_called_once()
+        self.assertIn("新番", send.call_args[0][2])
+
+    def test_quote_quiz(self):
+        day = service.today()
+        q = self.extras.quiz_next(self.user, day, kind="quote")
+        self.assertEqual(q.kind, "quote")
+        self.assertTrue(q.prompt)
+        self.assertEqual(len(set(q.options)), 4)
+        self.assertIn(q.answer, q.options)
+        self.assertEqual(self.extras.quiz_next(self.user, day, kind="quote").id, q.id)
+        self.client.force_login(self.user)
+        res = self.client.post("/gacha/api/quiz/answer/", {"id": q.id, "pick": q.answer}).json()
+        self.assertTrue(res["correct"])
+        self.assertEqual(res["kind"], "quote")
+        self.assertEqual(res["left"], 2)

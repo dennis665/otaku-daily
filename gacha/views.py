@@ -4,9 +4,9 @@ from django.views.decorators.http import require_GET, require_POST
 
 from dramas.models import Work
 
-from . import cards, service
-from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_LABEL, RARITY_WEIGHT,
-                     TICKET_PRICE, Card, OwnedCard)
+from . import cards, extras, service
+from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, QUIZ_DAILY, QUIZ_REWARD, RARITIES, RARITY_LABEL,
+                     RARITY_WEIGHT, SHOWCASE_MAX, TICKET_PRICE, Card, OwnedCard)
 
 
 def _json(data, status=200):
@@ -44,6 +44,8 @@ def _status_json(user):
     s["ticket_price"] = TICKET_PRICE
     s["pity_at"] = PITY_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
+    s["showcase"] = [_card(o.card, o.card.work.title, o) for o in extras.showcase_cards(user)]
+    s["showcase_max"] = SHOWCASE_MAX
     return s
 
 
@@ -166,3 +168,92 @@ def album(request):
                       "have": sum(1 for c in cs if c["owned"]), "total": len(cs)})
     return _json({"rarities": RARITIES, "labels": RARITY_LABEL, "works": items,
                   "summary": {"works": len(items), "kinds": len(owned), "pulls": sum(o.count for o in owned.values())}})
+
+
+# ---------- 🏆 組合羈絆、🏅 收集稱號、⭐ 展示櫃 ----------
+@login_required
+@require_GET
+def achievements(request):
+    """組合羈絆進度與所有稱號（已解鎖／條件）"""
+    cards.sync()
+    extras.check_rewards(request.user)
+    coll, _ = extras.collection(request.user)
+    state = service.GachaState.objects.filter(user=request.user).first()
+    unlocked = set(state.titles if state else [])
+    titles = [{"name": n, "unlocked": n in unlocked, "rule": rule} for n, _, rule in extras.title_rules(coll)]
+    titles += [{"name": n, "unlocked": True, "rule": ""} for n in unlocked if n not in {t["name"] for t in titles}]
+    return _json({"combos": extras.combo_list(request.user, coll), "titles": titles,
+                  "title": state.title if state else "", "notice": state.notice if state else ""})
+
+
+@login_required
+@require_POST
+def set_title(request):
+    try:
+        extras.set_title(request.user, (request.POST.get("title") or "").strip())
+    except extras.ExtraError as e:
+        return _json({"ok": False, "error": str(e)}, 400)
+    return _json({"ok": True, "title": request.POST.get("title") or ""})
+
+
+@login_required
+@require_POST
+def showcase(request):
+    """展示櫃：card_id 沒放的放進去、已放的拿出來"""
+    try:
+        on = extras.toggle_showcase(request.user, int(request.POST.get("card_id") or 0))
+    except ValueError:
+        return _json({"ok": False, "error": "資料格式錯誤"}, 400)
+    except extras.ExtraError as e:
+        return _json({"ok": False, "error": str(e)}, 400)
+    return _json({"ok": True, "on": on, "status": _status_json(request.user)})
+
+
+# ---------- 🎵 聽歌猜作品 ----------
+def _kind(request):
+    k = request.GET.get("kind") or request.POST.get("kind") or "song"
+    return k if k in ("song", "quote") else "song"
+
+
+def _quiz_json(user, q=None, kind="song"):
+    day = service.today()
+    qs = extras.quiz_today(user, day, kind)
+    done = [x for x in qs if x.correct is not None]
+    unlimited = service.unlimited(user)
+    out = {"kind": kind, "daily": QUIZ_DAILY, "reward": QUIZ_REWARD, "unlimited": unlimited,
+           "left": 999 if unlimited else max(0, QUIZ_DAILY - len(qs)) + sum(1 for x in qs if x.correct is None),
+           "right": sum(1 for x in done if x.correct), "answered": len(done)}
+    pending = q if (q and q.correct is None) else next((x for x in qs if x.correct is None), None)
+    out["question"] = ({"id": pending.id, "url": pending.song_url, "prompt": pending.prompt, "options": pending.options}
+                       if pending else None)
+    return out
+
+
+@login_required
+@require_GET
+def quiz(request):
+    return _json(_quiz_json(request.user, kind=_kind(request)))
+
+
+@login_required
+@require_POST
+def quiz_next(request):
+    kind = _kind(request)
+    try:
+        q = extras.quiz_next(request.user, service.today(), service.unlimited(request.user), kind=kind)
+    except extras.ExtraError as e:
+        return _json({"ok": False, "error": str(e)}, 400)
+    return _json({"ok": True, **_quiz_json(request.user, q, kind)})
+
+
+@login_required
+@require_POST
+def quiz_answer(request):
+    try:
+        q, gain = extras.quiz_answer(request.user, int(request.POST.get("id") or 0), request.POST.get("pick") or "")
+    except ValueError:
+        return _json({"ok": False, "error": "資料格式錯誤"}, 400)
+    except extras.ExtraError as e:
+        return _json({"ok": False, "error": str(e)}, 400)
+    return _json({"ok": True, "correct": q.correct, "answer": q.answer, "gain": gain, **_quiz_json(request.user, kind=q.kind)})
+

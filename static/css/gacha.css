@@ -234,5 +234,52 @@
 .g-detail-acts { display: grid; gap: 8px; width: min(78vw, 340px); }
 .g-detail-acts:empty { display: none; }
 .g-slots .gcard.is-missing { cursor: pointer; }
-.g-toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 90px); transform: translateX(-50%); z-index: 230; background: rgba(20, 18, 43, .95); border: 1px solid #ffd166; color: #fff; border-radius: 99px; padding: 10px 18px; font-size: .9rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); white-space: nowrap; }
+.g-toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 90px); transform: translateX(-50%); z-index: 230; background: rgba(20, 18, 43, .95); border: 1px solid #ffd166; color: #fff; border-radius: 99px; padding: 10px 18px; font-size: .9rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); width: max-content; max-width: calc(100vw - 32px); text-align: center; line-height: 1.5; }
 body.offline-mode .g-views .chip[data-g="shop"], body.offline-mode #g-dust-all, body.offline-mode #g-detail-acts { display: none !important; }
+
+/* ---------- ⭐ 展示櫃 ---------- */
+.g-show { background: linear-gradient(135deg, rgba(255, 209, 102, .12), rgba(155, 123, 255, .12)); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 12px; margin-bottom: 8px; }
+.g-show-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: .88rem; }
+.g-title-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .75rem; font-weight: 800; color: #20160a; background: linear-gradient(135deg, #ffe08a, #ffb347); border-radius: 99px; padding: 3px 10px; }
+.g-title-badge[hidden] { display: none; }
+.g-show-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 340px; margin: 0 auto; }
+.g-show-slots .gcard { cursor: pointer; }
+.g-show-empty { aspect-ratio: 5 / 7; border: 2px dashed var(--line); border-radius: 6% / 4.3%; display: grid; place-content: center; text-align: center; color: var(--muted); font-size: 1.4rem; cursor: pointer; }
+.g-show-empty small { font-size: .62rem; line-height: 1.4; margin-top: 4px; }
+
+/* ---------- 🏅 稱號、🏆 組合羈絆 ---------- */
+.g-h small { font-weight: 400; font-size: .72rem; color: var(--muted); margin-left: 4px; }
+.g-titles { display: flex; flex-wrap: wrap; gap: 8px; }
+.g-title { border: 1px solid var(--line); background: var(--bg2); color: var(--text); border-radius: 12px; padding: 7px 12px; font-size: .82rem; font-weight: 700; cursor: pointer; text-align: left; }
+.g-title small { display: block; font-weight: 400; font-size: .68rem; color: var(--muted); margin-top: 2px; }
+.g-title.is-locked { opacity: .55; cursor: default; }
+.g-title.is-on { border-color: #ffd166; background: linear-gradient(135deg, rgba(255, 209, 102, .25), rgba(255, 140, 80, .18)); box-shadow: 0 0 0 1px #ffd166 inset; }
+.g-combo { border-top: 1px dashed var(--line); padding: 8px 0 2px; }
+.g-combo:first-of-type { border-top: 0; }
+.g-combo-top { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; }
+.g-combo-top span { flex: none; color: var(--muted); font-size: .76rem; }
+.g-combo.is-done .g-combo-top b { color: #ffd166; }
+.g-combo-chars { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.g-combo-chars span { font-size: .72rem; border-radius: 99px; padding: 2px 8px; background: var(--line); color: var(--muted); }
+.g-combo-chars span.on { background: rgba(94, 231, 255, .18); color: var(--text); box-shadow: 0 0 0 1px rgba(94, 231, 255, .5) inset; }
+
+/* ---------- 🎵 聽歌猜作品 ---------- */
+.g-quiz { text-align: center; padding: 6px 0 12px; }
+.g-quiz-kinds { justify-content: center; }
+.g-quiz-disc[hidden], .g-quiz-quote[hidden] { display: none; }
+.g-quiz-quote { margin: 10px 0 6px; padding: 18px 16px; border-radius: 14px; font-size: 1.15rem; font-weight: 800; line-height: 1.6;
+  background: linear-gradient(135deg, rgba(155, 123, 255, .18), rgba(255, 111, 174, .14)); border: 1px solid var(--line); }
+.g-quiz-disc { width: 120px; height: 120px; margin: 8px auto 4px; border-radius: 50%; display: grid; place-items: center; font-size: 2.6rem;
+  background: radial-gradient(circle, #1b1838 0 18%, #ff6fae 19% 22%, #2b1f63 23% 100%); box-shadow: 0 10px 30px rgba(155, 123, 255, .35), inset 0 0 0 6px rgba(255, 255, 255, .08); }
+.g-quiz-disc.is-playing { animation: g-spin 3s linear infinite; }
+.g-quiz .g-btn { width: 100%; margin: 4px 0 10px; }
+.g-quiz .g-btn[hidden] { display: none; }
+.g-quiz-opts { display: grid; gap: 8px; }
+.g-quiz-opt { border: 1px solid var(--line); background: var(--bg2); color: var(--text); border-radius: 12px; padding: 12px; font-size: .92rem; font-weight: 700; cursor: pointer; }
+.g-quiz-opt:active { transform: scale(.98); }
+.g-quiz-result { margin: 12px 0 8px; padding: 10px; border-radius: 12px; font-size: .92rem; line-height: 1.6; }
+.g-quiz-result[hidden] { display: none; }
+.g-quiz-result.ok { background: rgba(94, 231, 255, .14); border: 1px solid rgba(94, 231, 255, .5); }
+.g-quiz-result.ng { background: rgba(255, 111, 174, .12); border: 1px solid rgba(255, 111, 174, .45); }
+body.offline-mode .g-views .chip[data-g="ach"], body.offline-mode .g-views .chip[data-g="quiz"] { display: none !important; }
+

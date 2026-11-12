@@ -162,8 +162,15 @@
     <button class="chip active" data-g="draw" type="button">🎰 抽卡</button>
     <button class="chip" data-g="album" type="button">📖 我的卡冊 <b id="g-album-n"></b></button>
     <button class="chip" data-g="shop" type="button">🛒 星塵商店</button>
+    <button class="chip" data-g="ach" type="button">🏆 成就</button>
+    <button class="chip" data-g="quiz" type="button">🎯 問答</button>
   </div>
   <div id="g-draw">
+    {# 展示櫃：自己選最多 3 張收集到的卡＋目前的稱號 #}
+    <div class="g-show" id="g-show">
+      <div class="g-show-top"><b>⭐ 我的展示櫃</b><span class="g-title-badge" id="g-title-badge" hidden></span></div>
+      <div class="g-show-slots" id="g-show-slots"></div>
+    </div>
     <div class="g-machine" id="g-machine" aria-hidden="true">
       <div class="g-aura"></div>
       <div class="g-pack"><div class="g-pack-shine"></div><div class="g-pack-logo"><small>UKIYO</small>ANIME<br>CARDS<em>★ DAILY ★</em></div></div>
@@ -204,6 +211,31 @@
     <p class="g-info g-left">到「📖 我的卡冊」點還沒收集到的卡（顯示卡號的剪影），就能用星塵直接兌換那一張。</p>
     <h3 class="g-h">📊 星塵價目表</h3>
     <div id="g-dust-table"></div>
+  </div>
+  {# 成就：收集稱號（選一個顯示）＋組合羈絆（集齊送星塵） #}
+  <div id="g-ach" hidden>
+    <h3 class="g-h">🏅 收集稱號 <small>點已解鎖的稱號設為顯示</small></h3>
+    <div class="g-titles" id="g-titles"></div>
+    <h3 class="g-h">🏆 組合羈絆</h3>
+    <p class="g-info g-left">組合裡每位角色都至少收集到 1 張卡（任何造型都算），就會送星塵，每組送一次。</p>
+    <div id="g-combos"></div>
+  </div>
+  {# 問答：🎵 聽歌猜作品、💬 名言猜猜看，各自每天 3 題，答對送星塵 #}
+  <div id="g-quiz" hidden>
+    <div class="chips g-quiz-kinds" id="q-kinds" role="group" aria-label="題型">
+      <button class="chip active" data-k="song" type="button">🎵 聽歌猜作品</button>
+      <button class="chip" data-k="quote" type="button">💬 名言猜猜看</button>
+    </div>
+    <div class="g-quiz">
+      <div class="g-quiz-disc" id="q-disc" aria-hidden="true">🎵</div>
+      <blockquote class="g-quiz-quote" id="q-quote" hidden></blockquote>
+      <p class="g-info" id="q-info">讀取中…</p>
+      <button class="g-btn" id="q-play" type="button" hidden>▶ 播放題目（15 秒）</button>
+      <div class="g-quiz-opts" id="q-opts"></div>
+      <p class="g-quiz-result" id="q-result" hidden></p>
+      <button class="g-btn alt" id="q-next" type="button" hidden>開始答題</button>
+    </div>
+    <audio id="q-audio" preload="none" playsinline></audio>
   </div>
 </section>
 

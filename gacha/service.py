@@ -96,12 +96,15 @@ def task_status(user, day=None):
 def status(user):
     """今天剩幾張券、保留券、任務進度"""
     cards.sync()
+    from .extras import check_rewards
+    check_rewards(user)   # 新集齊的組合羈絆、新解鎖的稱號
     day = today()
     state = GachaState.objects.filter(user=user).first()
     has_cards = bool(card_work_ids())
     base = {"day": day.isoformat(), "pity_left": PITY_AT - (state.since_ssr if state else 0),
             "pool_works": len(card_work_ids()), "bonus": state.bonus_tickets if state else 0, "task": task_status(user, day),
-            "stardust": state.stardust if state else 0, "notice": state.notice if state else ""}
+            "stardust": state.stardust if state else 0, "notice": state.notice if state else "",
+            "title": state.title if state else ""}
     if state and state.notice:   # 通知只顯示一次
         GachaState.objects.filter(pk=state.pk).update(notice="")
     if unlimited(user):
