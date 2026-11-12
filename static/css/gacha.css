@@ -281,6 +281,14 @@ body.offline-mode .g-views .chip[data-g="shop"], body.offline-mode #g-dust-all, 
 .g-quiz-opt:active { transform: scale(.98); }
 .g-quiz-result { margin: 12px 0 8px; padding: 10px; border-radius: 12px; font-size: .92rem; line-height: 1.6; }
 .g-quiz-result[hidden] { display: none; }
+.g-h[hidden] { display: none; }
+.g-quiz-hist { display: grid; gap: 8px; }
+.g-quiz-row { border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; font-size: .84rem; line-height: 1.55; background: var(--bg2); }
+.g-quiz-row.ok { border-color: rgba(94, 231, 255, .45); }
+.g-quiz-row.ng { border-color: rgba(255, 111, 174, .4); }
+.g-quiz-row-q { font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.g-quiz-row-a { color: var(--muted); margin-top: 3px; }
+.g-quiz-row-a b { color: var(--text); }
 .g-quiz-result.ok { background: rgba(94, 231, 255, .14); border: 1px solid rgba(94, 231, 255, .5); }
 .g-quiz-result.ng { background: rgba(255, 111, 174, .12); border: 1px solid rgba(255, 111, 174, .45); }
 body.offline-mode .g-views .chip[data-g="ach"], body.offline-mode .g-views .chip[data-g="quiz"] { display: none !important; }

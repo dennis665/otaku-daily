@@ -15,6 +15,7 @@ User = get_user_model()
 def setUpModule():
     # 測試不連 GitHub 讀卡片索引
     cards._state["at"] = 1e18
+    cards._state["campaigns_done"] = True   # 一次性活動另外測
 
 
 def make_work(sid, title, rarities=("N", "R", "SR", "SSR")):
@@ -393,3 +394,31 @@ class ExtrasTests(TestCase):
         self.assertTrue(res["correct"])
         self.assertEqual(res["kind"], "quote")
         self.assertEqual(res["left"], 2)
+
+    def test_quiz_history_today(self):
+        self.client.force_login(self.user)
+        q = self.extras.quiz_next(self.user, service.today(), kind="quote")
+        wrong = next(o for o in q.options if o != q.answer)
+        res = self.client.post("/gacha/api/quiz/answer/", {"id": q.id, "pick": wrong}).json()
+        h = res["history"][0]
+        self.assertEqual((h["picked"], h["answer"], h["correct"]), (wrong, q.answer, False))
+        self.assertEqual(h["prompt"], q.prompt)
+        self.assertEqual(len(self.client.get("/gacha/api/quiz/?kind=quote").json()["history"]), 1)
+
+    def test_campaign_once_with_push(self):
+        from unittest import mock
+        other = User.objects.create_user("other", password="pw-123456")
+        cards._state["campaigns_done"] = False
+        try:
+            with mock.patch("notifications.push.send_to_users") as send:
+                self.assertEqual(cards.run_campaigns(), [c["key"] for c in cards.CAMPAIGNS])
+                cards._state["campaigns_done"] = False
+                self.assertEqual(cards.run_campaigns(), [])          # 同一個活動不會再發
+            send.assert_called_once()
+            total = sum(c["tickets"] for c in cards.CAMPAIGNS)
+            for u in (self.user, other):
+                st = GachaState.objects.get(user=u)
+                self.assertEqual(st.bonus_tickets, total)
+                self.assertIn("自選抽卡券", st.notice)
+        finally:
+            cards._state["campaigns_done"] = True

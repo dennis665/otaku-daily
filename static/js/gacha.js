@@ -715,15 +715,38 @@
         box.appendChild(b);
       });
     }
+    paintQuizHistory(isSong);
     $('q-result').hidden = !result;
     if (result) {
       $('q-result').className = `g-quiz-result ${result.correct ? 'ok' : 'ng'}`;
       $('q-result').innerHTML = result.correct ? `⭕ 答對了！<b>${esc(result.answer)}</b><br>✨ +${result.gain} 星塵` : `❌ 答錯了，正確答案是<br><b>${esc(result.answer)}</b>`;
     }
   }
+  // 今天的作答紀錄：題目（名言／歌曲）、你的回答、正確答案；聽歌題可以再聽一次
+  function paintQuizHistory(isSong) {
+    const list = quiz.history || [];
+    $('q-hist-h').hidden = !list.length;
+    $('q-hist').innerHTML = list.map((h, i) => `
+      <div class="g-quiz-row ${h.correct ? 'ok' : 'ng'}">
+        <div class="g-quiz-row-q">${h.correct ? '⭕' : '❌'} ${isSong ? `🎵 第 ${list.length - i} 題 <button class="act" type="button" data-replay="${esc(h.url)}">▶ 再聽一次</button>` : `「${esc(h.prompt.replace(/^「|」$/g, ''))}」`}</div>
+        <div class="g-quiz-row-a">${h.correct ? '' : `你的回答：${esc(h.picked)}<br>`}正確答案：<b>${esc(h.answer)}</b></div>
+      </div>`).join('');
+  }
+  $('q-hist').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-replay]');
+    if (!b) return;
+    playSnippet(b.dataset.replay, `hist:${b.dataset.replay}`);
+  });
+  function playSnippet(url, id) {
+    if (qAudio.dataset.id !== id) { stopQuizAudio(); qAudio.src = url; qAudio.dataset.id = id; }
+    startSnippet();
+  }
   $('q-play').addEventListener('click', () => {
     const q = quiz && quiz.question;
     if (!q) return;
+    playSnippet(q.url, String(q.id));
+  });
+  function startSnippet() {
     const main = document.getElementById('audio');
     if (main && !main.paused) main.pause();   // 先停掉音樂分頁正在播的歌
     clearTimeout(qTimer);
@@ -742,7 +765,7 @@
     }, { once: true });
     qAudio.play().catch(() => { done(); alert('播放失敗，請再按一次'); });
     setTimeout(done, 12000);
-  });
+  }
   $('q-next').addEventListener('click', async () => {
     try {
       quiz = await postForm('/gacha/api/quiz/next/', { kind: quizKind });

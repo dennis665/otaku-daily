@@ -96,6 +96,7 @@ def task_status(user, day=None):
 def status(user):
     """今天剩幾張券、保留券、任務進度"""
     cards.sync()
+    cards.run_campaigns()   # 一次性活動（例：大更新送券）
     from .extras import check_rewards
     check_rewards(user)   # 新集齊的組合羈絆、新解鎖的稱號
     day = today()

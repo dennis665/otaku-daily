@@ -226,6 +226,9 @@ def _quiz_json(user, q=None, kind="song"):
     pending = q if (q and q.correct is None) else next((x for x in qs if x.correct is None), None)
     out["question"] = ({"id": pending.id, "url": pending.song_url, "prompt": pending.prompt, "options": pending.options}
                        if pending else None)
+    # 今天已經回答的題目（新的在前）：題目、你的回答、正確答案
+    out["history"] = [{"url": x.song_url, "prompt": x.prompt, "picked": x.picked, "answer": x.answer, "correct": x.correct}
+                      for x in reversed(done[-30:])]
     return out
 
 

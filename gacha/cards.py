@@ -221,6 +221,49 @@ def apply_index(index):
     return created, len(gone)
 
 
+# 一次性活動：伺服器第一次遇到就發給「當下所有帳號」並推播，同一個 key 只發一次（記在 GiftedWork，key 前面加 campaign:）
+CAMPAIGNS = [
+    {"key": "2026-11-12-update", "tickets": 10,
+     "title": "🎉 宅日常抽卡大更新",
+     "body": "新增 🏆 組合羈絆、🏅 收集稱號、⭐ 展示櫃、🎯 問答！送你 🎫 自選抽卡券 10 張"},
+]
+
+
+def run_campaigns():
+    """發放還沒發過的活動（打開抽卡分頁時檢查；同一個活動只會發一次）"""
+    if _state.get("campaigns_done"):
+        return []
+    from django.contrib.auth import get_user_model
+    from django.db import IntegrityError
+
+    from .models import GachaState, GiftedWork
+    sent = []
+    for c in CAMPAIGNS:
+        key = f"campaign:{c['key']}"[:40]
+        if GiftedWork.objects.filter(key=key).exists():
+            continue
+        try:
+            with transaction.atomic():
+                GiftedWork.objects.create(key=key)   # 先佔下這個活動，其他程序就不會重複發
+                users = list(get_user_model().objects.filter(is_active=True).values_list("id", flat=True))
+                for uid in users:
+                    state, _ = GachaState.objects.select_for_update().get_or_create(user_id=uid)
+                    state.bonus_tickets += c["tickets"]
+                    state.notice = _add_notice(state.notice, c["body"])
+                    state.save(update_fields=["bonus_tickets", "notice"])
+        except IntegrityError:
+            continue
+        sent.append(c["key"])
+        logger.info("活動 %s 已發給 %s 個帳號", c["key"], len(users))
+        try:
+            from notifications.push import send_to_users
+            send_to_users(get_user_model().objects.filter(is_active=True), c["title"], c["body"], url="/?tab=gacha", tag=f"gacha-{c['key']}")
+        except Exception as exc:
+            logger.warning("活動推播失敗：%s", exc)
+    _state["campaigns_done"] = True
+    return sent
+
+
 def combos():
     """組合羈絆設定（卡面庫 index.json 的 combos）：{作品編號: [{"name": 組合名, "chars": [角色名…]}]}"""
     return _state.get("combos") or {}
