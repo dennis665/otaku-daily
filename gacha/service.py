@@ -16,8 +16,8 @@ from django.utils import timezone as dj_tz
 from dramas.models import Follow, Work
 
 from . import cards
-from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, RARITIES, RARITY_WEIGHT, TASK_REWARD, TASK_SECONDS,
-                     TICKET_PRICE, Card, GachaDay, GachaState, OwnedCard, Pull)
+from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, PITY_NEW_AT, PITY_SR_AT, RARITIES, RARITY_WEIGHT,
+                     TASK_REWARD, TASK_SECONDS, TICKET_PRICE, Card, GachaDay, GachaState, OwnedCard, Pull)
 
 TW = timezone(timedelta(hours=8))
 HIGH = {"SSR", "UR", "LR"}
@@ -103,6 +103,8 @@ def status(user):
     state = GachaState.objects.filter(user=user).first()
     has_cards = bool(card_work_ids())
     base = {"day": day.isoformat(), "pity_left": PITY_AT - (state.since_ssr if state else 0),
+            "sr_left": max(1, PITY_SR_AT - (state.since_sr if state else 0)),
+            "new_left": max(1, PITY_NEW_AT - (state.since_new if state else 0)),
             "pool_works": len(card_work_ids()), "bonus": state.bonus_tickets if state else 0, "task": task_status(user, day),
             "stardust": state.stardust if state else 0, "notice": state.notice if state else "",
             "title": state.title if state else ""}
@@ -153,14 +155,21 @@ def claim_task(user):
     return state.bonus_tickets
 
 
-def pick_card(work, pity, rng):
-    """先抽稀有度再抽卡；這部作品（系列）沒有該稀有度就退到最接近的較低稀有度（沒有較低就往上）"""
+def pick_card(work, pity, rng, min_rarity=None, only=None):
+    """
+    先抽稀有度再抽卡；這部作品（系列）沒有該稀有度就退到最接近的較低稀有度（沒有較低就往上）
+    pity＝50 抽 SSR 保底；min_rarity＝至少這個稀有度（10 抽 SR 保底）；only＝只從這些卡片 id 裡抽（100 抽新卡保底）
+    """
     by_rarity = {}
     for c in cards_for(work):
-        by_rarity.setdefault(c.rarity, []).append(c)
+        if only is None or c.id in only:
+            by_rarity.setdefault(c.rarity, []).append(c)
     if not by_rarity:
         return None
-    rarity = roll_rarity(rng, pity=pity, allowed=set(by_rarity)) if pity and HIGH & set(by_rarity) else roll_rarity(rng)
+    if pity:
+        min_rarity = "SSR"
+    floor = [r for r in by_rarity if min_rarity and RARITIES.index(r) >= RARITIES.index(min_rarity)]
+    rarity = roll_rarity(rng, allowed=set(floor)) if floor else roll_rarity(rng)
     if rarity not in by_rarity:
         i = RARITIES.index(rarity)
         lower = [r for r in reversed(RARITIES[:i]) if r in by_rarity]
@@ -189,7 +198,10 @@ def pull(user, work_id=None, rng=random):
     free = unlimited(user)
     with transaction.atomic():
         state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
-        pity = state.since_ssr + 1 >= PITY_AT
+        pity = state.since_ssr + 1 >= PITY_AT                  # 50 抽 SSR 保底
+        sr_pity = not pity and state.since_sr + 1 >= PITY_SR_AT   # 10 抽 SR 保底
+        new_pity = state.since_new + 1 >= PITY_NEW_AT           # 100 抽新卡保底
+        owned_ids = set(OwnedCard.objects.filter(user=user).values_list("card_id", flat=True)) if new_pity else set()
         ticket = ""
         if work_id:
             try:
@@ -213,25 +225,44 @@ def pull(user, work_id=None, rng=random):
             if not free and Pull.objects.filter(user=user, day=day, pool=Pull.Pool.FREE).count() >= FREE_DAILY:
                 raise PullError("今天的隨機抽卡券用完了，明天再來！")
             candidates = sorted(card_work_ids())
-            if pity:
-                high = sorted(set(Card.objects.filter(active=True, rarity__in=HIGH).values_list("work_id", flat=True)))
+            if new_pity:   # 100 抽保底：只從還有沒收集到的卡的作品裡抽
+                left = sorted(set(Card.objects.filter(active=True).exclude(id__in=owned_ids).values_list("work_id", flat=True)))
+                candidates = left or candidates
+            if pity or sr_pity:
+                need = HIGH if pity else {"SR", "SSR", "UR", "LR"}
+                qs = Card.objects.filter(active=True, rarity__in=need, work_id__in=candidates)
+                if new_pity:
+                    qs = qs.exclude(id__in=owned_ids)
+                high = sorted(set(qs.values_list("work_id", flat=True)))
                 candidates = high or candidates
             if not candidates:
                 raise PullError("目前還沒有卡片可以抽，敬請期待！")
             work = Work.objects.get(pk=rng.choice(candidates))
             pool = Pull.Pool.FREE
-        card = pick_card(work, pity, rng)
+        card = None
+        pity_kind = ""
+        if new_pity:
+            unowned = set(cards_for(work).exclude(id__in=owned_ids).values_list("id", flat=True))
+            if unowned:   # 這部作品還有沒收集到的卡：必中新卡；全部收集了就不觸發，次數保留
+                card = pick_card(work, pity, rng, min_rarity="SR" if sr_pity else None, only=unowned)
+                pity_kind = "new"
+        if card is None:
+            card = pick_card(work, pity, rng, min_rarity="SR" if sr_pity else None)
+            pity_kind = "ssr" if pity else "sr" if sr_pity else ""
         if card is None:
             raise PullError("這部作品還沒有卡片")
         try:
             with transaction.atomic():
-                p = Pull.objects.create(user=user, work=work, card=card, rarity=card.rarity, pool=pool, ticket=ticket, day=day, pity=pity)
+                p = Pull.objects.create(user=user, work=work, card=card, rarity=card.rarity, pool=pool, ticket=ticket, day=day,
+                                        pity=pity, pity_kind=pity_kind)
         except IntegrityError:
             raise PullError("抽卡失敗，請再試一次")
         state.total += 1
         state.since_ssr = 0 if card.rarity in HIGH else state.since_ssr + 1
-        state.save()
+        state.since_sr = 0 if RARITIES.index(card.rarity) >= RARITIES.index("SR") else state.since_sr + 1
         owned, created = OwnedCard.objects.get_or_create(user=user, card=card, defaults={"work_id": card.work_id, "rarity": card.rarity})
+        state.since_new = 0 if created else state.since_new + 1   # 沒抽到新卡就累積（保底沒觸發時次數也保留）
+        state.save()
         if not created:
             owned.count += 1
             owned.save(update_fields=["count", "last_at"])

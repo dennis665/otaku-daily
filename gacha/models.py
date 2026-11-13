@@ -16,6 +16,8 @@ RARITY_LABEL = {"N": "N", "R": "R", "SR": "SR", "SSR": "SSR", "UR": "UR", "LR": 
 # 機率（萬分比，合計 10000）
 RARITY_WEIGHT = {"N": 5500, "R": 2700, "SR": 1200, "SSR": 500, "UR": 90, "LR": 10}
 PITY_AT = 50          # 連續 50 抽沒有 SSR 以上，下一抽必定 SSR 以上
+PITY_SR_AT = 10       # 連續 10 抽沒有 SR 以上，下一抽必定 SR 以上
+PITY_NEW_AT = 100     # 連續 100 抽沒有抽到新卡（沒拿過的卡），下一抽必定是新卡；抽的作品已經全部收集時不觸發，次數保留到下次
 FREE_DAILY = 5        # 每天「隨機抽卡券」（全作品大混池）張數，當天有效
 PICK_DAILY = 10       # 每天「自選抽卡券」（自己選作品抽）張數，當天有效
 TASK_SECONDS = 300    # 每日任務：當天 App 累積在線 5 分鐘
@@ -66,6 +68,7 @@ class Pull(models.Model):
     ticket = models.CharField("使用的券", max_length=10, blank=True)   # daily＝當天的自選券、bonus＝任務送的保留券
     day = models.DateField("台灣日期", db_index=True)
     pity = models.BooleanField("保底出貨", default=False)
+    pity_kind = models.CharField("保底種類", max_length=5, blank=True)   # sr＝10 抽 SR、ssr＝50 抽 SSR、new＝100 抽新卡
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -96,6 +99,8 @@ class GachaState(models.Model):
     """每個帳號的保底計數"""
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gacha_state")
     since_ssr = models.PositiveIntegerField("距離上次 SSR 以上的抽數", default=0)
+    since_sr = models.PositiveIntegerField("距離上次 SR 以上的抽數", default=0)
+    since_new = models.PositiveIntegerField("距離上次抽到新卡的抽數", default=0)
     total = models.PositiveIntegerField("總抽數", default=0)
     bonus_tickets = models.PositiveIntegerField("保留的自選抽卡券", default=0)   # 任務獎勵，不會過期
     stardust = models.PositiveIntegerField("星塵", default=0)

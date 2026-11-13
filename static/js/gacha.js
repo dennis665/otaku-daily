@@ -61,6 +61,7 @@
         <div class="gcard-badge">${esc(LABEL[c.rarity])}</div>
         ${c.count > 1 && opts.count !== false ? `<div class="gcard-count">×${c.count}</div>` : ''}
         ${c.new && opts.isNew ? '<div class="gcard-new">NEW</div>' : ''}
+        ${c.pity_kind === 'new' ? '<div class="gcard-pity">100抽保底</div>' : ''}
       </div>${back}</div>`;
   }
 
@@ -101,6 +102,10 @@
       $('g-info').textContent = '讀取失敗，請稍後再試';
     }
   }
+  // 三層保底進度：10 抽 SR、50 抽 SSR、100 抽新卡
+  function pityText(s) {
+    return `保底：再 <b>${s.sr_left}</b> 抽 SR・再 <b>${s.pity_left}</b> 抽 SSR・再 <b>${s.new_left}</b> 抽必中新卡`;
+  }
   function picksLeft() { return status ? status.pick_left + status.bonus : 0; }
   function fmtTime(sec) { return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
   // 在線時間：伺服器每 30 秒同步一次，中間畫面每秒自己往上跳（最多多算 35 秒，網路斷了就停住）
@@ -130,8 +135,8 @@
     const left = picksLeft() + s.random_left;
     $('g-count').textContent = s.unlimited ? '∞' : left;
     $('g-info').innerHTML = s.unlimited
-      ? `♾ 測試帳號：抽卡不限次數・再 <b>${s.pity_left}</b> 抽必出 SSR 以上`
-      : `再 <b>${s.pity_left}</b> 抽必出 SSR 以上・每天 00:00 補券・✨ 星塵 <b>${s.stardust}</b>`;
+      ? `♾ 測試帳號：抽卡不限次數<br>${pityText(s)}`
+      : `${pityText(s)}<br>每天 00:00 補券・✨ 星塵 <b>${s.stardust}</b>`;
     $('g-tickets').innerHTML = s.unlimited ? '' : `
       <div class="g-ticket">🎟 自選抽卡券<b>${s.pick_left}／${s.pick_daily}${s.bonus ? ` <em>＋保留 ${s.bonus}</em>` : ''}</b>自己選作品抽</div>
       <div class="g-ticket">🎲 隨機抽卡券<b>${s.random_left}／${s.free_daily}</b>全作品大混池</div>`;
@@ -159,7 +164,7 @@
     $('g-rates').innerHTML = `<table>${s.rates.map((r) => `<tr><td><b style="color:${COLOR[r.rarity]}">${esc(r.label)}</b></td><td>${r.percent}%</td></tr>`).join('')}</table>
       <p>・每天台灣時間 00:00 補券：自選抽卡券 ${s.pick_daily} 張（自己選作品抽）、隨機抽卡券 ${s.free_daily} 張（全作品大混池），當天沒用完不保留。<br>
       ・每日任務：當天 App 累積在線 5 分鐘，可領自選抽卡券 5 張；這是保留券，不會過期、可以累積。自選抽時先用當天的券，再用保留券。<br>
-      ・連續 ${s.pity_at} 抽沒有 SSR 以上，下一抽必定 SSR 以上。<br>・抽卡結果由伺服器決定並記錄，重新整理也不會改變。</p>`;
+      ・保底（自選與隨機抽合計計算）：連續 ${s.pity_sr_at} 抽沒有 SR 以上，第 ${s.pity_sr_at} 抽必定 SR 以上；連續 ${s.pity_at} 抽沒有 SSR 以上，第 ${s.pity_at} 抽必定 SSR 以上；連續 ${s.pity_new_at} 抽沒有抽到新卡（沒拿過的卡），第 ${s.pity_new_at} 抽必中新卡，卡上會標「${s.pity_new_at} 抽保底」。自選抽的作品如果已經全部收集，新卡保底不會觸發，次數保留到下一次抽還有新卡的作品。<br>・抽卡結果由伺服器決定並記錄，重新整理也不會改變。</p>`;
   }
   $('g-free').addEventListener('click', () => draw({ count: 1 }));
   $('g-all').addEventListener('click', () => draw({ count: Math.min(status ? status.random_left : 1, 5) }));
@@ -367,7 +372,7 @@
     if (skipping) return;
     const box = $('g-spot');
     $('g-spot-card').innerHTML = cardHTML(c, { count: false });
-    $('g-spot-tag').innerHTML = `✨ 新卡入手！<small>${esc(c.name || c.title)}・${esc(LABEL[c.rarity])}</small>`;
+    $('g-spot-tag').innerHTML = `${c.pity_kind === 'new' ? '🎯 100 抽保底・' : '✨ '}新卡入手！<small>${esc(c.name || c.title)}・${esc(LABEL[c.rarity])}</small>`;
     box.style.setProperty('--sc', COLOR[c.rarity]);
     box.hidden = false;
     box.classList.remove('go');

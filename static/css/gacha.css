@@ -323,4 +323,6 @@ body.offline-mode .g-views .chip[data-g="ach"], body.offline-mode .g-views .chip
 .g-spot-tag small { display: block; font-size: .85rem; font-weight: 700; margin-top: 4px; opacity: .9; }
 .g-spot-hint { margin: 0; color: rgba(255, 255, 255, .6); font-size: .8rem; animation: g-blink 1.6s ease-in-out infinite; }
 @keyframes g-spot-in { 0% { transform: scale(.4) rotate(-8deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.gcard-pity { position: absolute; left: 50%; top: 46%; z-index: 4; transform: translate(-50%, -50%) rotate(-12deg); white-space: nowrap; font-size: 8cqw; font-weight: 900;
+  color: #fff; background: linear-gradient(135deg, #ff3d6e, #ffb347); padding: 1.2cqw 4cqw; border-radius: 6px; box-shadow: 0 3px 10px rgba(0, 0, 0, .55); letter-spacing: .05em; }
 

@@ -5,7 +5,7 @@ from django.views.decorators.http import require_GET, require_POST
 from dramas.models import Work
 
 from . import cards, extras, service
-from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, QUIZ_DAILY, QUIZ_REWARD, RARITIES, RARITY_LABEL,
+from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, PITY_NEW_AT, PITY_SR_AT, QUIZ_DAILY, QUIZ_REWARD, RARITIES, RARITY_LABEL,
                      RARITY_WEIGHT, SHOWCASE_MAX, TICKET_PRICE, Card, OwnedCard)
 
 
@@ -45,6 +45,8 @@ def _status_json(user):
     s["card_price"] = CARD_PRICE
     s["ticket_price"] = TICKET_PRICE
     s["pity_at"] = PITY_AT
+    s["pity_sr_at"] = PITY_SR_AT
+    s["pity_new_at"] = PITY_NEW_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
     s["showcase"] = [_card(o.card, o.card.work.title, o) for o in extras.showcase_cards(user)]
     s["showcase_max"] = SHOWCASE_MAX
@@ -72,7 +74,7 @@ def status(request):
 
 def _pulled(user, pairs):
     owned = {o.card_id: o for o in OwnedCard.objects.filter(user=user, card_id__in=[p.card_id for p, _ in pairs])}
-    return [{**_card(p.card, p.card.work.title, owned.get(p.card_id), new), "pity": p.pity} for p, new in pairs]
+    return [{**_card(p.card, p.card.work.title, owned.get(p.card_id), new), "pity": p.pity, "pity_kind": p.pity_kind} for p, new in pairs]
 
 
 @login_required

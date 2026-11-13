@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from dramas.models import Follow, Work
 
 from . import cards, service
-from .models import CARD_PRICE, DUST_VALUE, FREE_DAILY, NEW_WORK_GIFT, PICK_DAILY, PITY_AT, TASK_REWARD, TICKET_PRICE, Card, GachaState, OwnedCard, Pull
+from .models import CARD_PRICE, DUST_VALUE, FREE_DAILY, NEW_WORK_GIFT, PICK_DAILY, PITY_AT, PITY_NEW_AT, PITY_SR_AT, TASK_REWARD, TICKET_PRICE, Card, GachaState, OwnedCard, Pull
 
 User = get_user_model()
 
@@ -120,6 +120,36 @@ class GachaTests(TestCase):
         self.assertIn(p.rarity, service.HIGH)
         self.assertEqual(GachaState.objects.get(user=self.user).since_ssr, 0)
         self.assertEqual(Pull.objects.count(), 1)
+
+    def test_sr_pity_every_10(self):
+        GachaState.objects.create(user=self.user, since_sr=PITY_SR_AT - 1)
+        p, _ = service.pull(self.user, self.w1.id, rng=random.Random(0))
+        self.assertIn(p.rarity, {"SR", "SSR", "UR", "LR"})
+        self.assertEqual(p.pity_kind, "sr")
+        self.assertEqual(GachaState.objects.get(user=self.user).since_sr, 0)
+
+    def test_new_card_pity_at_100(self):
+        cards_w1 = list(Card.objects.filter(work=self.w1))
+        for c in cards_w1[1:]:   # 只剩一張沒收集到
+            OwnedCard.objects.create(user=self.user, card=c, work=self.w1, rarity=c.rarity)
+        GachaState.objects.create(user=self.user, since_new=PITY_NEW_AT - 1)
+        p, new = service.pull(self.user, self.w1.id, rng=random.Random(0))
+        self.assertTrue(new)
+        self.assertEqual((p.card_id, p.pity_kind), (cards_w1[0].id, "new"))
+        self.assertEqual(GachaState.objects.get(user=self.user).since_new, 0)
+
+    def test_new_card_pity_kept_when_series_complete(self):
+        for c in Card.objects.filter(work=self.w1):   # 這部作品全部收集了
+            OwnedCard.objects.create(user=self.user, card=c, work=self.w1, rarity=c.rarity)
+        GachaState.objects.create(user=self.user, since_new=PITY_NEW_AT - 1)
+        p, new = service.pull(self.user, self.w1.id, rng=random.Random(0))
+        self.assertFalse(new)
+        self.assertNotEqual(p.pity_kind, "new")
+        self.assertEqual(GachaState.objects.get(user=self.user).since_new, PITY_NEW_AT)   # 次數保留
+        p, new = service.pull(self.user, self.w2.id, rng=random.Random(0))   # 換到還有新卡的作品就觸發
+        self.assertTrue(new)
+        self.assertEqual(p.pity_kind, "new")
+        self.assertEqual(GachaState.objects.get(user=self.user).since_new, 0)
 
     def test_apply_index_creates_and_deactivates(self):
         Work.objects.create(source_id=77, title="新作品")
