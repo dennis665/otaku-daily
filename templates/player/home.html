@@ -190,6 +190,10 @@
     <h3 class="g-h">🎟 自選作品抽卡（點卡包選張數）</h3>
     <div class="g-works" id="g-works"></div>
     <details class="g-rates"><summary>📊 出貨機率與規則</summary><div id="g-rates"></div></details>
+    <div class="g-local" id="g-anim-local" hidden>
+      <span id="g-anim-local-info"></span>
+      <button class="act" id="g-anim-clear" type="button">🗑 清除動畫快取</button>
+    </div>
   </div>
   <div id="g-album" hidden>
     <p class="g-info" id="g-sum"></p>
@@ -384,6 +388,7 @@
   <div class="g-cutin" id="g-cutin" hidden><div class="g-cutin-band"><div class="g-cutin-text"><b id="g-cutin-name"></b><small id="g-cutin-sub"></small></div></div></div>
   {# 抽到新卡：全畫面展示 #}
   <div class="g-spot" id="g-spot" hidden><p class="g-spot-tag" id="g-spot-tag"></p><div class="g-spot-card" id="g-spot-card"></div><p class="g-spot-hint">點一下繼續</p></div>
+  <video class="g-anim" id="g-anim" muted playsinline preload="auto" hidden></video>
   <button class="g-skip" id="g-skip" type="button">略過 ⏭</button>
   <p class="g-tip" id="g-tip">點一下快轉</p>
 </div>

@@ -41,6 +41,37 @@
     paintLocal();
   });
 
+  // ---------- 抽卡動畫存到手機：播放過後自動存進手機，之後直接從手機讀取不耗流量 ----------
+  const ANIM_CACHE = 'ukiyo-gacha-anims';
+  async function saveAnims(urls) {
+    if (!canCache) return;
+    const list = [...new Set(urls)].filter((u) => u && u.startsWith('/static/video/gacha/'));
+    if (!list.length) return;
+    try {
+      const cache = await caches.open(ANIM_CACHE);
+      for (const url of list) {
+        if (await cache.match(url, { ignoreVary: true })) continue;
+        const res = await fetch(url, { credentials: 'same-origin', loading: false }).catch(() => null);
+        if (res && res.ok) await cache.put(url, res);
+      }
+    } catch { /* 手機空間不足或無痕模式：照常從網路讀 */ }
+    paintAnimLocal();
+  }
+  async function paintAnimLocal() {
+    const box = $('g-anim-local');
+    if (!canCache || !box) return;
+    const saved = (await (await caches.open(ANIM_CACHE)).keys()).length;
+    box.hidden = !saved;
+    $('g-anim-local-info').textContent = `🎬 手機已存 ${saved} 部抽卡動畫（播放不耗流量）`;
+  }
+  if ($('g-anim-clear')) {
+    $('g-anim-clear').addEventListener('click', async () => {
+      if (!window.confirm('要清除手機裡存的抽卡動畫嗎？（之後抽卡會再從網路讀取）')) return;
+      await caches.delete(ANIM_CACHE);
+      paintAnimLocal();
+    });
+  }
+
   // ---------- 卡片 ----------
   function cardHTML(c, opts = {}) {
     if (!c) {
@@ -165,6 +196,7 @@
       <p>・每天台灣時間 00:00 補券：自選抽卡券 ${s.pick_daily} 張（自己選作品抽）、隨機抽卡券 ${s.free_daily} 張（全作品大混池），當天沒用完不保留。<br>
       ・每日任務：當天 App 累積在線 5 分鐘，可領自選抽卡券 5 張；這是保留券，不會過期、可以累積。自選抽時先用當天的券，再用保留券。<br>
       ・保底（自選與隨機抽合計計算，中途抽到不會提前歸零）：每 ${s.pity_sr_at} 抽必定 SR 以上；每 ${s.pity_at} 抽必定 SSR 以上；每 ${s.pity_new_at} 抽必中沒拿過的新卡，卡上會標「${s.pity_new_at} 抽保底」。自選抽的作品如果已經全部收集，新卡保底不會觸發，次數保留到下一次抽還有新卡的作品。<br>・抽卡結果由伺服器決定並記錄，重新整理也不會改變。</p>`;
+    paintAnimLocal();
   }
   $('g-free').addEventListener('click', () => draw({ count: 1 }));
   $('g-all').addEventListener('click', () => draw({ count: Math.min(status ? status.random_left : 1, 5) }));
@@ -322,6 +354,8 @@
     tip.textContent = '';
     $('g-cutin').hidden = true;
     $('g-spot').hidden = true;
+    const vid = $('g-anim');
+    if (vid) { vid.pause(); vid.hidden = true; vid.removeAttribute('src'); }
     $('g-skip').textContent = '略過 ⏭';
     setGlow('N');
     stage.hidden = false;
@@ -329,6 +363,8 @@
   }
   function closeStage() {
     stage.hidden = true;
+    const vid = $('g-anim');
+    if (vid) { vid.pause(); vid.hidden = true; vid.removeAttribute('src'); }
     stopFx();
     document.body.classList.remove('sheet-open');
     busy = false;
@@ -415,13 +451,67 @@
     skipping = false;
     saveImages(data.cards.flatMap((c) => [c.image, c.back_image]));   // 抽到的卡面與卡背直接存到手機
     albumStale = true;
-    await perform(data.cards);
+    // 自選抽卡播放該作品動畫；隨機抽卡從該次抽到的作品裡隨機挑一部播放
+    const anims = [...new Set(data.cards.map((c) => c.anim).filter(Boolean))];
+    const animUrl = opts.work_id
+      ? ((picked && picked.anim) || anims[0] || '')
+      : (anims.length ? anims[Math.floor(Math.random() * anims.length)] : '');
+    await perform(data.cards, { animUrl });
+  }
+
+  async function playAnim(url) {
+    if (skipping || !url) return;
+    const vid = $('g-anim');
+    if (!vid) return;
+    let playSrc = url;
+    let blobUrl = '';
+    if (canCache) {
+      try {
+        const cache = await caches.open(ANIM_CACHE);
+        const cached = await cache.match(url, { ignoreVary: true });
+        if (cached) {
+          blobUrl = URL.createObjectURL(await cached.blob());
+          playSrc = blobUrl;
+        } else {
+          saveAnims([url]);   // 第一次播放時背景順便存進手機，下次直接免流量播放
+        }
+      } catch { /* 忽略快取讀取錯誤，改用網路網址 */ }
+    }
+    if (skipping) {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      return;
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        vid.onended = null;
+        vid.onerror = null;
+        vid.pause();
+        vid.hidden = true;
+        vid.removeAttribute('src');
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+        resolve();
+      };
+      const timer = setTimeout(done, 7000);
+      skip = done;
+      vid.onended = done;
+      vid.onerror = done;
+      vid.src = playSrc;
+      vid.currentTime = 0;
+      vid.hidden = false;
+      const p = vid.play();
+      if (p && typeof p.catch === 'function') p.catch(done);
+    });
   }
 
   async function perform(cards, opts = {}) {
     const best = cards.reduce((m, c) => (rank(c.rarity) > rank(m) ? c.rarity : m), 'N');
     const lv = rank(best);
     tip.textContent = '點一下快轉・右上角可整段略過';
+    if (!opts.exchange && opts.animUrl) await playAnim(opts.animUrl);
     // 蓄力：光芒逐級升級（藍 → 金 → 粉 → 彩虹 → 黑金），越稀有越久；星塵兌換不用蓄力
     const steps = opts.exchange ? [] : ['R', 'SR', 'SSR', 'UR', 'LR'].filter((r) => rank(r) <= lv && rank(r) >= 2);
     if (opts.exchange) setGlow(best);

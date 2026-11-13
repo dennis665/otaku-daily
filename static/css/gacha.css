@@ -140,6 +140,8 @@
 .g-stamp.go { animation: g-stamp .55s cubic-bezier(.2, 1.4, .4, 1) forwards; }
 .g-stamp small { display: block; font-size: .9rem; text-align: center; letter-spacing: .3em; }
 .g-tip { position: absolute; z-index: 9; padding: 0 16px; bottom: calc(env(safe-area-inset-bottom) + 22px); left: 0; right: 0; text-align: center; color: rgba(255, 255, 255, .7); font-size: .85rem; animation: g-blink 1.6s ease-in-out infinite; }
+.g-anim { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #12131a; z-index: 6; pointer-events: none; }
+.g-anim[hidden] { display: none; }
 
 /* ---------- 卡冊 ---------- */
 .g-filter-wrap { margin-bottom: 10px; }

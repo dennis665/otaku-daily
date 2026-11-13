@@ -11,10 +11,12 @@ const WAKE_VIDEO_CACHE = `ukiyo-wake-video-${WAKE_VIDEO.split('/').pop()}`;
 const PAGE_CACHE = 'ukiyo-offline-page';
 const SONG_CACHE = 'ukiyo-offline-songs';
 const HOME_URL = '/';
-// 抽到的卡面圖片（頁面存進來，這裡只負責優先從手機提供；抽卡分頁可一鍵清除）
+// 抽到的卡面圖片與抽卡動畫（頁面存進來，這裡只負責優先從手機提供；抽卡分頁可一鍵清除）
 const CARD_CACHE = 'ukiyo-cards';
-const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE, PAGE_CACHE, SONG_CACHE, CARD_CACHE];
+const GACHA_ANIM_CACHE = 'ukiyo-gacha-anims';
+const KEEP = [CACHE, WAKE_PAGE_CACHE, WAKE_VIDEO_CACHE, PAGE_CACHE, SONG_CACHE, CARD_CACHE, GACHA_ANIM_CACHE];
 const isCardImage = (url) => url.origin === self.location.origin && url.pathname.startsWith('/gacha/img/');
+const isGachaAnim = (url) => url.origin === self.location.origin && url.pathname.startsWith('/static/video/gacha/');
 async function serveCard(req) {
   const cached = await caches.match(req.url, { cacheName: CARD_CACHE, ignoreVary: true });
   return cached || fetch(req);
@@ -153,6 +155,18 @@ self.addEventListener('message', (e) => {
   if (e.data && e.data.type === 'songs-changed') { songKeys = null; songMem = { url: '', buf: null, type: '' }; }
 });
 
+let animMem = { url: '', buf: null };
+async function serveGachaAnim(req) {
+  const key = req.url.split('#')[0];
+  if (animMem.url !== key) {
+    const cache = await caches.open(GACHA_ANIM_CACHE);
+    const cached = await cache.match(key, { ignoreVary: true });
+    if (!cached) return fetch(req);
+    animMem = { url: key, buf: await cached.arrayBuffer() };
+  }
+  return rangeResponse(animMem.buf, 'video/mp4', req);
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
@@ -173,6 +187,12 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname === WAKE_VIDEO) {
     event.respondWith(serveVideo(req));
+    return;
+  }
+
+  // 抽卡動畫：手機裡有存就直接從手機分段提供，不耗流量
+  if (isGachaAnim(url)) {
+    event.respondWith(serveGachaAnim(req).catch(() => fetch(req)));
     return;
   }
 
