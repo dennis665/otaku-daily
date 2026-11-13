@@ -199,7 +199,8 @@ def pull(user, work_id=None, rng=random):
     with transaction.atomic():
         state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
         pity = state.since_ssr + 1 >= PITY_AT                  # 50 抽 SSR 保底
-        sr_pity = not pity and state.since_sr + 1 >= PITY_SR_AT   # 10 抽 SR 保底
+        sr_due = state.since_sr + 1 >= PITY_SR_AT               # 10 抽 SR 保底（即使同抽觸發 50 抽 SSR 保底也要歸零）
+        sr_pity = not pity and sr_due
         new_pity = state.since_new + 1 >= PITY_NEW_AT           # 100 抽新卡保底
         owned_ids = set(OwnedCard.objects.filter(user=user).values_list("card_id", flat=True)) if new_pity else set()
         ticket = ""
@@ -258,10 +259,10 @@ def pull(user, work_id=None, rng=random):
         except IntegrityError:
             raise PullError("抽卡失敗，請再試一次")
         state.total += 1
-        state.since_ssr = 0 if card.rarity in HIGH else state.since_ssr + 1
-        state.since_sr = 0 if RARITIES.index(card.rarity) >= RARITIES.index("SR") else state.since_sr + 1
+        state.since_ssr = 0 if pity else state.since_ssr + 1
+        state.since_sr = 0 if sr_due else state.since_sr + 1
         owned, created = OwnedCard.objects.get_or_create(user=user, card=card, defaults={"work_id": card.work_id, "rarity": card.rarity})
-        state.since_new = 0 if created else state.since_new + 1   # 沒抽到新卡就累積（保底沒觸發時次數也保留）
+        state.since_new = 0 if pity_kind == "new" else state.since_new + 1   # 中途抽到不提前歸零；100 抽保底觸發才歸零，未觸發則保留次數
         state.save()
         if not created:
             owned.count += 1

@@ -164,7 +164,7 @@
     $('g-rates').innerHTML = `<table>${s.rates.map((r) => `<tr><td><b style="color:${COLOR[r.rarity]}">${esc(r.label)}</b></td><td>${r.percent}%</td></tr>`).join('')}</table>
       <p>・每天台灣時間 00:00 補券：自選抽卡券 ${s.pick_daily} 張（自己選作品抽）、隨機抽卡券 ${s.free_daily} 張（全作品大混池），當天沒用完不保留。<br>
       ・每日任務：當天 App 累積在線 5 分鐘，可領自選抽卡券 5 張；這是保留券，不會過期、可以累積。自選抽時先用當天的券，再用保留券。<br>
-      ・保底（自選與隨機抽合計計算）：連續 ${s.pity_sr_at} 抽沒有 SR 以上，第 ${s.pity_sr_at} 抽必定 SR 以上；連續 ${s.pity_at} 抽沒有 SSR 以上，第 ${s.pity_at} 抽必定 SSR 以上；連續 ${s.pity_new_at} 抽沒有抽到新卡（沒拿過的卡），第 ${s.pity_new_at} 抽必中新卡，卡上會標「${s.pity_new_at} 抽保底」。自選抽的作品如果已經全部收集，新卡保底不會觸發，次數保留到下一次抽還有新卡的作品。<br>・抽卡結果由伺服器決定並記錄，重新整理也不會改變。</p>`;
+      ・保底（自選與隨機抽合計計算，中途抽到不會提前歸零）：每 ${s.pity_sr_at} 抽必定 SR 以上；每 ${s.pity_at} 抽必定 SSR 以上；每 ${s.pity_new_at} 抽必中沒拿過的新卡，卡上會標「${s.pity_new_at} 抽保底」。自選抽的作品如果已經全部收集，新卡保底不會觸發，次數保留到下一次抽還有新卡的作品。<br>・抽卡結果由伺服器決定並記錄，重新整理也不會改變。</p>`;
   }
   $('g-free').addEventListener('click', () => draw({ count: 1 }));
   $('g-all').addEventListener('click', () => draw({ count: Math.min(status ? status.random_left : 1, 5) }));

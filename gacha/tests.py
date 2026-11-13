@@ -151,6 +151,24 @@ class GachaTests(TestCase):
         self.assertEqual(p.pity_kind, "new")
         self.assertEqual(GachaState.objects.get(user=self.user).since_new, 0)
 
+    def test_early_hits_do_not_reset_pity_and_50th_resets_both_ssr_and_sr(self):
+        state = GachaState.objects.create(user=self.user, since_sr=2, since_ssr=10, since_new=20)
+        # 用固定機率先抽到一張之前沒拿過的 SSR（mock roll_rarity 直接回傳 SSR）
+        from unittest import mock
+        with mock.patch("gacha.service.roll_rarity", return_value="SSR"):
+            p, new = service.pull(self.user, self.w1.id, rng=random.Random(0))
+        self.assertEqual(p.rarity, "SSR")
+        self.assertTrue(new)
+        state.refresh_from_db()
+        # 中途抽到 SR / SSR / 新卡都不提前歸零
+        self.assertEqual((state.since_sr, state.since_ssr, state.since_new), (3, 11, 21))
+        # 第 50 抽同時到 10 抽 SR 與 50 抽 SSR 保底時，兩者都要歸零
+        GachaState.objects.filter(pk=state.pk).update(since_sr=PITY_SR_AT - 1, since_ssr=PITY_AT - 1)
+        p50, _ = service.pull(self.user, self.w1.id, rng=random.Random(0))
+        self.assertIn(p50.rarity, service.HIGH)
+        state.refresh_from_db()
+        self.assertEqual((state.since_sr, state.since_ssr, state.since_new), (0, 0, 22))
+
     def test_apply_index_creates_and_deactivates(self):
         Work.objects.create(source_id=77, title="新作品")
         Card.objects.all().delete()
