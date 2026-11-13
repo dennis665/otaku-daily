@@ -462,7 +462,7 @@ class ExtrasTests(TestCase):
                 self.assertEqual(cards.run_campaigns(), [c["key"] for c in cards.CAMPAIGNS])
                 cards._state["campaigns_done"] = False
                 self.assertEqual(cards.run_campaigns(), [])          # 同一個活動不會再發
-            send.assert_called_once()
+            self.assertEqual(send.call_count, len(cards.CAMPAIGNS))
             total = sum(c["tickets"] for c in cards.CAMPAIGNS)
             for u in (self.user, other):
                 st = GachaState.objects.get(user=u)

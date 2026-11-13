@@ -177,8 +177,8 @@
     if (!$('g-shop').hidden) paintShop();
     $('g-free').disabled = !s.random_left;
     $('g-all').disabled = s.random_left < 2;
-    const n = Math.min(s.random_left, 5);
-    $('g-all').innerHTML = `🎲 隨機連抽${n > 1 ? ` ×${n}` : ''}<small>${s.unlimited ? '一次 5 張' : '把隨機券一次用完'}</small>`;
+    const n = Math.min(s.random_left, 10);
+    $('g-all').innerHTML = `🎲 隨機連抽${n > 1 ? ` ×${n}` : ''}<small>${s.unlimited ? '一次 10 張' : '把隨機券一次用完'}</small>`;
     const box = $('g-works');
     box.innerHTML = '';
     if (!s.pool_works) {
@@ -199,7 +199,7 @@
     paintAnimLocal();
   }
   $('g-free').addEventListener('click', () => draw({ count: 1 }));
-  $('g-all').addEventListener('click', () => draw({ count: Math.min(status ? status.random_left : 1, 5) }));
+  $('g-all').addEventListener('click', () => draw({ count: Math.min(status ? status.random_left : 1, 10) }));
 
   // 選作品後選張數
   let pickWork = null;

@@ -224,8 +224,11 @@ def apply_index(index):
 # 一次性活動：伺服器第一次遇到就發給「當下所有帳號」並推播，同一個 key 只發一次（記在 GiftedWork，key 前面加 campaign:）
 CAMPAIGNS = [
     {"key": "2026-11-12-update", "tickets": 10,
-     "title": "🎉 宅日常抽卡大更新",
+     "title": "🎉 Ukiyo 抽卡大更新",
      "body": "新增 🏆 組合羈絆、🏅 收集稱號、⭐ 展示櫃、🎯 問答！送你 🎫 自選抽卡券 10 張"},
+    {"key": "2026-11-13-anim-pity", "tickets": 10,
+     "title": "🎉 Ukiyo 抽卡動畫與保底大進化",
+     "body": "新增主角抽卡動畫、10/50/100 抽三層保底與每日 10 張隨機抽！送你 🎫 自選抽卡券 10 張"},
 ]
 
 
