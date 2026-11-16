@@ -83,8 +83,18 @@ def _ensure_card_backs():
                 str(sid): path for sid, path in (idx.get("card_backs") or {}).items()
                 if SAFE_FILE.match(path)
             }
+            _set_backs_version(idx)
         except Exception:
             pass
+
+
+def _set_backs_version(index):
+    """卡背版本（index.json 的 card_backs_v）：換新卡背時加 1，網址帶上版本讓手機重新讀取，伺服器也清掉記憶體裡的舊卡背"""
+    v = int(index.get("card_backs_v") or 1)
+    if _state.get("card_backs_v") not in (None, v):
+        for key in [k for k in _images if k.startswith("card_backs/")]:
+            _images.pop(key, None)
+    _state["card_backs_v"] = v
 
 
 def card_back_url(work):
@@ -94,15 +104,16 @@ def card_back_url(work):
     _ensure_card_backs()
     backs = _state.get("card_backs") or {}
     sid = str(getattr(work, "source_id", work))
+    v = _state.get("card_backs_v", 1)
     if sid in backs:
-        return f"/gacha/img/{backs[sid]}"
+        return f"/gacha/img/{backs[sid]}?v={v}"
     franchise_id = getattr(work, "franchise_id", None)
     if franchise_id:
         from dramas.models import Work
         sids = Work.objects.filter(franchise_id=franchise_id).values_list("source_id", flat=True)
         for s in sids:
             if str(s) in backs:
-                return f"/gacha/img/{backs[str(s)]}"
+                return f"/gacha/img/{backs[str(s)]}?v={v}"
     return ""
 
 
@@ -216,6 +227,7 @@ def apply_index(index):
         str(sid): path for sid, path in (index.get("card_backs") or {}).items()
         if SAFE_FILE.match(path)
     }
+    _set_backs_version(index)
     _state["combos"] = {str(k): v for k, v in (index.get("combos") or {}).items() if isinstance(v, list)}
     _state["titles"] = {str(k): v for k, v in (index.get("titles") or {}).items() if isinstance(v, dict)}
     return created, len(gone)
