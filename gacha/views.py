@@ -37,11 +37,26 @@ def _anim_url(work):
     return ""
 
 
+def _anim_ssr_url(work):
+    """抽到 SSR 以上時播放的華麗動畫（static/video/gacha/ssr/<source_id>.mp4，沒有則回空字串）"""
+    if not work:
+        return ""
+    cands = [work]
+    if work.franchise_id:
+        c = service.canonical_work(work)
+        if c and c.id != work.id:
+            cands.append(c)
+    for w in cands:
+        if w.source_id and (_ANIM_DIR / "ssr" / f"{w.source_id}.mp4").is_file():
+            return static(f"video/gacha/ssr/{w.source_id}.mp4")
+    return ""
+
+
 def _card(card, work_title, owned=None, new=False):
     title = card.work.franchise.name if (card.work and card.work.franchise) else work_title
     return {"card_id": card.id, "work_id": card.work_id, "title": title, "name": card.name, "no": card.no,
             "rarity": card.rarity, "rarity_label": RARITY_LABEL[card.rarity], "image": cards.image_url(card),
-            "back_image": cards.card_back_url(card.work), "anim": _anim_url(card.work),
+            "back_image": cards.card_back_url(card.work), "anim": _anim_url(card.work), "anim_ssr": _anim_ssr_url(card.work),
             "owned": owned is not None, "count": owned.count if owned else 0, "new": new,
             "first_at": owned.first_at.astimezone(service.TW).strftime("%Y/%m/%d") if owned else ""}
 
@@ -59,7 +74,7 @@ def _status_json(user):
     s = service.status(user)
     # 可以自選的卡包（每個系列一個，追的作品排前面）
     s["works"] = [{"id": w.id, "title": w.franchise.name if w.franchise else w.title, "image": _cover(w),
-                   "card_back": cards.card_back_url(w), "anim": _anim_url(w), "followed": followed}
+                   "card_back": cards.card_back_url(w), "anim": _anim_url(w), "anim_ssr": _anim_ssr_url(w), "followed": followed}
                   for w, followed in service.pick_works(user)]
     s["free_daily"] = FREE_DAILY
     s["pick_daily"] = PICK_DAILY

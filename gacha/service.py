@@ -16,7 +16,7 @@ from django.utils import timezone as dj_tz
 from dramas.models import Follow, Work
 
 from . import cards
-from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, PICK_DAILY, PITY_AT, PITY_NEW_AT, PITY_SR_AT, RARITIES, RARITY_WEIGHT,
+from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, HIDDEN_SIDS, PICK_DAILY, PITY_AT, PITY_NEW_AT, PITY_SR_AT, RARITIES, RARITY_WEIGHT,
                      TASK_REWARD, TASK_SECONDS, TICKET_PRICE, Card, GachaDay, GachaState, OwnedCard, Pull)
 
 TW = timezone(timedelta(hours=8))
@@ -45,8 +45,8 @@ def roll_rarity(rng=random, pity=False, allowed=None):
 
 
 def card_work_ids():
-    """卡片直接掛的作品（全作品隨機池從這裡抽）"""
-    return set(Card.objects.filter(active=True).values_list("work_id", flat=True))
+    """卡片直接掛的作品（全作品隨機池從這裡抽）；暫不上架的作品（HIDDEN_SIDS）不算"""
+    return set(Card.objects.filter(active=True).exclude(work__source_id__in=HIDDEN_SIDS).values_list("work_id", flat=True))
 
 
 def drawable_work_ids(work_ids=None):
@@ -227,7 +227,8 @@ def pull(user, work_id=None, rng=random):
                 raise PullError("今天的隨機抽卡券用完了，明天再來！")
             candidates = sorted(card_work_ids())
             if new_pity:   # 100 抽保底：只從還有沒收集到的卡的作品裡抽
-                left = sorted(set(Card.objects.filter(active=True).exclude(id__in=owned_ids).values_list("work_id", flat=True)))
+                left = sorted(set(Card.objects.filter(active=True, work_id__in=candidates).exclude(id__in=owned_ids)
+                                  .values_list("work_id", flat=True)))
                 candidates = left or candidates
             if pity or sr_pity:
                 need = HIGH if pity else {"SR", "SSR", "UR", "LR"}

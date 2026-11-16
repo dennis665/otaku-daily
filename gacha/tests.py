@@ -470,3 +470,20 @@ class ExtrasTests(TestCase):
                 self.assertIn("自選抽卡券", st.notice)
         finally:
             cards._state["campaigns_done"] = True
+
+
+class HiddenWorksTests(TestCase):
+    def test_hidden_work_not_drawable(self):
+        from .models import HIDDEN_SIDS
+        user = User.objects.create_user("hide", password="pw-123456")
+        sid = sorted(HIDDEN_SIDS)[0]
+        hidden = make_work(sid, "暫不上架")
+        shown = make_work(990, "上架中")
+        self.assertNotIn(hidden.id, service.card_work_ids())
+        self.assertIn(shown.id, service.card_work_ids())
+        self.assertNotIn(hidden.id, [w.id for w, _ in service.pick_works(user)])
+        with self.assertRaises(service.PullError):
+            service.pull(user, hidden.id)
+        for _ in range(5):   # 隨機池只會抽到上架中的作品
+            p, _ = service.pull(user)
+            self.assertEqual(p.work_id, shown.id)

@@ -142,6 +142,8 @@
 .g-tip { position: absolute; z-index: 9; padding: 0 16px; bottom: calc(env(safe-area-inset-bottom) + 22px); left: 0; right: 0; text-align: center; color: rgba(255, 255, 255, .7); font-size: .85rem; animation: g-blink 1.6s ease-in-out infinite; }
 .g-anim { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #12131a; z-index: 6; pointer-events: none; }
 .g-anim[hidden] { display: none; }
+/* 有抽卡動畫時，等伺服器結果的那一下不顯示卡包，畫面保持黑底直接接動畫 */
+.g-stage.is-anim-wait .g-stage-pack, .g-stage.is-anim-wait .g-rays { visibility: hidden; }
 
 /* ---------- 卡冊 ---------- */
 .g-filter-wrap { margin-bottom: 10px; }

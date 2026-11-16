@@ -426,7 +426,11 @@
     skipping = false;
     const picked = opts.work_id && status ? status.works.find((w) => w.id === opts.work_id) : null;
     setStagePack(picked ? picked.card_back : '');
+    // 有抽卡動畫：一抽下去不先停在卡包畫面，結果回來就直接播動畫
+    const expectAnim = picked ? Boolean(picked.anim || picked.anim_ssr) : Boolean(status && status.works.some((w) => w.anim || w.anim_ssr));
     openStage();
+    stage.classList.toggle('is-anim-wait', expectAnim);
+    if (picked) preloadAnims([picked.anim, picked.anim_ssr]);
     buzz(30);
     // 一邊蓄力一邊等伺服器結果
     let data;
@@ -435,7 +439,7 @@
       const body = new URLSearchParams({ count: opts.count || 1, ...(opts.work_id ? { work_id: opts.work_id } : {}) });
       const [res] = await Promise.all([
         fetch(url, { method: 'POST', credentials: 'same-origin', loading: false, headers: { 'X-CSRFToken': csrf() }, body }),
-        new Promise((r) => setTimeout(r, 900)),
+        new Promise((r) => setTimeout(r, expectAnim ? 0 : 900)),
       ]);
       data = await res.json().catch(() => ({ ok: false, error: '連線失敗，請稍後再試' }));
     } catch {
@@ -451,12 +455,19 @@
     skipping = false;
     saveImages(data.cards.flatMap((c) => [c.image, c.back_image]));   // 抽到的卡面與卡背直接存到手機
     albumStale = true;
-    // 自選抽卡播放該作品動畫；隨機抽卡從該次抽到的作品裡隨機挑一部播放
-    const anims = [...new Set(data.cards.map((c) => c.anim).filter(Boolean))];
-    const animUrl = opts.work_id
-      ? ((picked && picked.anim) || anims[0] || '')
-      : (anims.length ? anims[Math.floor(Math.random() * anims.length)] : '');
+    // 抽到 SSR 以上（含）播華麗動畫，其餘播一般動畫；自選抽卡用該作品的，隨機抽卡用抽到最高稀有度那張卡的作品
+    const high = data.cards.some((c) => rank(c.rarity) >= rank('SSR'));
+    const top = [...data.cards].sort((a, b) => rank(b.rarity) - rank(a.rarity))[0] || {};
+    const src = opts.work_id && picked ? picked : top;
+    const animUrl = (high && src.anim_ssr) || src.anim || '';
+    if (!animUrl) stage.classList.remove('is-anim-wait');   // 沒有動畫：照原本的卡包蓄力演出
     await perform(data.cards, { animUrl });
+  }
+
+  // 先在背景把這部作品的動畫存進手機，按下去時可以立刻播放
+  function preloadAnims(urls) {
+    const list = urls.filter(Boolean);
+    if (list.length) saveAnims(list);
   }
 
   async function playAnim(url) {
@@ -493,9 +504,10 @@
         vid.hidden = true;
         vid.removeAttribute('src');
         if (blobUrl) URL.revokeObjectURL(blobUrl);
+        stage.classList.remove('is-anim-wait');
         resolve();
       };
-      const timer = setTimeout(done, 7000);
+      const timer = setTimeout(done, 15000);
       skip = done;
       vid.onended = done;
       vid.onerror = done;
