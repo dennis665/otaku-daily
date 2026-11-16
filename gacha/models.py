@@ -17,6 +17,8 @@ RARITY_LABEL = {"N": "N", "R": "R", "SR": "SR", "SSR": "SSR", "UR": "UR", "LR": 
 RARITY_WEIGHT = {"N": 5500, "R": 2700, "SR": 1200, "SSR": 500, "UR": 90, "LR": 10}
 # 暫不上架的作品（youranimes 作品編號）：還沒有抽卡動畫，先不出現在自選卡包與隨機池；已經抽到的卡冊照樣保留
 HIDDEN_SIDS = {249, 3028, 3742}   # 鬼滅之刃、SPY×FAMILY、【我推的孩子】
+# 限定抽卡：新抽卡動畫上市，這些作品每個帳號各送一次「必中 SSR 以上」的抽卡（不用券、不計入保底次數）
+SPECIAL_SIDS = {588, 3788, 2694, 4120}   # 催眠麥克風、我獨自升級、藍色監獄、藥師少女的獨語
 PITY_AT = 50          # 每 50 抽必定 SSR 以上（中途抽到不提前歸零）
 PITY_SR_AT = 10       # 每 10 抽必定 SR 以上（中途抽到不提前歸零）
 PITY_NEW_AT = 100     # 每 100 抽必中沒拿過的新卡（中途抽到不提前歸零）；抽的作品已經全部收集時不觸發，次數保留到下次
@@ -110,6 +112,7 @@ class GachaState(models.Model):
     titles = models.JSONField("已解鎖的稱號", default=list, blank=True)         # 解鎖後永久保留
     title = models.CharField("顯示中的稱號", max_length=60, blank=True)
     showcase = models.JSONField("展示櫃（卡片 id，最多 3 張）", default=list, blank=True)
+    special_used = models.JSONField("已用過的限定抽卡（作品編號）", default=list, blank=True)
 
     class Meta:
         verbose_name = verbose_name_plural = "抽卡狀態"

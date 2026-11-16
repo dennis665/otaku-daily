@@ -487,3 +487,35 @@ class HiddenWorksTests(TestCase):
         for _ in range(5):   # 隨機池只會抽到上架中的作品
             p, _ = service.pull(user)
             self.assertEqual(p.work_id, shown.id)
+
+
+class SpecialPullTests(TestCase):
+    """限定抽卡：每部作品一次、必中 SSR 以上、不用券、不計入保底次數"""
+    def test_special_pull_once_and_high(self):
+        from .models import SPECIAL_SIDS
+        user = User.objects.create_user("spec", password="pw-123456")
+        sid = sorted(SPECIAL_SIDS)[0]
+        w = make_work(sid, "限定作品", rarities=("N", "R", "SR", "SSR", "UR"))
+        self.assertEqual([x.id for x in service.special_works(user)], [w.id])
+        GachaState.objects.create(user=user, since_sr=3, since_ssr=7, since_new=11)
+        p, _ = service.special_pull(user, w.id, rng=random.Random(0))
+        self.assertIn(p.rarity, service.HIGH)
+        self.assertEqual(p.ticket, "special")
+        st = GachaState.objects.get(user=user)
+        self.assertEqual((st.since_sr, st.since_ssr, st.since_new), (3, 7, 11))   # 保底次數不變
+        self.assertEqual(Pull.objects.filter(user=user).count(), 1)
+        self.assertEqual(service.special_works(user), [])
+        with self.assertRaises(service.PullError):
+            service.special_pull(user, w.id)               # 只能一次
+        other = make_work(991, "一般作品")
+        with self.assertRaises(service.PullError):
+            service.special_pull(user, other.id)           # 不在限定名單
+
+    def test_special_always_high_rarity(self):
+        from .models import SPECIAL_SIDS
+        sid = sorted(SPECIAL_SIDS)[1]
+        w = make_work(sid, "限定作品2", rarities=("N", "R", "SR", "SSR"))
+        for i in range(20):
+            u = User.objects.create_user(f"s{i}", password="pw-123456")
+            p, _ = service.special_pull(u, w.id, rng=random.Random(i))
+            self.assertIn(p.rarity, service.HIGH)

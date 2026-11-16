@@ -330,3 +330,16 @@ body.offline-mode .g-views .chip[data-g="ach"], body.offline-mode .g-views .chip
 .gcard-pity { position: absolute; left: 50%; top: 46%; z-index: 4; transform: translate(-50%, -50%) rotate(-12deg); white-space: nowrap; font-size: 8cqw; font-weight: 900;
   color: #fff; background: linear-gradient(135deg, #ff3d6e, #ffb347); padding: 1.2cqw 4cqw; border-radius: 6px; box-shadow: 0 3px 10px rgba(0, 0, 0, .55); letter-spacing: .05em; }
 
+/* ---------- ✨ 限定抽卡 ---------- */
+.g-special { border-radius: 14px; padding: 10px 12px 12px; margin-bottom: 10px; border: 1px solid #ffd166;
+  background: linear-gradient(135deg, rgba(255, 111, 174, .22), rgba(255, 209, 102, .2), rgba(155, 123, 255, .2)); box-shadow: 0 0 18px rgba(255, 209, 102, .25); }
+.g-special[hidden] { display: none; }
+.g-special-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; margin-bottom: 8px; font-size: .88rem; }
+.g-special-top span { color: var(--muted); font-size: .74rem; }
+.g-special-works { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.g-special-work { position: relative; border: 0; padding: 0; background: none; color: var(--text); cursor: pointer; text-align: center; font-size: .7rem; }
+.g-special-work img { width: 100%; aspect-ratio: 5 / 7; object-fit: cover; border-radius: 8px; display: block; box-shadow: 0 0 0 2px #ffd166, 0 4px 12px rgba(0, 0, 0, .4); }
+.g-special-work span { display: block; margin-top: 4px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-special-work em { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-style: normal; font-weight: 900; font-size: .62rem;
+  color: #fff; background: linear-gradient(135deg, #ff3d6e, #ffb347); border-radius: 99px; padding: 2px 6px; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
+

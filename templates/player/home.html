@@ -166,6 +166,11 @@
     <button class="chip" data-g="quiz" type="button">🎯 問答</button>
   </div>
   <div id="g-draw">
+    {# 限定抽卡：新抽卡動畫上市，每部作品一次必中 SSR 以上 #}
+    <div class="g-special" id="g-special" hidden>
+      <div class="g-special-top"><b>✨ 新抽卡動畫上市・限定抽卡</b><span>每部一次・必中 SSR 以上・不用券</span></div>
+      <div class="g-special-works" id="g-special-works"></div>
+    </div>
     {# 展示櫃：自己選最多 3 張收集到的卡＋目前的稱號 #}
     <div class="g-show" id="g-show">
       <div class="g-show-top"><b>⭐ 我的展示櫃</b><span class="g-title-badge" id="g-title-badge" hidden></span></div>

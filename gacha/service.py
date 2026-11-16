@@ -16,7 +16,7 @@ from django.utils import timezone as dj_tz
 from dramas.models import Follow, Work
 
 from . import cards
-from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, HIDDEN_SIDS, PICK_DAILY, PITY_AT, PITY_NEW_AT, PITY_SR_AT, RARITIES, RARITY_WEIGHT,
+from .models import (CARD_PRICE, DUST_VALUE, FREE_DAILY, HIDDEN_SIDS, PICK_DAILY, SPECIAL_SIDS, PITY_AT, PITY_NEW_AT, PITY_SR_AT, RARITIES, RARITY_WEIGHT,
                      TASK_REWARD, TASK_SECONDS, TICKET_PRICE, Card, GachaDay, GachaState, OwnedCard, Pull)
 
 TW = timezone(timedelta(hours=8))
@@ -189,6 +189,48 @@ def pull_many(user, work_id=None, count=1, rng=random):
                 raise
             break
     return out
+
+
+def special_works(user, state=None):
+    """還可以用的限定抽卡作品（每部作品的代表作品，依作品編號）"""
+    state = state if state is not None else GachaState.objects.filter(user=user).first()
+    used = {int(x) for x in (state.special_used if state else [])}
+    out = []
+    for w in Work.objects.filter(source_id__in=SPECIAL_SIDS - used).select_related("franchise"):
+        c = canonical_work(w)
+        if c.id in drawable_work_ids([c.id]) and HIGH & set(cards_for(c).values_list("rarity", flat=True)):
+            out.append(w)
+    return out
+
+
+def special_pull(user, work_id, rng=random):
+    """限定抽卡：每部作品一次、必中 SSR 以上；不用券、不計入 10／50／100 抽保底次數。回傳 (Pull, 是否新卡)"""
+    cards.sync()
+    with transaction.atomic():
+        state, _ = GachaState.objects.select_for_update().get_or_create(user=user)
+        try:
+            raw_work = Work.objects.select_related("franchise").get(pk=work_id)
+        except Work.DoesNotExist:
+            raise PullError("找不到這部作品")
+        sid = raw_work.source_id
+        if sid not in SPECIAL_SIDS:
+            raise PullError("這部作品沒有限定抽卡")
+        if sid in {int(x) for x in state.special_used or []}:
+            raise PullError("這部作品的限定抽卡已經用過了")
+        work = canonical_work(raw_work)
+        card = pick_card(work, True, rng)
+        if card is None or card.rarity not in HIGH:
+            raise PullError("這部作品目前沒有 SSR 以上的卡")
+        p = Pull.objects.create(user=user, work=work, card=card, rarity=card.rarity, pool=Pull.Pool.PICK, ticket="special",
+                                day=today(), pity=False, pity_kind="")
+        state.total += 1
+        state.special_used = list(state.special_used or []) + [sid]
+        state.save(update_fields=["total", "special_used"])
+        owned, created = OwnedCard.objects.get_or_create(user=user, card=card, defaults={"work_id": card.work_id, "rarity": card.rarity})
+        if not created:
+            owned.count += 1
+            owned.save(update_fields=["count", "last_at"])
+    return p, created
 
 
 def pull(user, work_id=None, rng=random):

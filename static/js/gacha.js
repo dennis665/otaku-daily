@@ -173,6 +173,7 @@
       <div class="g-ticket">🎲 隨機抽卡券<b>${s.random_left}／${s.free_daily}</b>全作品大混池</div>`;
     paintTask(s.task);
     paintShowcase();
+    paintSpecial();
     if (s.notice) { toast(s.notice); s.notice = ''; }   // 通知只顯示一次
     if (!$('g-shop').hidden) paintShop();
     $('g-free').disabled = !s.random_left;
@@ -436,7 +437,7 @@
     let data;
     try {
       const url = '/gacha/api/pull/';
-      const body = new URLSearchParams({ count: opts.count || 1, ...(opts.work_id ? { work_id: opts.work_id } : {}) });
+      const body = new URLSearchParams({ count: opts.count || 1, ...(opts.work_id ? { work_id: opts.work_id } : {}), ...(opts.special ? { special: 1 } : {}) });
       const [res] = await Promise.all([
         fetch(url, { method: 'POST', credentials: 'same-origin', loading: false, headers: { 'X-CSRFToken': csrf() }, body }),
         new Promise((r) => setTimeout(r, expectAnim ? 0 : 900)),
@@ -773,6 +774,25 @@
   $('g-detail-close').addEventListener('click', closeDetail);
   detail.addEventListener('click', (e) => { if (e.target === detail) closeDetail(); });
   tilt($('g-detail-card'));
+
+  // ---------- ✨ 限定抽卡（新抽卡動畫上市，每部一次必中 SSR 以上） ----------
+  function paintSpecial() {
+    const list = (status && status.special) || [];
+    $('g-special').hidden = !list.length;
+    const box = $('g-special-works');
+    box.innerHTML = '';
+    list.forEach((w) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'g-special-work';
+      b.innerHTML = `${w.card_back ? `<img src="${esc(w.card_back)}" alt="" loading="lazy">` : ''}<span>${esc(w.title)}</span><em>限定抽 ×1</em>`;
+      b.addEventListener('click', () => {
+        if (!window.confirm(`使用「${w.title}」的限定抽卡？（必中 SSR 以上，每部作品只有一次）`)) return;
+        draw({ work_id: w.id, count: 1, special: true });
+      });
+      box.appendChild(b);
+    });
+  }
 
   // ---------- ⭐ 展示櫃 ----------
   function paintShowcase() {

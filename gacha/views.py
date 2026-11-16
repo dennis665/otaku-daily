@@ -86,6 +86,8 @@ def _status_json(user):
     s["pity_new_at"] = PITY_NEW_AT
     s["rates"] = [{"rarity": r, "label": RARITY_LABEL[r], "percent": RARITY_WEIGHT[r] / 100} for r in RARITIES]
     s["showcase"] = [_card(o.card, o.card.work.title, o) for o in extras.showcase_cards(user)]
+    s["special"] = [{"id": w.id, "title": w.franchise.name if w.franchise else w.title, "card_back": cards.card_back_url(w)}
+                    for w in service.special_works(user)]
     s["showcase_max"] = SHOWCASE_MAX
     return s
 
@@ -121,7 +123,10 @@ def pull(request):
     try:
         work_id = int(request.POST.get("work_id") or 0) or None
         count = int(request.POST.get("count") or 1)
-        pairs = service.pull_many(request.user, work_id, count)
+        if request.POST.get("special"):   # 限定抽卡：必中 SSR 以上，一部作品一次
+            pairs = [service.special_pull(request.user, work_id)]
+        else:
+            pairs = service.pull_many(request.user, work_id, count)
     except (ValueError, Work.DoesNotExist):
         return _json({"ok": False, "error": "找不到這部作品"}, 400)
     except service.PullError as e:
