@@ -296,10 +296,10 @@ body.sheet-open { overflow: hidden; }
 .g-filter .gf.active { opacity: 1; transform: scale(1.04); outline: 2px solid #fff; outline-offset: 1px; }
 .group-pick { display: flex; flex-wrap: wrap; gap: 8px; }
 .group-pick .muted { color: var(--muted); }
-.g-pick { --h: 280; display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px; border-radius: 99px; cursor: pointer; font-size: .9rem;
+.plan-gpick { --h: 280; display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px; border-radius: 99px; cursor: pointer; font-size: .9rem;
   border: 2px solid hsl(var(--h) 70% 55%); color: var(--text); background: var(--bg2); }
-.g-pick input { accent-color: hsl(var(--h) 70% 55%); width: 18px; height: 18px; margin: 0; }
-.g-pick:has(input:checked) { background: hsl(var(--h) 65% 38%); color: #fff; }
+.plan-gpick input { accent-color: hsl(var(--h) 70% 55%); width: 18px; height: 18px; margin: 0; }
+.plan-gpick:has(input:checked) { background: hsl(var(--h) 65% 38%); color: #fff; }
 
 /* 活動排序 */
 .e-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 10px; }

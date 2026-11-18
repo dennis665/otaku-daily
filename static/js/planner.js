@@ -225,7 +225,7 @@
     pick.innerHTML = '';
     if (!data.groups.length) pick.append(el('small', 'muted', '還沒有群組，這會是個人行程（可以到「👥 群組」建立）'));
     data.groups.forEach((g) => {
-      const lab = el('label', 'g-pick');
+      const lab = el('label', 'plan-gpick');
       const box = el('input'); box.type = 'checkbox'; box.value = g.id;
       lab.style.setProperty('--h', hue(g.id));
       lab.append(box, document.createTextNode(` 👥 ${g.name}`));
