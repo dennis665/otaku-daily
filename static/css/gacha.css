@@ -343,3 +343,64 @@ body.offline-mode .g-views .chip[data-g="ach"], body.offline-mode .g-views .chip
 .g-special-work em { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-style: normal; font-weight: 900; font-size: .62rem;
   color: #fff; background: linear-gradient(135deg, #ff3d6e, #ffb347); border-radius: 99px; padding: 2px 6px; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
 
+
+/* ---------- 🎡 決定轉盤（wheel.js） ---------- */
+.wh-stage { --wh-bg: #1a1440; --wh-ac: #ff6fae; --wh-size: min(84vw, 400px); position: relative; overflow: hidden; border-radius: 22px;
+  padding: 26px 12px 18px; margin-bottom: 14px; display: grid; justify-items: center; gap: 10px;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--wh-ac) 30%, var(--wh-bg)), var(--wh-bg) 70%, #07060f);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wh-ac) 45%, transparent) inset, 0 12px 30px rgba(0, 0, 0, .45); transition: background .6s; }
+.wh-art { position: absolute; inset: 0; background: center / cover no-repeat; opacity: .34; filter: saturate(1.1); transition: opacity .8s, background-image .6s; pointer-events: none; }
+.wh-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; filter: saturate(1.15); transition: opacity .6s; pointer-events: none; }
+.playing .wh-bg { opacity: .95; }
+.playing .wh-art { opacity: 0; }
+.wh-wrap { transition: opacity .6s, transform .6s; }
+.playing .wh-wrap { opacity: .38; transform: scale(.9); }   /* 播抽卡動畫時轉盤半透明，讓動畫當主角 */
+.wh-veil { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, transparent 30%, color-mix(in srgb, var(--wh-bg) 75%, transparent) 75%), linear-gradient(transparent 70%, rgba(5, 4, 14, .55)); }
+.wh-wrap { position: relative; width: var(--wh-size); aspect-ratio: 1; display: grid; place-items: center; }
+.wh-wrap::before { content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #fff3c4, var(--wh-ac), #ffd166, var(--wh-ac), #fff3c4);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--wh-ac) 70%, transparent), 0 0 60px color-mix(in srgb, var(--wh-ac) 35%, transparent); }
+.wh-wrap::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #120e26; }
+.wh-canvas { position: relative; z-index: 1; width: calc(100% - 26px); height: calc(100% - 26px); border-radius: 50%; will-change: transform; }
+.wh-lights { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.wh-lights i { position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px; border-radius: 50%;
+  background: #fff7d6; box-shadow: 0 0 8px #ffe08a, 0 0 14px var(--wh-ac); animation: wh-blink 1.2s infinite alternate; }
+.spinning .wh-lights i { animation-duration: .18s; }
+@keyframes wh-blink { from { opacity: 1; } to { opacity: .25; } }
+.wh-pointer { position: absolute; z-index: 3; top: -12px; left: 50%; width: 34px; height: 44px; transform: translateX(-50%);
+  background: linear-gradient(#fff3c4, #ffd166 45%, var(--wh-ac)); clip-path: polygon(50% 100%, 0 0, 100% 0);
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .6)) drop-shadow(0 0 8px var(--wh-ac)); }
+.spinning .wh-pointer { animation: wh-tick .12s infinite alternate; }
+@keyframes wh-tick { to { transform: translateX(-50%) rotate(-10deg); } }
+.wh-hub { position: absolute; z-index: 3; width: 32%; aspect-ratio: 1; border-radius: 50%; border: 0; padding: 6%; cursor: pointer;
+  display: grid; place-items: center; align-content: center; gap: 2px;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--wh-ac) 35%, #2a2350), #0d0a1e 75%);
+  box-shadow: 0 0 0 4px #ffd166, 0 0 0 7px color-mix(in srgb, var(--wh-ac) 60%, #000), 0 0 26px var(--wh-ac); animation: wh-pulse 2s infinite; }
+.wh-hub img { width: 100%; max-height: 60%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(255, 255, 255, .7)); }
+.wh-hub span { font: 900 .78rem/1 system-ui, sans-serif; letter-spacing: .18em; color: #fff3c4; text-shadow: 0 0 6px var(--wh-ac); }
+.spinning .wh-hub { animation: none; pointer-events: none; }
+@keyframes wh-pulse { 50% { box-shadow: 0 0 0 4px #ffd166, 0 0 0 7px color-mix(in srgb, var(--wh-ac) 60%, #000), 0 0 44px var(--wh-ac); } }
+.wh-hint { position: relative; z-index: 1; margin: 4px 0 0; font-size: .85rem; color: #fff3c4; text-shadow: 0 1px 3px #000; }
+.wh-result { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 20px; background: rgba(5, 4, 14, .55); backdrop-filter: blur(3px); }
+.wh-result[hidden] { display: none; }
+.wh-r-box { position: relative; z-index: 1; width: min(300px, 100%); text-align: center; padding: 20px 16px; border-radius: 18px; display: grid; gap: 10px; justify-items: center;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--wh-ac) 30%, #1b1640), #0f0c22); border: 2px solid #ffd166;
+  box-shadow: 0 0 30px var(--wh-ac); animation: wh-pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+.wh-r-box small { color: #fff3c4; letter-spacing: .1em; }
+.wh-r-box b { font-size: 1.5rem; color: #fff; text-shadow: 0 0 10px var(--wh-ac); }
+.wh-r-logo { max-width: 80%; max-height: 90px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(255, 255, 255, .8)); }
+.wh-r-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+@keyframes wh-pop { from { transform: scale(.4); opacity: 0; } }
+.wh-spark { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; border-radius: 2px; background: #ffd166; box-shadow: 0 0 6px var(--wh-ac);
+  animation: wh-burst 1.2s ease-out forwards; }
+.wh-spark:nth-child(3n) { background: var(--wh-ac); }
+.wh-spark:nth-child(3n+1) { background: #fff; border-radius: 50%; }
+@keyframes wh-burst { from { transform: translate(-50%, -50%) scale(.3); opacity: 1; } to { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(220deg); opacity: 0; } }
+.wh-theme-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.wh-theme-row span { font-weight: 800; white-space: nowrap; }
+.wh-theme-row select { flex: 1; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font: inherit; }
+.wh-sets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.wh-edit { display: grid; gap: 8px; }
+.wh-edit input, .wh-edit textarea { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font: inherit; }
+.wh-edit-btns { display: flex; justify-content: flex-end; }

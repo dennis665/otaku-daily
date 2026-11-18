@@ -129,6 +129,7 @@
       if (!res.ok) throw new Error();
       status = await res.json();
       paintStatus();
+      window.dispatchEvent(new CustomEvent('gacha-status', { detail: status }));   // 轉盤（wheel.js）用作品清單
     } catch {
       $('g-info').textContent = '讀取失敗，請稍後再試';
     }
@@ -1003,6 +1004,8 @@
     $('g-shop').hidden = v !== 'shop';
     $('g-ach').hidden = v !== 'ach';
     $('g-quiz').hidden = v !== 'quiz';
+    $('g-wheel').hidden = v !== 'wheel';
+    window.dispatchEvent(new CustomEvent('gacha-view', { detail: v }));
     if (v !== 'quiz') stopQuizAudio();
     if (v === 'ach') loadAch();
     if (v === 'quiz') loadQuiz();

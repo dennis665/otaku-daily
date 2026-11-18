@@ -74,7 +74,8 @@ def _status_json(user):
     s = service.status(user)
     # 可以自選的卡包（每個系列一個，追的作品排前面）
     s["works"] = [{"id": w.id, "title": w.franchise.name if w.franchise else w.title, "image": _cover(w),
-                   "card_back": cards.card_back_url(w), "anim": _anim_url(w), "anim_ssr": _anim_ssr_url(w), "followed": followed}
+                   "card_back": cards.card_back_url(w), "anim": _anim_url(w), "anim_ssr": _anim_ssr_url(w), "followed": followed,
+                   "wheel": cards.wheel_theme(w)}
                   for w, followed in service.pick_works(user)]
     s["free_daily"] = FREE_DAILY
     s["pick_daily"] = PICK_DAILY

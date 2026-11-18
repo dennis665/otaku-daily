@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 SYNC_SECONDS = 600
 _state = {"at": 0.0, "card_backs": {}}
-SAFE_FILE = re.compile(r"^(?:\d+/[A-Z]{1,3}_[0-9a-f]{6,40}|card_backs/card_back_\d+)\.webp$")
+SAFE_FILE = re.compile(r"^(?:\d+/[A-Z]{1,3}_[0-9a-f]{6,40}|card_backs/card_back_\d+|logos/logo_\d+_[0-9a-f]{8})\.webp$")
 
 
 def _repo():
@@ -230,6 +230,8 @@ def apply_index(index):
     _set_backs_version(index)
     _state["combos"] = {str(k): v for k, v in (index.get("combos") or {}).items() if isinstance(v, list)}
     _state["titles"] = {str(k): v for k, v in (index.get("titles") or {}).items() if isinstance(v, dict)}
+    _state["wheel"] = {str(k): v for k, v in (index.get("wheel") or {}).items()
+                       if isinstance(v, dict) and SAFE_FILE.match(str(v.get("logo", "")))}
     return created, len(gone)
 
 
@@ -288,6 +290,25 @@ def run_campaigns():
 def combos():
     """組合羈絆設定（卡面庫 index.json 的 combos）：{作品編號: [{"name": 組合名, "chars": [角色名…]}]}"""
     return _state.get("combos") or {}
+
+
+_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def wheel_theme(work):
+    """轉盤主題（index.json 的 wheel）：{"logo": 圖片網址, "bg": 底色, "accent": 強調色}；沒有設定回 None。同系列共用"""
+    themes = _state.get("wheel") or {}
+    sids = [str(getattr(work, "source_id", ""))]
+    if getattr(work, "franchise_id", None):
+        from dramas.models import Work
+        sids += [str(s) for s in Work.objects.filter(franchise_id=work.franchise_id).values_list("source_id", flat=True)]
+    for sid in sids:
+        t = themes.get(sid)
+        if t:
+            return {"logo": f"/gacha/img/{t['logo']}",
+                    "bg": t.get("bg") if _COLOR.match(str(t.get("bg", ""))) else "#1a1440",
+                    "accent": t.get("accent") if _COLOR.match(str(t.get("accent", ""))) else "#ff6fae"}
+    return None
 
 
 def work_titles():

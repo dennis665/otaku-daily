@@ -164,6 +164,7 @@
     <button class="chip" data-g="shop" type="button">🛒 星塵商店</button>
     <button class="chip" data-g="ach" type="button">🏆 成就</button>
     <button class="chip" data-g="quiz" type="button">🎯 問答</button>
+    <button class="chip" data-g="wheel" type="button">🎡 轉盤</button>
   </div>
   <div id="g-draw">
     {# 限定抽卡：新抽卡動畫上市，每部作品一次必中 SSR 以上 #}
@@ -247,6 +248,32 @@
     <audio id="q-audio" preload="none" playsinline></audio>
     <h3 class="g-h" id="q-hist-h" hidden>📜 今天的作答紀錄</h3>
     <div class="g-quiz-hist" id="q-hist"></div>
+  </div>
+  {# 決定轉盤：項目自己輸入；主題用下拉選一部上架作品（配色、中心 logo、背景放代表全圖；轉動時播該作品的抽卡動畫，播完才出結果）（wheel.js） #}
+  <div id="g-wheel" class="wh" hidden>
+    <div class="wh-stage" id="wh-stage">
+      <div class="wh-art" id="wh-art" aria-hidden="true"></div>
+      <video class="wh-bg" id="wh-bg" muted playsinline preload="none" aria-hidden="true"></video>
+      <div class="wh-veil" aria-hidden="true"></div>
+      <div class="wh-wrap" id="wh-wrap">
+        <div class="wh-lights" id="wh-lights" aria-hidden="true"></div>
+        <canvas class="wh-canvas" id="wh-canvas" width="760" height="760"></canvas>
+        <div class="wh-pointer" aria-hidden="true"></div>
+        <button class="wh-hub" id="wh-spin" type="button" aria-label="轉動轉盤"><img id="wh-hub-logo" alt=""><span>SPIN</span></button>
+      </div>
+      <p class="wh-hint" id="wh-hint">點中間的按鈕開始轉</p>
+      <div class="wh-result" id="wh-result" hidden></div>
+    </div>
+    <div class="wh-panel">
+      <label class="wh-theme-row"><span>🎨 主題</span><select id="wh-theme" aria-label="轉盤主題"></select></label>
+      <h3 class="g-h">🎡 轉盤內容 <small>選一組或新增，項目自己輸入</small></h3>
+      <div class="wh-sets" id="wh-sets"></div>
+      <div class="wh-edit" id="wh-edit">
+        <input id="wh-name" maxlength="20" placeholder="轉盤名稱，例如：午餐吃什麼">
+        <textarea id="wh-items" rows="6" placeholder="一行一個選項（2～24 個）"></textarea>
+        <div class="wh-edit-btns"><button class="g-btn sm alt" id="wh-del" type="button">🗑 刪除這個轉盤</button></div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -428,4 +455,5 @@
 <script src="{% static 'js/viewer.js' %}"></script>
 <script src="{% static 'js/drama.js' %}"></script>
 <script src="{% static 'js/gacha.js' %}"></script>
+<script src="{% static 'js/wheel.js' %}"></script>
 {% endblock %}
