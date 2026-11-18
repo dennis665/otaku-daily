@@ -265,7 +265,7 @@
     v.links.forEach((l) => addLinkRow(l));
     showError('p-form-error', '');
     openSheet('p-sheet');
-    if (!it) form.elements.title.focus();
+    if (!it && !preset.title) form.elements.title.focus();   // 從活動帶入時標題已填好，不要讓手機鍵盤蓋住表單
   }
 
   form.addEventListener('submit', (e) => {
@@ -283,9 +283,10 @@
     };
     api(editing ? `/plan/api/itineraries/${editing.id}/` : '/plan/api/itineraries/', body)
       .then(async () => {
-        closeSheet('p-sheet');
+        // 先讀好最新行程再關表單，不要在重新讀取前閃一下「還沒有行程」
         view = body.date_time ? 'upcoming' : 'tbd';
         await reload();
+        closeSheet('p-sheet');
       })
       .catch((err) => showError('p-form-error', err.message));
   });
