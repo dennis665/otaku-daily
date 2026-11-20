@@ -474,9 +474,12 @@ class ExtrasTests(TestCase):
 
 class HiddenWorksTests(TestCase):
     def test_hidden_work_not_drawable(self):
-        from .models import HIDDEN_SIDS
+        from unittest import mock
+        sid = 991   # 名單目前是空的（全部上架），測試時自己放一部進去
+        patcher = mock.patch.object(service, "HIDDEN_SIDS", {sid})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         user = User.objects.create_user("hide", password="pw-123456")
-        sid = sorted(HIDDEN_SIDS)[0]
         hidden = make_work(sid, "暫不上架")
         shown = make_work(990, "上架中")
         self.assertNotIn(hidden.id, service.card_work_ids())
