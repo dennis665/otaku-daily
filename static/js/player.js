@@ -73,7 +73,15 @@
       li.classList.toggle('active', i === state.active);
       li.innerHTML = '<span class="no"></span><span class="name"></span><span class="playing">▶</span>';
       li.querySelector('.no').textContent = i + 1;
-      li.querySelector('.name').textContent = item.title;
+      // 顯示名稱（作品＋類別，例：XX TV片頭曲 ①），下面小字是系列・播出季度；沒有就照檔名
+      const nm = li.querySelector('.name');
+      if (item.label) {   // 類別標籤放最前面，作品名太長時只截作品名
+        const k = document.createElement('b');
+        k.className = `kind${/片尾|ED/.test(item.label) ? ' ed' : /劇中/.test(item.label) ? ' ins' : ''}`;
+        k.textContent = item.label;
+        nm.append(k, document.createTextNode(item.work));
+      } else nm.textContent = item.name || item.title;
+      if (item.sub) { const sub = document.createElement('small'); sub.className = 'sub'; sub.textContent = item.sub; nm.appendChild(sub); }
       li.addEventListener('click', () => state.onPick(i));
       if (state.decorate) state.decorate(li, item, i);
       listEl.appendChild(li);
@@ -99,7 +107,8 @@
     const clear = root.querySelector('.finder-clear');
     const status = root.querySelector('.finder-status');
     const results = root.querySelector('.finder-results');
-    const index = items.map((item, i) => ({ i, title: item.title, key: norm(item.title) }));
+    // 搜尋比對：顯示名稱＋標籤（作品名、日文名、別名、系列、季度、類別、原檔名）
+    const index = items.map((item, i) => ({ i, title: item.name || item.title, sub: item.sub || '', key: norm(`${item.name || ''} ${item.title} ${item.tags || ''}`) }));
     let matches = [];
 
     // 把符合的關鍵字標亮（只處理原文中找得到的部分）
@@ -152,6 +161,7 @@
         const name = document.createElement('span');
         name.className = 'name';
         highlight(name, x.title, words);
+        if (x.sub) { const sub = document.createElement('small'); sub.className = 'sub'; sub.textContent = x.sub; name.appendChild(sub); }
         const no = document.createElement('span');
         no.className = 'no';
         no.textContent = x.i + 1;
@@ -219,7 +229,7 @@
     if (curBlob && curBlob !== src) { URL.revokeObjectURL(curBlob); curBlob = null; }
     if (src) curBlob = src;
     audio.src = src || s.audio;
-    $('m-title').textContent = s.title;
+    $('m-title').textContent = s.name || s.title;
     $('m-dl').href = s.audio;
     $('m-dl').setAttribute('download', `${s.title}.${(s.audio.split('.').pop() || 'm4a').toLowerCase()}`);
     $('m-seek').value = 0;
@@ -484,7 +494,7 @@
   }
   function openAdd(song) {
     addSong = song;
-    $('m-add-song').textContent = `🎵 ${song.title}`;
+    $('m-add-song').textContent = `🎵 ${song.name || song.title}`;
     $('m-add-name').value = '';
     showError('m-add-error', '');
     paintAdd();
@@ -732,7 +742,7 @@
     vIndex = i;
     if (autoplay) trackMediaLoading(video);
     video.src = videos[i].video;
-    $('v-title').textContent = videos[i].title;
+    $('v-title').textContent = videos[i].name || videos[i].title;
     markActive(vList, i);
     store.set('videoIndex', i);
     if (autoplay) video.play().catch(() => {});
@@ -747,8 +757,8 @@
   function updateMediaSession(s) {
     if (!('mediaSession' in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: s.title,
-      artist: '動漫原聲',
+      title: s.name || s.title,
+      artist: s.sub || '動漫原聲',
       album: 'Ukiyo',
       artwork: [{ src: '/static/icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
     });

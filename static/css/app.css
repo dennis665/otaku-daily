@@ -453,3 +453,8 @@ body.offline-mode #m-off-get, body.offline-mode #m-off-del { display: none !impo
 .guide-hint a { color: var(--cyan); font-weight: 700; text-decoration: none; flex: 1; }
 a.icon { display: inline-grid; place-items: center; text-decoration: none; }
 body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !important; }
+/* 歌曲／影片清單：顯示名稱下面一行小字（系列・播出季度） */
+.list .name .sub, .finder-results .name .sub { display: block; font-size: .72rem; color: var(--muted); font-weight: 400; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list .name .kind { display: inline-block; font-size: .68rem; font-weight: 700; color: #fff; background: rgba(255, 111, 174, .75); border-radius: 6px; padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
+.list .name .kind.ed { background: rgba(94, 160, 255, .8); }
+.list .name .kind.ins { background: rgba(255, 186, 73, .85); color: #2a1a00; }

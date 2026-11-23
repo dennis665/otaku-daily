@@ -134,3 +134,32 @@ class GuideTests(TestCase):
             rf.assert_any_call("guide/v-music.mp4")
         self.assertEqual(self.client.get("/guide/media/..%2Fsecret.webp").status_code, 404)
         self.assertEqual(self.client.get("/guide/media/x.exe").status_code, 404)
+
+
+class SongMetaTests(TestCase):
+    """音樂／影片清單的作品、季度、類別：看劇庫主題曲連結對應作品，類別看歌名與長度"""
+    def test_annotate(self):
+        from unittest import mock
+
+        from dramas.models import Airing, Franchise, Work
+        from player import songmeta
+        songmeta._cache["works"] = None
+        fr = Franchise.objects.create(name="測試系列")
+        url = "https://raw.githubusercontent.com/x/y/main/video/"
+        w = Work.objects.create(source_id=901, title="測試動畫 第二季", franchise=fr,
+                                mp3_links=[{"title": "a", "url": url + "測試動畫2.mp3"}, {"title": "b", "url": url + "測試動畫1.mp3"}])
+        Airing.objects.create(work=w, kind="SEASON", label="2025年7月新番", year=2025, month=7)
+        Work.objects.create(source_id=902, title="另一部", mp3_links=[{"title": "c", "url": url + "另一部%20ED.mp3"}])
+        meta = {"sec": {"測試動畫1": 90, "測試動畫2": 89, "另一部 ED": 240}, "work": {}, "kind": {}}
+        songs = [{"id": n, "title": n, "audio": "x", "video": None} for n in ["另一部 ED", "測試動畫1", "測試動畫2", "米津玄師 - Lemon"]]
+        with mock.patch.object(songmeta, "_meta", return_value=meta):
+            rows = {r["id"]: r for r in songmeta.annotate(songs)}
+        self.assertEqual(rows["測試動畫1"]["name"], "測試動畫 第二季 TV片頭曲 ①")   # 編號照檔名結尾數字
+        self.assertEqual(rows["測試動畫2"]["label"], "TV片頭曲 ②")
+        self.assertEqual(rows["測試動畫1"]["sub"], "測試系列・2025年7月新番")
+        self.assertIn("2025年7月新番", rows["測試動畫1"]["tags"])
+        self.assertEqual(rows["另一部 ED"]["label"], "完整ED")   # 240 秒＝完整版
+        self.assertEqual(rows["米津玄師 - Lemon"]["name"], "米津玄師 - Lemon")
+        self.assertNotIn("label", rows["米津玄師 - Lemon"])
+        self.assertEqual(songs[1]["title"], "測試動畫1")   # 原清單不被改動
+        songmeta._cache["works"] = None
