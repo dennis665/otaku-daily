@@ -39,7 +39,7 @@
   </div>
 
   <nav class="gd-toc" aria-label="目錄">
-    <a href="#start">🚀 開始使用</a><a href="#music">🎵 音樂</a><a href="#video">🎬 影片</a><a href="#events">🎪 活動</a>
+    <a href="#start">🚀 開始使用</a><a href="#music">🎵 音樂</a><a href="#songreq">🙋 投稿歌曲</a><a href="#video">🎬 影片</a><a href="#events">🎪 活動</a>
     <a href="#plan">📅 行程</a><a href="#drama">📺 追劇</a><a href="#gacha">🎴 抽卡</a><a href="#wheel">🎡 轉盤</a><a href="#more">⚙️ 設定與通知</a>
   </nav>
 
@@ -59,11 +59,12 @@
     <div class="gd-media">
       <figure class="vid"><video src="{{ m }}v-music.mp4?v={{ v }}" poster="{{ m }}p-music.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>點歌播放</figcaption></figure>
       <figure><img src="{{ m }}s-music.webp?v={{ v }}" alt="音樂播放器" loading="lazy"><figcaption>播放器</figcaption></figure>
-      <figure><img src="{{ m }}s-music-lists.webp?v={{ v }}" alt="歌單" loading="lazy"><figcaption>歌單與存到手機</figcaption></figure>
+      <figure><img src="{{ m }}s-music-lists.webp?v={{ v }}" alt="歌曲清單" loading="lazy"><figcaption>類別標籤與播放中</figcaption></figure>
+      <figure><img src="{{ m }}s-music-search.webp?v={{ v }}" alt="搜尋" loading="lazy"><figcaption>用季度、類別搜尋</figcaption></figure>
     </div>
     <h3>怎麼用</h3>
     <ul>
-      <li><b>清單</b>：每首歌前面的小標籤是類別（TV片頭曲、完整片頭曲、TV片尾曲、完整ED、劇中歌），下面一行小字是動畫系列和播出季度。</li>
+      <li><b>清單</b>：每首歌前面的小標籤是類別（TV片頭曲、完整片頭曲、TV片尾曲、完整ED、劇中歌、J-POP），下面一行小字是動畫系列和播出季度；正在播的那首左邊會出現芙莉蓮小動畫。名稱太長時會左右滑動顯示全名（其他列用手指按住也會滑）。</li>
       <li><b>搜尋</b>：最上面的搜尋框可以打歌名、作品名（中文、日文、別名）、播出季度（例：2025年7月）或類別（例：完整片頭曲），多個關鍵字用空白分開。</li>
       <li><b>播放控制</b>：▶ 播放／暫停、⏮ ⏭ 上下一首、🔁 切換循環方式（全部循環、單曲循環、隨機播放）、⬇ 下載這首歌。</li>
       <li><b>自訂歌單</b>：按「＋ 新歌單」建立，歌曲右邊的 ＋ 可以加進歌單；選了歌單後，上一首／下一首就只在這個歌單裡播。</li>
@@ -71,9 +72,27 @@
     </ul>
   </section>
 
+  <section class="gd-sec" id="songreq">
+    <h2>🙋 投稿歌曲</h2>
+    <p>想聽的歌清單裡沒有？在音樂分頁按「🙋 投稿歌曲」，貼上 YouTube 連結投稿，管理者有空時會下載加進音樂清單。</p>
+    <div class="gd-media">
+      <figure class="vid"><video src="{{ m }}v-songreq.mp4?v={{ v }}" poster="{{ m }}p-songreq.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>投稿一首歌</figcaption></figure>
+      <figure><img src="{{ m }}s-songreq-form.webp?v={{ v }}" alt="投稿表單" loading="lazy"><figcaption>投稿表單</figcaption></figure>
+      <figure><img src="{{ m }}s-songreq-mine.webp?v={{ v }}" alt="我的投稿" loading="lazy"><figcaption>我的投稿與狀態</figcaption></figure>
+    </div>
+    <h3>怎麼用</h3>
+    <ol>
+      <li><b>作品</b>：輸入中文或日文搜尋追劇清單，點一下選好；不在清單裡的（例如 J-POP），勾「不在追劇清單裡，自己輸入名稱」。</li>
+      <li><b>類型</b>：TV片頭曲、完整片頭曲、TV片尾曲、完整ED、劇中歌、完整劇中歌，或選「其他」自己寫標籤（例：角色歌、Live 版）。</li>
+      <li><b>YouTube 連結</b>：建議找官方頻道的「ノンクレジットOP／ED（無字幕片頭／片尾）」或 MV。</li>
+      <li>勾選要 🎵 音樂、🎬 影片（預設都要），可以寫備註，按「送出投稿」。</li>
+      <li><b>📜 我的投稿</b>：看處理狀態（⏳ 等待處理、✅ 已加入、🙈 沒有採用），還沒處理的可以收回。</li>
+    </ol>
+  </section>
+
   <section class="gd-sec" id="video">
     <h2>🎬 影片</h2>
-    <p>動漫 MV 與片段，用法和音樂一樣：搜尋、點選播放、上一部／下一部、循環播放。</p>
+    <p>動漫 MV 與片段，用法和音樂一樣：搜尋（可以打作品、季度、類別）、點選播放、上一部／下一部、循環播放；清單一樣有類別標籤與系列・季度。</p>
     <div class="gd-media">
       <figure><img src="{{ m }}s-video.webp?v={{ v }}" alt="影片" loading="lazy"><figcaption>影片清單</figcaption></figure>
     </div>
