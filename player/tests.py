@@ -207,8 +207,16 @@ class SongRequestTests(TestCase):
             self.assertEqual(self.client.post(f"/api/song-requests/{rid}/delete/").status_code, 400)   # 處理過不能刪
             self.assertEqual(self.client.get("/api/song-requests/?scope=all&pending=1").json()["items"], [])
 
-    def test_missing_only_on_staging(self):
+    def test_missing_only_for_owner(self):
         from django.test import override_settings
-        self.assertEqual(self.client.get("/api/song-requests/missing/").status_code, 404)
-        with override_settings(APP_ENV="staging"):
-            self.assertEqual(self.client.get("/api/song-requests/missing/").status_code, 200)
+
+        from dramas.models import Follow, Work
+        w = Work.objects.create(source_id=991, title="缺歌動畫")
+        Follow.objects.create(user=self.user, work=w)
+        self.assertEqual(self.client.get("/api/song-requests/missing/").status_code, 404)   # 不是管理者帳號
+        with override_settings(SONG_OWNER="req"):
+            items = self.client.get("/api/song-requests/missing/").json()["items"]
+            self.assertEqual([x["title"] for x in items], ["缺歌動畫"])
+            self.assertIn("我的追劇缺歌", self.client.get("/").content.decode())
+            self.post(work_id=w.id, title="")   # 儲存（投稿）後就不再列出
+            self.assertEqual(self.client.get("/api/song-requests/missing/").json()["items"], [])

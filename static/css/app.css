@@ -496,3 +496,25 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 .sr-st.skip { color: var(--muted); }
 .sr-picked[hidden], #sr-sheet [hidden] { display: none !important; }
 #sr-sheet .sr-own input, #sr-sheet .sr-opts input { width: 18px; height: 18px; padding: 0; margin: 0; flex: none; }
+/* 我的追劇缺歌：逐筆就地編輯 */
+.sr-mtools { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+.sr-mtools input[type=search] { flex: 1; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font: inherit; }
+.sr-mtools label { display: flex; gap: 6px; align-items: center; font-size: .82rem; color: var(--muted); white-space: nowrap; }
+.sr-mrow { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; background: var(--bg2); }
+.sr-mrow.saved { opacity: .75; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.sr-mhead small { display: block; color: var(--muted); font-size: .75rem; margin-top: 2px; }
+.sr-mhead a, .sr-cand a { color: var(--cyan); }
+.sr-cand { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px dashed var(--line); font-size: .82rem; cursor: pointer; }
+.sr-cand input[type=radio] { width: 18px; height: 18px; flex: none; accent-color: var(--pink); margin: 0; }
+.sr-cand img { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; flex: none; background: #000; }
+.sr-cand span { min-width: 0; }
+.sr-cand span a { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--text); text-decoration: none; }
+.sr-cand small { display: block; color: var(--muted); font-size: .72rem; }
+.sr-cand.own input[type=url] { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: .82rem; }
+.sr-mopts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.sr-mopts select, .sr-mopts .sr-mtags { padding: 7px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: .82rem; }
+.sr-mopts .sr-mtags { flex: 1; min-width: 110px; }
+.sr-mopts label { display: flex; gap: 4px; align-items: center; font-size: .85rem; }
+.sr-mopts input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--pink); margin: 0; }
+.sr-mrow .alert { margin: 6px 0 0; }
+.sr-more { width: 100%; margin-top: 4px; }

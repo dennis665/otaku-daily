@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -30,6 +31,7 @@ def home(request):
         "reminder_hint": SCHEDULE_HINT,
         "hidden_tabs": UserPrefs.hidden_for(request.user),
         "song_aliases": alias_map(),
+        "song_owner": is_song_owner(request.user),
     })
 
 
@@ -306,30 +308,53 @@ def song_request_delete(request, pk):
     return _ok()
 
 
+_cand_cache = {"data": None}
+
+
+def _candidates():
+    """「我的追劇缺歌」的 YouTube 候選（player/data/song_candidates.json，依作品 source_id）"""
+    if _cand_cache["data"] is None:
+        try:
+            path = Path(__file__).resolve().parent / "data" / "song_candidates.json"
+            _cand_cache["data"] = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _cand_cache["data"] = {}
+    return _cand_cache["data"]
+
+
+def is_song_owner(user):
+    return user.is_authenticated and user.username == settings.SONG_OWNER
+
+
 @login_required
 @require_GET
 def song_request_missing(request):
-    """（只有測試站）我追的 TV 動畫中，2024 年 1 月以後播出、還沒有歌、也還沒投稿的作品"""
-    if settings.APP_ENV != "staging":
+    """（只開放給 SONG_OWNER）我追的所有作品中，還沒有歌、也還沒投稿的；附 YouTube 候選"""
+    if not is_song_owner(request.user):
         raise Http404
     from dramas.models import Follow, Work
 
     from .songmeta import song_works
     have = {w.id for w in song_works().values()}
     asked = set(SongRequest.objects.exclude(work=None).values_list("work_id", flat=True))
+    cands = _candidates()
     today = timezone.localdate()
     now_key = today.year * 100 + today.month
     out = []
     ids = Follow.objects.filter(user=request.user).values_list("work_id", flat=True)
-    for w in Work.objects.filter(id__in=ids, media_type=Work.Media.TV).prefetch_related("airings"):
+    for w in Work.objects.filter(id__in=ids).prefetch_related("airings"):
         if w.mp3_links or w.mp4_links or w.id in have or w.id in asked:
             continue
-        labels = []
+        keys = []
         for a in w.airings.all():
-            m = re.match(r"^(\d{4})年(\d{1,2})月新番$", a.label or "")
-            if m and 202401 <= int(m.group(1)) * 100 + int(m.group(2)) <= now_key:
-                labels.append((int(m.group(1)) * 100 + int(m.group(2)), a.label))
-        if labels:
-            out.append({"id": w.id, "title": w.title, "label": min(labels)[1], "jp": next((x for x in (w.alt_titles or []) if re.search(r"[ぁ-ヿ]", x)), "")})
-    out.sort(key=lambda x: x["label"], reverse=True)
+            if a.year:
+                keys.append((a.year * 100 + (a.month or 1), a.label))
+        aired = [k for k in keys if k[0] <= now_key and "決定" not in k[1]]
+        latest = max(aired) if aired else (max(keys) if keys else (0, "動畫化決定"))
+        out.append({"id": w.id, "source_id": w.source_id, "title": w.title, "media": w.get_media_type_display(),
+                    "label": latest[1], "key": latest[0], "aired": bool(aired),
+                    "jp": next((x for x in (w.alt_titles or []) if re.search(r"[ぁ-ヿ]", x)), ""),
+                    "kind": "TV片頭曲" if w.media_type == Work.Media.TV else "完整劇中歌",
+                    "candidates": cands.get(str(w.source_id)) or []})
+    out.sort(key=lambda x: (not x["aired"], -x["key"]))   # 已播出的在前，新的在前
     return _ok(items=out)

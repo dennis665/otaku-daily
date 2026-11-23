@@ -142,8 +142,12 @@
     } catch { /* 讀不到就不顯示數字 */ }
   }
 
-  // ---------- 測試站：我的追劇缺歌 ----------
+  // ---------- 我的追劇缺歌（只開放給管理者帳號）：每部作品就地選連結、類型、音樂／影片，按「儲存」才算確認 ----------
+  // 沒按儲存的不會處理；儲存後變成一筆投稿（等待處理）
   let missing = [];
+  let missLimit = 30;
+  const KINDS = ['TV片頭曲', '完整片頭曲', 'TV片尾曲', '完整ED', '劇中歌', '完整劇中歌', '其他'];
+  const fmtSec = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '');
   async function loadMissing() {
     const box = $('sr-missing');
     if (!box) return;
@@ -151,25 +155,67 @@
     try {
       const j = await api('/api/song-requests/missing/');
       missing = j.items;
-      $('sr-miss-n').textContent = missing.length || '';
-      box.innerHTML = `<p class="sheet-sub">你追的 TV 動畫中，2024 年 1 月以後播出、還沒有歌也還沒投稿的有 ${missing.length} 部。按「投稿」會帶入作品與「TV片頭曲」。</p>`;
-      missing.forEach((w) => {
-        const row = document.createElement('div');
-        row.className = 'sr-row';
-        const q = encodeURIComponent(`${w.jp || w.title} ノンクレジットOP`);
-        row.innerHTML = `<div><b>${esc(w.title)}</b><small>${esc(w.label)}・<a href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">🔍 YouTube 找 OP</a></small></div>`;
-        const b = document.createElement('button');
-        b.className = 'act'; b.type = 'button'; b.textContent = '投稿';
-        b.addEventListener('click', () => {
-          setView('form');
-          $('sr-own').checked = false; $('sr-title').hidden = true;
-          pick({ id: w.id, title: w.title });
-          $('sr-kind').value = 'TV片頭曲';
-          $('sr-url').focus();
-        });
-        row.appendChild(b);
-        box.appendChild(row);
-      });
+      missLimit = 30;
+      paintMissing();
     } catch (err) { box.innerHTML = `<p class="alert">${esc(err.message)}</p>`; }
+  }
+  function paintMissing() {
+    const box = $('sr-missing');
+    const q = (box.querySelector('#sr-mq') || {}).value || '';
+    const airedOnly = box.querySelector('#sr-maired') ? box.querySelector('#sr-maired').checked : true;
+    $('sr-miss-n').textContent = missing.length || '';
+    const list = missing.filter((w) => (!airedOnly || w.aired) && (!q || `${w.title} ${w.jp}`.toLowerCase().includes(q.toLowerCase())));
+    box.innerHTML = `<p class="sheet-sub">你追的作品中還沒有歌、也還沒投稿的有 ${missing.length} 部（已播出 ${missing.filter((w) => w.aired).length} 部）。
+      每部選好連結、類型與要下載的檔案後按「儲存」，<b>沒按儲存的不會處理</b>。</p>
+      <div class="sr-mtools"><input id="sr-mq" type="search" placeholder="搜尋作品" value="${esc(q)}"><label><input type="checkbox" id="sr-maired"${airedOnly ? ' checked' : ''}> 只看已播出</label></div>`;
+    const mq = box.querySelector('#sr-mq');
+    mq.addEventListener('input', () => { missLimit = 30; const pos = mq.selectionStart; paintMissing(); const n = $('sr-mq'); n.focus(); n.setSelectionRange(pos, pos); });
+    box.querySelector('#sr-maired').addEventListener('change', () => { missLimit = 30; paintMissing(); });
+    list.slice(0, missLimit).forEach((w) => box.appendChild(missRow(w)));
+    if (list.length > missLimit) {
+      const more = document.createElement('button');
+      more.className = 'btn ghost sr-more'; more.type = 'button'; more.textContent = `顯示更多（還有 ${list.length - missLimit} 部）`;
+      more.addEventListener('click', () => { missLimit += 30; paintMissing(); });
+      box.appendChild(more);
+    }
+    if (!list.length) box.insertAdjacentHTML('beforeend', '<p class="sheet-sub">沒有符合的作品。</p>');
+  }
+  function missRow(w) {
+    const row = document.createElement('div');
+    row.className = 'sr-mrow';
+    const q = encodeURIComponent(`${w.jp || w.title} ${w.kind === 'TV片頭曲' ? 'ノンクレジットOP' : '主題歌 MV'}`);
+    const group = `srm-${w.id}`;
+    const cands = w.candidates.map((c, k) => `<label class="sr-cand"><input type="radio" name="${group}" value="${esc(c.url)}"${k === 0 ? ' checked' : ''}>
+        <img src="https://i.ytimg.com/vi/${esc((c.url.match(/v=([\w-]+)/) || [])[1] || '')}/default.jpg" alt="" loading="lazy">
+        <span><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title)}</a><small>${fmtSec(c.sec)}・${esc(c.channel || '上傳者不明')}</small></span></label>`).join('');
+    row.innerHTML = `<div class="sr-mhead"><b>${esc(w.title)}</b><small>${esc(w.media)}・${esc(w.label)}${w.aired ? '' : '・尚未播出'}・<a href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">🔍 YouTube</a></small></div>
+      ${cands || '<p class="sheet-sub">沒有自動找到候選，請貼上自己找的連結。</p>'}
+      <label class="sr-cand own"><input type="radio" name="${group}" value="own"${w.candidates.length ? '' : ' checked'}><input type="url" class="sr-murl" placeholder="或貼上自己找的 YouTube 連結"></label>
+      <div class="sr-mopts"><select class="sr-mkind">${KINDS.map((k) => `<option${k === w.kind ? ' selected' : ''}>${k}</option>`).join('')}</select>
+        <input class="sr-mtags" maxlength="100" placeholder="標籤（選其他時必填）">
+        <label><input type="checkbox" class="sr-ma" checked> 🎵</label><label><input type="checkbox" class="sr-mv" checked> 🎬</label>
+        <button class="btn primary sm sr-msave" type="button">儲存</button></div>
+      <p class="alert" hidden></p>`;
+    const urlIn = row.querySelector('.sr-murl');
+    urlIn.addEventListener('input', () => { if (urlIn.value.trim()) row.querySelector(`input[name="${group}"][value="own"]`).checked = true; });
+    row.querySelector('.sr-msave').addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      const err = row.querySelector('.alert');
+      const pick = row.querySelector(`input[name="${group}"]:checked`);
+      const url = !pick || pick.value === 'own' ? urlIn.value.trim() : pick.value;
+      btn.disabled = true;
+      try {
+        await api('/api/song-requests/', {
+          work_id: w.id, kind: row.querySelector('.sr-mkind').value, tags: row.querySelector('.sr-mtags').value.trim(), url,
+          audio: row.querySelector('.sr-ma').checked, video: row.querySelector('.sr-mv').checked, note: '我的追劇缺歌',
+        });
+        missing = missing.filter((x) => x.id !== w.id);
+        row.className = 'sr-mrow saved';
+        row.innerHTML = `<b>${esc(w.title)}</b> <span class="sr-st done">✅ 已儲存，等待處理</span>`;
+        $('sr-miss-n').textContent = missing.length || '';
+        loadMine(true);
+      } catch (e) { err.textContent = e.message; err.hidden = false; btn.disabled = false; }
+    });
+    return row;
   }
 })();

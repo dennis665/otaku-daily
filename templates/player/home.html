@@ -393,7 +393,7 @@
     <div class="chips" id="sr-tabs" role="group" aria-label="投稿">
       <button class="chip active" data-v="form" type="button">✍️ 投稿</button>
       <button class="chip" data-v="mine" type="button">📜 我的投稿 <b id="sr-mine-n"></b></button>
-      {% if app_env == "staging" %}<button class="chip" data-v="missing" type="button">📋 我的追劇缺歌 <b id="sr-miss-n"></b></button>{% endif %}
+      {% if song_owner %}<button class="chip" data-v="missing" type="button">📋 我的追劇缺歌 <b id="sr-miss-n"></b></button>{% endif %}
     </div>
     <form id="sr-form" novalidate>
       <p class="sheet-sub">想聽的歌清單裡沒有？貼上 YouTube 連結投稿，管理者會在有空時下載加進音樂清單。</p>

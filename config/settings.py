@@ -31,6 +31,8 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 APP_ENV = os.environ.get("APP_ENV", "production")
 # 抽卡不限次數的帳號（只在測試站有效，方便測試演出與機率）
 GACHA_UNLIMITED_USERS = {"dennis"} if APP_ENV == "staging" else set()
+# 「📋 我的追劇缺歌」（逐筆確認後投稿、管理者批次下載）只開放給這個帳號
+SONG_OWNER = os.environ.get("SONG_OWNER", "dennis")
 # 目前部署的版本：Render 部署時會提供這次的 Git commit；App 用它判斷有沒有新版本可以更新
 APP_VERSION = os.environ.get("RENDER_GIT_COMMIT") or "dev"
 
