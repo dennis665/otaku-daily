@@ -97,7 +97,7 @@ def annotate(playlist):
                          "tags": " ".join(x for x in [s["id"], c["work"], label, c.get("sub") or "", c.get("tags") or ""] if x),
                          "_key": ("custom:" + c["work"], label)})
             continue
-        if not w:   # 不是動畫歌（歌手 - 歌名、放鬆音樂）：照原名顯示
+        if not w:   # 不是動畫歌又沒在 custom 設定：照原名顯示
             rows.append({**s, "name": s["title"], "sub": "", "tags": s["title"]})
             continue
         kind = _kind(s["id"], kinds)
