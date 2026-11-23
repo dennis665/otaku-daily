@@ -458,3 +458,11 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 .list .name .kind { display: inline-block; font-size: .68rem; font-weight: 700; color: #fff; background: rgba(255, 111, 174, .75); border-radius: 6px; padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
 .list .name .kind.ed { background: rgba(94, 160, 255, .8); }
 .list .name .kind.ins { background: rgba(255, 186, 73, .85); color: #2a1a00; }
+/* 跑馬燈：文字太長時左右來回滑動顯示全名（player.js 的 marquee） */
+.list .name .l1 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mq-box.mq { text-overflow: clip; }
+.mq-in { display: inline; white-space: nowrap; }   /* 沒在滑動時維持「…」 */
+.mq-box.mq .mq-in { display: inline-block; animation: mq-slide var(--mq-t, 6s) ease-in-out infinite alternate; }
+@keyframes mq-slide { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--mq-d, 0)); } }
+.now-info .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { .mq-box.mq .mq-in { animation: none; } }

@@ -37,11 +37,40 @@
       document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${tab.dataset.tab}`));
       // 切換分頁時暫停另一邊，避免兩個同時發聲
       // 切到「活動」分頁時音樂繼續播（邊聽歌邊看活動）
+      // 隱藏中的分頁量不到寬度：切過來時重新計算標題要不要滑動
+      requestAnimationFrame(() => document.querySelectorAll(`#panel-${tab.dataset.tab} .mq-box[data-mq-always]`).forEach((b) => marquee(b)));
       if (tab.dataset.tab === 'music') video.pause();
       if (tab.dataset.tab === 'video') audio.pause();
       store.set('tab', tab.dataset.tab);
     });
   });
+
+  // ---------- 跑馬燈：文字太長被截斷時，左右來回慢慢滑動顯示全名 ----------
+  // box＝裁切的外框（overflow hidden），裡面第一個子元素 .mq-in 是會移動的文字
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function marquee(box, on = true) {
+    const inner = box && box.querySelector('.mq-in');
+    if (!inner) return;
+    box.classList.remove('mq');
+    inner.style.removeProperty('--mq-d');
+    if (!on || reduceMotion) return;
+    requestAnimationFrame(() => {
+      const over = box.scrollWidth - box.clientWidth;   // 外框不換行、超出部分隱藏，scrollWidth＝文字全長
+      if (over <= 4) return;   // 放得下就不用動
+      inner.style.setProperty('--mq-d', `${-over - 8}px`);
+      inner.style.setProperty('--mq-t', `${Math.max(4, over / 30 + 2.5)}s`);   // 每秒約 30px，頭尾各停一下
+      box.classList.add('mq');
+    });
+  }
+  function setMarqueeText(el, text) {
+    el.innerHTML = '';
+    const inner = document.createElement('span');
+    inner.className = 'mq-in';
+    inner.textContent = text;
+    el.appendChild(inner);
+    marquee(el);
+  }
+  window.addEventListener('resize', () => document.querySelectorAll('.mq-box').forEach((b) => { if (b.classList.contains('mq') || b.dataset.mqAlways) marquee(b); }));
 
   // ---------- 共用：清單繪製與循環模式 ----------
   // 清單分頁：只畫出目前這一頁（清單資料很小，主要是讓畫面不用一次畫出上百列）
@@ -75,12 +104,21 @@
       li.querySelector('.no').textContent = i + 1;
       // 顯示名稱（作品＋類別，例：XX TV片頭曲 ①），下面小字是系列・播出季度；沒有就照檔名
       const nm = li.querySelector('.name');
-      if (item.label) {   // 類別標籤放最前面，作品名太長時只截作品名
+      const l1 = document.createElement('span');
+      l1.className = 'l1 mq-box';
+      const inner = document.createElement('span');
+      inner.className = 'mq-in';
+      if (item.label) {   // 類別標籤放最前面
         const k = document.createElement('b');
         k.className = `kind${/片尾|ED/.test(item.label) ? ' ed' : /劇中/.test(item.label) ? ' ins' : ''}`;
         k.textContent = item.label;
-        nm.append(k, document.createTextNode(item.work));
-      } else nm.textContent = item.name || item.title;
+        inner.append(k, document.createTextNode(item.work));
+      } else inner.textContent = item.name || item.title;
+      l1.appendChild(inner);
+      nm.appendChild(l1);
+      // 正在播的那列一直滑；其他列手指按住或滑鼠移過去時才滑（整頁一起動太亂）
+      li.addEventListener('pointerenter', () => marquee(l1));
+      li.addEventListener('pointerleave', () => { if (!li.classList.contains('active')) marquee(l1, false); });
       if (item.sub) { const sub = document.createElement('small'); sub.className = 'sub'; sub.textContent = item.sub; nm.appendChild(sub); }
       li.addEventListener('click', () => state.onPick(i));
       if (state.decorate) state.decorate(li, item, i);
@@ -93,7 +131,11 @@
       state.active = index;
       state.pager.showIndex(index, state.items.length);   // 換歌時自動翻到正在播的那一頁
     }
-    listEl.querySelectorAll('li').forEach((li) => li.classList.toggle('active', Number(li.dataset.index) === index));
+    listEl.querySelectorAll('li').forEach((li) => {
+      const on = Number(li.dataset.index) === index;
+      li.classList.toggle('active', on);
+      marquee(li.querySelector('.l1'), on);
+    });
     const cur = listEl.querySelector('li.active');
     if (cur) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
@@ -229,7 +271,8 @@
     if (curBlob && curBlob !== src) { URL.revokeObjectURL(curBlob); curBlob = null; }
     if (src) curBlob = src;
     audio.src = src || s.audio;
-    $('m-title').textContent = s.name || s.title;
+    setMarqueeText($('m-title'), s.work || s.name || s.title);
+    setMarqueeText($('m-sub'), [s.label, s.sub].filter(Boolean).join('・') || '動漫原聲');
     $('m-dl').href = s.audio;
     $('m-dl').setAttribute('download', `${s.title}.${(s.audio.split('.').pop() || 'm4a').toLowerCase()}`);
     $('m-seek').value = 0;
@@ -742,7 +785,7 @@
     vIndex = i;
     if (autoplay) trackMediaLoading(video);
     video.src = videos[i].video;
-    $('v-title').textContent = videos[i].name || videos[i].title;
+    setMarqueeText($('v-title'), videos[i].name || videos[i].title);
     markActive(vList, i);
     store.set('videoIndex', i);
     if (autoplay) video.play().catch(() => {});
