@@ -18,6 +18,55 @@
     if (!r.ok || j.ok === false) throw new Error(j.error || '發生錯誤，請稍後再試');
     return j;
   }
+  // ---------- 投稿前檢查影片：用 YouTube 官方嵌入播放器讀長度（超過 10 分鐘不收、刪除或私人影片不收） ----------
+  const MAX_SEC = 600;
+  const ytId = (url) => (String(url).match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/live\/)([\w-]{11})/) || [])[1] || '';
+  let ytApi = null;
+  function loadYtApi() {
+    if (ytApi) return ytApi;
+    ytApi = new Promise((resolve, reject) => {
+      if (window.YT && window.YT.Player) { resolve(window.YT); return; }
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(window.YT); };
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      tag.onerror = () => { ytApi = null; reject(new Error('api')); };
+      document.head.appendChild(tag);
+    });
+    return ytApi;
+  }
+  // 回傳秒數；讀不到（網路、YouTube 限制嵌入）回傳 0，交給伺服器再檢查；影片不存在或私人丟出錯誤
+  async function ytDuration(url) {
+    const id = ytId(url);
+    if (!id) throw new Error('請貼上 YouTube 影片連結（youtube.com/watch?v=… 或 youtu.be/…）');
+    let YT;
+    try { YT = await loadYtApi(); } catch { return 0; }
+    return new Promise((resolve, reject) => {
+      const holder = document.createElement('div');
+      holder.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:120px;';
+      const inner = document.createElement('div');
+      holder.appendChild(inner);
+      document.body.appendChild(holder);
+      let done = false;
+      const finish = (fn, v) => { if (done) return; done = true; clearTimeout(timer); try { player.destroy(); } catch { /* 忽略 */ } holder.remove(); fn(v); };
+      const timer = setTimeout(() => finish(resolve, 0), 10000);
+      const player = new YT.Player(inner, {
+        videoId: id, width: 200, height: 120, playerVars: { autoplay: 0, controls: 0 },
+        events: {
+          onReady: (e) => {
+            const tick = (n) => { const d = e.target.getDuration(); if (d > 0 || n > 20) finish(resolve, d || 0); else setTimeout(() => tick(n + 1), 200); };
+            tick(0);
+          },
+          onError: (e) => (e.data === 100 ? finish(reject, new Error('這部影片不存在或是私人影片，請換一個連結')) : finish(resolve, 0)),
+        },
+      });
+    });
+  }
+  async function checkVideo(url) {
+    const sec = await ytDuration(url);
+    if (sec > MAX_SEC) throw new Error(`影片長度 ${Math.floor(sec / 60)} 分 ${Math.round(sec % 60)} 秒，超過 10 分鐘，請找單首歌的影片`);
+    return Math.round(sec);
+  }
   const show = (id, text) => { const e = $(id); e.textContent = text || ''; e.hidden = !text; };
 
   function setView(v) {
@@ -101,7 +150,12 @@
       video: $('sr-video').checked,
       note: $('sr-note').value.trim(),
     };
+    const btn = e.submitter || $('sr-form').querySelector('button[type=submit]');
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = '檢查影片中…';
     try {
+      body.sec = await checkVideo(body.url);
       const j = await api('/api/song-requests/', body);
       show('sr-ok', `✅ 已投稿「${j.item.work || j.item.title} ${j.item.kind}」，處理後會出現在音樂清單`);
       $('sr-url').value = ''; $('sr-note').value = ''; $('sr-tags').value = '';
@@ -109,6 +163,8 @@
       missing = missing.filter((w) => w.id !== body.work_id);
       loadMine(true);
     } catch (err) { show('sr-error', err.message); }
+    btn.disabled = false;
+    btn.textContent = label;
   });
 
   // ---------- 我的投稿 ----------
@@ -204,9 +260,11 @@
       const pick = row.querySelector(`input[name="${group}"]:checked`);
       const url = !pick || pick.value === 'own' ? urlIn.value.trim() : pick.value;
       btn.disabled = true;
+      btn.textContent = '檢查中…';
       try {
+        const sec = await checkVideo(url);
         await api('/api/song-requests/', {
-          work_id: w.id, kind: row.querySelector('.sr-mkind').value, tags: row.querySelector('.sr-mtags').value.trim(), url,
+          sec, work_id: w.id, kind: row.querySelector('.sr-mkind').value, tags: row.querySelector('.sr-mtags').value.trim(), url,
           audio: row.querySelector('.sr-ma').checked, video: row.querySelector('.sr-mv').checked, note: '我的追劇缺歌',
         });
         missing = missing.filter((x) => x.id !== w.id);
@@ -214,7 +272,7 @@
         row.innerHTML = `<b>${esc(w.title)}</b> <span class="sr-st done">✅ 已儲存，等待處理</span>`;
         $('sr-miss-n').textContent = missing.length || '';
         loadMine(true);
-      } catch (e) { err.textContent = e.message; err.hidden = false; btn.disabled = false; }
+      } catch (e) { err.textContent = e.message; err.hidden = false; btn.disabled = false; btn.textContent = '儲存'; }
     });
     return row;
   }

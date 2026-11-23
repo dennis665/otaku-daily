@@ -48,6 +48,7 @@ class SongRequest(models.Model):
     audio = models.BooleanField("下載音樂", default=True)
     video = models.BooleanField("下載影片", default=True)
     note = models.CharField("備註", max_length=200, blank=True)
+    sec = models.PositiveIntegerField("影片長度（秒，0＝不明）", default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

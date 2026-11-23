@@ -238,6 +238,26 @@ def manifest(request):
 # ---------- 🙋 歌曲投稿 ----------
 _YT = re.compile(r"^https?://(www\.|m\.|music\.)?(youtube\.com/(watch\?|shorts/|live/)|youtu\.be/)[\w\-?=&%./]+$")
 MAX_PENDING = 30
+MAX_VIDEO_SEC = 600   # 投稿影片最長 10 分鐘（單首歌；避免整集、合輯、一小時循環）
+
+
+def youtube_seconds(url):
+    """讀 YouTube 影片長度（秒）；影片不存在或私人回傳 -1；讀不到（例如被擋）回傳 0（前端已用嵌入播放器檢查過，這裡是補檢查）"""
+    m = re.search(r"(?:youtu\.be/|[?&]v=|/shorts/|/live/)([\w-]{11})", url)
+    if not m:
+        return 0
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"https://www.youtube.com/watch?v={m.group(1)}&hl=zh-TW",
+                                     headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "zh-TW,zh;q=0.9"})
+        html = urllib.request.urlopen(req, timeout=6).read(1_500_000).decode("utf-8", "ignore")
+    except Exception:
+        return 0
+    status = re.search(r'"playabilityStatus":\{"status":"(\w+)"', html)
+    if status and status.group(1) in ("ERROR", "LOGIN_REQUIRED"):
+        return -1
+    hit = re.search(r'"lengthSeconds":"(\d+)"', html)
+    return int(hit.group(1)) if hit else 0
 
 
 def _req_status():
@@ -249,7 +269,7 @@ def _req_status():
 def _req_json(r, status, me):
     st = status.get(str(r.id)) or {}
     return {"id": r.id, "work_id": r.work_id, "source_id": r.work.source_id if r.work else None, "work": r.work.title if r.work else "", "title": r.title, "kind": r.kind, "tags": r.tags,
-            "url": r.url, "audio": r.audio, "video": r.video, "note": r.note, "user": r.user.username, "mine": r.user_id == me.id,
+            "url": r.url, "audio": r.audio, "video": r.video, "note": r.note, "sec": r.sec, "user": r.user.username, "mine": r.user_id == me.id,
             "created": timezone.localtime(r.created_at).strftime("%Y/%m/%d %H:%M"),
             "status": st.get("status") or "pending", "song": st.get("song", ""), "result": st.get("note", "")}
 
@@ -287,13 +307,24 @@ def song_requests(request):
         return _err("請貼上 YouTube 影片連結（youtube.com/watch?v=… 或 youtu.be/…）")
     if not (data.get("audio") or data.get("video")):
         return _err("音樂和影片至少要勾一個")
+    try:
+        sec = max(0, int(data.get("sec") or 0))
+    except (TypeError, ValueError):
+        sec = 0
+    if not sec:
+        sec = youtube_seconds(url)
+        if sec < 0:
+            return _err("這部影片不存在或是私人影片，請換一個連結")
+    if sec > MAX_VIDEO_SEC:
+        return _err(f"影片長度 {sec // 60} 分 {sec % 60} 秒，超過 10 分鐘，請找單首歌的影片")
     pending = SongRequest.objects.filter(user=request.user).exclude(id__in=[int(k) for k in status if k.isdigit()])
     if pending.count() >= MAX_PENDING:
         return _err(f"你還有 {MAX_PENDING} 首投稿等待處理，處理完再投稿")
     if pending.filter(url=url).exists():
         return _err("這個連結你已經投稿過了，等待處理中")
     r = SongRequest.objects.create(user=request.user, work=work, title="" if work else title, kind=kind, tags=tags, url=url,
-                                   audio=bool(data.get("audio")), video=bool(data.get("video")), note=(data.get("note") or "").strip()[:200])
+                                   audio=bool(data.get("audio")), video=bool(data.get("video")), note=(data.get("note") or "").strip()[:200],
+                                   sec=sec)
     return _ok(item=_req_json(r, status, request.user))
 
 

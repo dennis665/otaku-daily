@@ -168,8 +168,22 @@ class SongMetaTests(TestCase):
 class SongRequestTests(TestCase):
     """🙋 歌曲投稿：檢查欄位、只能收回自己未處理的、處理狀態看 song_meta.json、缺歌清單只在測試站"""
     def setUp(self):
+        from unittest import mock
         self.user = get_user_model().objects.create_user("req", password="pw-123456")
         self.client.force_login(self.user)
+        patcher = mock.patch("player.views.youtube_seconds", return_value=0)   # 測試不連 YouTube
+        self.yt = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_video_length_limit(self):
+        r = self.post(sec=601)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("超過 10 分鐘", r.json()["error"])
+        self.assertEqual(self.post(sec=90).json()["item"]["sec"], 90)
+        self.yt.return_value = 3600   # 前端讀不到長度時，伺服器自己讀
+        self.assertEqual(self.post(url="https://youtu.be/zzzzzzzzzzz").status_code, 400)
+        self.yt.return_value = -1     # 不存在或私人影片
+        self.assertIn("不存在", self.post(url="https://youtu.be/yyyyyyyyyyy").json()["error"])
 
     def post(self, **kw):
         body = {"kind": "TV片頭曲", "url": "https://youtu.be/abcDEF12345", "audio": True, "video": True, "title": "自己的歌", **kw}
