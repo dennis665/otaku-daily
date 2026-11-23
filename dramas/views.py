@@ -106,7 +106,9 @@ def _filtered(request, qs):
         qs = qs.filter(media_type=media)
     if request.GET.get("only") == "new":
         qs = qs.filter(first_seen__gte=date.today() - timedelta(days=NEW_DAYS))
-    return qs.distinct().order_by("-sort_key", "title")
+    if label:   # 只有依播出季度篩選會 join 出重複的作品；不篩選時不做 DISTINCT（5000 多部作品比對全部欄位很慢）
+        qs = qs.distinct()
+    return qs.order_by("-sort_key", "title")
 
 
 def _page_json(request, qs, ids, extra=None):

@@ -75,10 +75,14 @@ def cards_for(work):
 
 def pick_works(user):
     """可以自選的卡包：每個有卡片的系列一個（追的作品排前面）；回傳 [(Work, 是否有追)]"""
-    reps = {}
-    for w in Work.objects.filter(id__in=card_work_ids()).select_related("franchise"):
-        c = canonical_work(w)
-        reps[c.id] = c
+    # 每個系列的代表作品＝該系列有卡的作品中 id 最小的（和 canonical_work 相同規則，但一次查完不逐部查）
+    reps, by_fr = {}, {}
+    for w in Work.objects.filter(id__in=card_work_ids()).select_related("franchise").order_by("id"):
+        if not w.franchise_id:
+            reps[w.id] = w
+        elif w.franchise_id not in by_fr:
+            by_fr[w.franchise_id] = w
+            reps[w.id] = w
     follows = set(Follow.objects.filter(user=user).values_list("work_id", flat=True))
     follow_fr = set(Work.objects.filter(id__in=follows).exclude(franchise=None).values_list("franchise_id", flat=True))
     out = [(w, w.id in follows or (w.franchise_id in follow_fr if w.franchise_id else False)) for w in reps.values()]
@@ -101,11 +105,12 @@ def status(user):
     check_rewards(user)   # 新集齊的組合羈絆、新解鎖的稱號
     day = today()
     state = GachaState.objects.filter(user=user).first()
-    has_cards = bool(card_work_ids())
+    pool_ids = card_work_ids()
+    has_cards = bool(pool_ids)
     base = {"day": day.isoformat(), "pity_left": PITY_AT - (state.since_ssr if state else 0),
             "sr_left": max(1, PITY_SR_AT - (state.since_sr if state else 0)),
             "new_left": max(1, PITY_NEW_AT - (state.since_new if state else 0)),
-            "pool_works": len(card_work_ids()), "bonus": state.bonus_tickets if state else 0, "task": task_status(user, day),
+            "pool_works": len(pool_ids), "bonus": state.bonus_tickets if state else 0, "task": task_status(user, day),
             "stardust": state.stardust if state else 0, "notice": state.notice if state else "",
             "title": state.title if state else ""}
     if state and state.notice:   # 通知只顯示一次
@@ -195,12 +200,19 @@ def special_works(user, state=None):
     """還可以用的限定抽卡作品（每部作品的代表作品，依作品編號）"""
     state = state if state is not None else GachaState.objects.filter(user=user).first()
     used = {int(x) for x in (state.special_used if state else [])}
-    out = []
-    for w in Work.objects.filter(source_id__in=SPECIAL_SIDS - used).select_related("franchise"):
-        c = canonical_work(w)
-        if c.id in drawable_work_ids([c.id]) and HIGH & set(cards_for(c).values_list("rarity", flat=True)):
-            out.append(w)
-    return out
+    targets = list(Work.objects.filter(source_id__in=SPECIAL_SIDS - used - HIDDEN_SIDS).select_related("franchise"))
+    if not targets:
+        return []
+    # 一次查出這些作品（含同系列）有 SSR 以上的卡，不逐部查
+    frs = {w.franchise_id for w in targets if w.franchise_id}
+    high = Card.objects.filter(active=True, rarity__in=HIGH).filter(
+        models.Q(work_id__in=[w.id for w in targets]) | models.Q(work__franchise_id__in=frs))
+    has_work, has_fr = set(), set()
+    for wid, fid in high.values_list("work_id", "work__franchise_id"):
+        has_work.add(wid)
+        if fid:
+            has_fr.add(fid)
+    return [w for w in targets if w.id in has_work or (w.franchise_id and w.franchise_id in has_fr)]
 
 
 def special_pull(user, work_id, rng=random):

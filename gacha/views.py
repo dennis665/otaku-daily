@@ -27,14 +27,11 @@ def _anim_url(work):
     """作品抽卡動畫網址（static/video/gacha/<source_id>.mp4，沒有則回空字串）"""
     if not work:
         return ""
-    cands = [work]
-    if work.franchise_id:
-        c = service.canonical_work(work)
-        if c and c.id != work.id:
-            cands.append(c)
-    for w in cands:
-        if w.source_id and (_ANIM_DIR / f"{w.source_id}.mp4").is_file():
-            return static(f"video/gacha/{w.source_id}.mp4")
+    if work.source_id and (_ANIM_DIR / f"{work.source_id}.mp4").is_file():   # 先看自己，沒有才查同系列代表作品
+        return static(f"video/gacha/{work.source_id}.mp4")
+    c = service.canonical_work(work) if work.franchise_id else None
+    if c and c.id != work.id and c.source_id and (_ANIM_DIR / f"{c.source_id}.mp4").is_file():
+        return static(f"video/gacha/{c.source_id}.mp4")
     return ""
 
 
@@ -42,14 +39,11 @@ def _anim_ssr_url(work):
     """抽到 SSR 以上時播放的華麗動畫（static/video/gacha/ssr/<source_id>.mp4，沒有則回空字串）"""
     if not work:
         return ""
-    cands = [work]
-    if work.franchise_id:
-        c = service.canonical_work(work)
-        if c and c.id != work.id:
-            cands.append(c)
-    for w in cands:
-        if w.source_id and (_ANIM_DIR / "ssr" / f"{w.source_id}.mp4").is_file():
-            return static(f"video/gacha/ssr/{w.source_id}.mp4")
+    if work.source_id and (_ANIM_DIR / "ssr" / f"{work.source_id}.mp4").is_file():
+        return static(f"video/gacha/ssr/{work.source_id}.mp4")
+    c = service.canonical_work(work) if work.franchise_id else None
+    if c and c.id != work.id and c.source_id and (_ANIM_DIR / "ssr" / f"{c.source_id}.mp4").is_file():
+        return static(f"video/gacha/ssr/{c.source_id}.mp4")
     return ""
 
 
@@ -86,10 +80,12 @@ def _cover(work):
 def _status_json(user):
     s = service.status(user)
     # 可以自選的卡包（每個系列一個，追的作品排前面）
-    s["works"] = [{"id": w.id, "title": w.franchise.name if w.franchise else w.title, "image": _cover(w),
-                   "card_back": cards.card_back_url(w), "anim": _anim_url(w), "anim_ssr": _anim_ssr_url(w), "followed": followed,
-                   "wheel": cards.wheel_theme(w)}
-                  for w, followed in service.pick_works(user)]
+    works = []
+    for w, followed in service.pick_works(user):
+        back, anim, anim_ssr = _work_media(w)
+        works.append({"id": w.id, "title": w.franchise.name if w.franchise else w.title, "image": f"{back}&w=240" if back else _cover(w),
+                      "card_back": back, "anim": anim, "anim_ssr": anim_ssr, "followed": followed, "wheel": cards.wheel_theme(w)})
+    s["works"] = works
     s["free_daily"] = FREE_DAILY
     s["pick_daily"] = PICK_DAILY
     s["dust_value"] = DUST_VALUE
@@ -111,7 +107,8 @@ def _status_json(user):
 def image(request, file):
     """卡面圖片（卡面庫不公開，由本站代為讀取；只有登入的人看得到）。檔名含內容指紋，內容不會變，可以長期快取"""
     try:
-        data = cards.image_bytes(file)
+        # ?w=240：卡背縮圖（卡包清單用，原圖 600×840 約 150KB → 約 15KB）
+        data = cards.thumb_bytes(file, 240) if request.GET.get("w") == "240" and file.startswith("card_backs/") else cards.image_bytes(file)
     except Exception:
         raise Http404
     res = HttpResponse(data, content_type="image/webp")

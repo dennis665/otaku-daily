@@ -67,6 +67,25 @@ def image_bytes(file):
     return data
 
 
+def thumb_bytes(file, width):
+    """縮小版圖片（寬 width，等比例），一樣放在記憶體快取"""
+    key = f"{file}@{width}"
+    if key in _images:
+        _images.move_to_end(key)
+        return _images[key]
+    import io
+
+    from PIL import Image
+    im = Image.open(io.BytesIO(image_bytes(file)))
+    im.thumbnail((width, width * 2), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, "WEBP", quality=82, method=4)
+    _images[key] = buf.getvalue()
+    while len(_images) > MAX_IMAGES:
+        _images.popitem(last=False)
+    return _images[key]
+
+
 # 卡面重新產生（同一個檔名、內容改了）時加 1，讓手機裡存的舊圖失效、重新讀取
 IMAGE_VERSION = 2
 
@@ -302,7 +321,7 @@ def wheel_theme(work):
     """轉盤主題（index.json 的 wheel）：{"logo": 圖片網址, "bg": 底色, "accent": 強調色}；沒有設定回 None。同系列共用"""
     themes = _state.get("wheel") or {}
     sids = [str(getattr(work, "source_id", ""))]
-    if getattr(work, "franchise_id", None):
+    if sids[0] not in themes and getattr(work, "franchise_id", None):   # 自己有設定就不用查同系列
         from dramas.models import Work
         sids += [str(s) for s in Work.objects.filter(franchise_id=work.franchise_id).values_list("source_id", flat=True)]
     for sid in sids:
