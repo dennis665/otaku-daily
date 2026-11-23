@@ -466,3 +466,6 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 @keyframes mq-slide { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--mq-d, 0)); } }
 .now-info .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { .mq-box.mq .mq-in { animation: none; } }
+/* 正在播放的那首：左邊編號換成芙莉蓮小動畫（和載入畫面同一張動圖，手機第一次載入後就有快取） */
+.list:not(.finder-results) li.active .no { flex: none; width: 46px; height: 46px; margin: -12px -8px -12px -12px; font-size: 0; color: transparent;
+  background: url("../img/loading-frieren.webp") center / contain no-repeat; }
