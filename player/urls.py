@@ -6,6 +6,8 @@ app_name = "player"
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("guide/", views.guide, name="guide"),
+    path("guide/media/<str:name>", views.guide_media, name="guide_media"),
     path("api/events/", views.events_api, name="events_api"),
     path("api/prefs/", views.prefs, name="prefs"),
     path("api/playlists/", views.playlists, name="playlists"),

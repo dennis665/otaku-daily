@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -28,6 +29,51 @@ def home(request):
         "hidden_tabs": UserPrefs.hidden_for(request.user),
         "song_aliases": alias_map(),
     })
+
+
+# ---------- 📖 功能介紹（第一次使用的人看）：截圖與影片放在不公開的卡面庫 guide/，登入才看得到 ----------
+GUIDE_VERSION = 1   # 介紹頁的截圖或影片重新錄製時加 1，讓手機重新下載
+_GUIDE_FILE = re.compile(r"^[a-z0-9-]+\.(webp|mp4)$")
+_guide_cache = {}
+
+
+@login_required
+def guide(request):
+    return render(request, "player/guide.html", {"v": GUIDE_VERSION})
+
+
+@login_required
+def guide_media(request, name):
+    """介紹頁的截圖與影片；影片支援分段讀取（iPhone 播放影片一定要）"""
+    if not _GUIDE_FILE.match(name):
+        raise Http404
+    from gacha import cards
+    if name not in _guide_cache:
+        try:
+            _guide_cache[name] = cards.read_file(f"guide/{name}")
+        except Exception:
+            raise Http404
+    data = _guide_cache[name]
+    ctype = "video/mp4" if name.endswith(".mp4") else "image/webp"
+    size = len(data)
+    m = re.match(r"bytes=(\d*)-(\d*)$", request.headers.get("Range", ""))
+    if m and ctype == "video/mp4" and (m.group(1) or m.group(2)):
+        if m.group(1):
+            start = int(m.group(1))
+            end = min(int(m.group(2)) if m.group(2) else size - 1, size - 1)
+        else:   # bytes=-N：最後 N 個位元組
+            start, end = max(0, size - int(m.group(2))), size - 1
+        if start > end:
+            res = HttpResponse(status=416)
+            res["Content-Range"] = f"bytes */{size}"
+            return res
+        res = HttpResponse(data[start:end + 1], status=206, content_type=ctype)
+        res["Content-Range"] = f"bytes {start}-{end}/{size}"
+    else:
+        res = HttpResponse(data, content_type=ctype)
+    res["Accept-Ranges"] = "bytes"
+    res["Cache-Control"] = "private, max-age=604800"
+    return res
 
 
 # ---------- 個人設定與自訂歌單 ----------

@@ -103,3 +103,34 @@ class RenamedSongTests(TestCase):
             self.assertEqual(m["urls"][pl._raw_url("幸運星.m4a")], pl._raw_url("幸運☆星 OP.m4a"))
             self.assertEqual(pl.audio_urls()["幸運星"], pl._raw_url("幸運☆星 OP.m4a"))
         self.assertEqual(pl.resolve_song("幸運星"), "幸運☆星 OP")
+
+
+class GuideTests(TestCase):
+    """📖 功能介紹頁：要登入；截圖與影片從卡面庫讀，影片支援分段讀取（iPhone 播影片需要）"""
+    def setUp(self):
+        from . import views
+        views._guide_cache.clear()
+        self.user = get_user_model().objects.create_user("guide", password="pw-123456")
+
+    def test_login_required(self):
+        self.assertEqual(self.client.get("/guide/").status_code, 302)
+        self.assertEqual(self.client.get("/guide/media/s-music.webp").status_code, 302)
+
+    def test_page_and_media(self):
+        from unittest import mock
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get("/guide/"), "功能介紹")
+        data = bytes(range(256)) * 4   # 1024 bytes
+        with mock.patch("gacha.cards.read_file", return_value=data) as rf:
+            r = self.client.get("/guide/media/v-music.mp4", HTTP_RANGE="bytes=10-19")
+            self.assertEqual(r.status_code, 206)
+            self.assertEqual(r["Content-Range"], "bytes 10-19/1024")
+            self.assertEqual(r.content, data[10:20])
+            r = self.client.get("/guide/media/v-music.mp4", HTTP_RANGE="bytes=-4")
+            self.assertEqual(r.content, data[-4:])
+            r = self.client.get("/guide/media/v-music.mp4")
+            self.assertEqual((r.status_code, len(r.content), r["Accept-Ranges"]), (200, 1024, "bytes"))
+            self.assertEqual(self.client.get("/guide/media/s-music.webp")["Content-Type"], "image/webp")
+            rf.assert_any_call("guide/v-music.mp4")
+        self.assertEqual(self.client.get("/guide/media/..%2Fsecret.webp").status_code, 404)
+        self.assertEqual(self.client.get("/guide/media/x.exe").status_code, 404)

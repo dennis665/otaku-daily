@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}功能介紹｜Ukiyo{% endblock %}
+{% block head %}
+<style>
+  .gd { max-width: 760px; margin: 0 auto; padding: 0 0 40px; }
+  .gd-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 14px; }
+  .gd-top h1 { font-size: 1.35rem; margin: 0; }
+  .gd-hero { background: linear-gradient(135deg, rgba(255, 111, 174, .18), rgba(94, 231, 255, .12)); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 16px; line-height: 1.7; }
+  .gd-hero p { margin: 0 0 6px; }
+  .gd-toc { display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 18px; position: sticky; top: 0; z-index: 5; padding: 8px 0; background: var(--bg); overflow-x: auto; scrollbar-width: none; }
+  .gd-toc::-webkit-scrollbar { display: none; }
+  .gd-toc a { flex: none; white-space: nowrap; padding: 7px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); text-decoration: none; font-size: .85rem; }
+  .gd-sec { background: var(--bg2); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 18px; scroll-margin-top: 64px; }
+  .gd-sec h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  .gd-sec h3 { margin: 16px 0 6px; font-size: .98rem; color: var(--cyan); }
+  .gd-sec p, .gd-sec li { line-height: 1.7; font-size: .93rem; }
+  .gd-sec ol, .gd-sec ul { padding-left: 1.3em; margin: 6px 0; }
+  .gd-sec .muted { color: var(--muted); font-size: .85rem; }
+  .gd-media { display: flex; gap: 10px; overflow-x: auto; padding: 6px 2px 10px; scroll-snap-type: x mandatory; }
+  .gd-media figure { flex: none; width: min(62vw, 240px); margin: 0; scroll-snap-align: start; }
+  .gd-media img, .gd-media video { width: 100%; aspect-ratio: 390 / 844; object-fit: cover; border-radius: 14px; border: 1px solid var(--line); background: #0d0b1f; display: block; }
+  .gd-media figcaption { font-size: .78rem; color: var(--muted); margin-top: 4px; text-align: center; }
+  .gd-media .vid figcaption::before { content: "🎬 "; }
+  .gd-tip { background: rgba(94, 231, 255, .08); border-left: 3px solid var(--cyan); padding: 8px 12px; border-radius: 8px; font-size: .88rem; margin: 10px 0 0; line-height: 1.6; }
+  .gd-back { display: inline-block; margin-top: 6px; }
+</style>
+{% endblock %}
+{% block content %}
+{% with m="/guide/media/" %}
+<div class="gd">
+  <div class="gd-top">
+    <h1>📖 Ukiyo 功能介紹</h1>
+    <a class="btn ghost sm" href="{% url 'player:home' %}">← 回首頁</a>
+  </div>
+  <div class="gd-hero">
+    <p>歡迎使用 <b>Ukiyo</b>！這裡集合了動漫音樂、影片、北部動漫活動、行程規劃、追劇和動畫小卡抽卡。</p>
+    <p>上方有 6 個分頁，點一下就能切換；用不到的分頁可以在右上角 ⚙️ 關掉。每個功能下面都有<b>截圖</b>和<b>操作影片</b>（左右滑動看更多），點影片就會播放。</p>
+  </div>
+
+  <nav class="gd-toc" aria-label="目錄">
+    <a href="#start">🚀 開始使用</a><a href="#music">🎵 音樂</a><a href="#video">🎬 影片</a><a href="#events">🎪 活動</a>
+    <a href="#plan">📅 行程</a><a href="#drama">📺 追劇</a><a href="#gacha">🎴 抽卡</a><a href="#wheel">🎡 轉盤</a><a href="#more">⚙️ 設定與通知</a>
+  </nav>
+
+  <section class="gd-sec" id="start">
+    <h2>🚀 開始使用</h2>
+    <ol>
+      <li><b>加到手機主畫面</b>：iPhone 用 Safari 開啟後按「分享 → 加入主畫面」；Android 用 Chrome 的選單「加到主畫面／安裝應用程式」。之後就像 App 一樣全螢幕開啟。</li>
+      <li><b>開通知</b>：右上角 🔔 →「開啟這台裝置的通知」，行程提醒、新作品上架都會推播給你（iPhone 需要先加到主畫面，iOS 16.4 以上）。</li>
+      <li><b>主機喚醒</b>：網站用免費主機，一段時間沒人用會休眠；打開時如果看到「主機喚醒中」的動畫畫面，等 30～60 秒會自動進入，不用一直重新整理。</li>
+    </ol>
+    <p class="gd-tip">💡 沒有網路時也能打開 App：音樂分頁可以播「存到手機」的歌，抽卡分頁可以看卡冊。</p>
+  </section>
+
+  <section class="gd-sec" id="music">
+    <h2>🎵 音樂</h2>
+    <p>收錄動漫主題曲與插曲，點歌名就播放，播完自動接下一首，手機鎖定畫面也會繼續播。</p>
+    <div class="gd-media">
+      <figure class="vid"><video src="{{ m }}v-music.mp4?v={{ v }}" poster="{{ m }}p-music.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>點歌播放</figcaption></figure>
+      <figure><img src="{{ m }}s-music.webp?v={{ v }}" alt="音樂播放器" loading="lazy"><figcaption>播放器</figcaption></figure>
+      <figure><img src="{{ m }}s-music-lists.webp?v={{ v }}" alt="歌單" loading="lazy"><figcaption>歌單與存到手機</figcaption></figure>
+    </div>
+    <h3>怎麼用</h3>
+    <ul>
+      <li><b>搜尋</b>：最上面的搜尋框輸入歌名、作品名（中文、日文、別名都可以）。</li>
+      <li><b>播放控制</b>：▶ 播放／暫停、⏮ ⏭ 上下一首、🔁 切換循環方式（全部循環、單曲循環、隨機播放）、⬇ 下載這首歌。</li>
+      <li><b>自訂歌單</b>：按「＋ 新歌單」建立，歌曲右邊的 ＋ 可以加進歌單；選了歌單後，上一首／下一首就只在這個歌單裡播。</li>
+      <li><b>存到手機（離線聽）</b>：選好歌單按「📥 存到手機」，之後沒網路也能聽，而且不耗流量；建議連 Wi-Fi 再存。</li>
+    </ul>
+  </section>
+
+  <section class="gd-sec" id="video">
+    <h2>🎬 影片</h2>
+    <p>動漫 MV 與片段，用法和音樂一樣：搜尋、點選播放、上一部／下一部、循環播放。</p>
+    <div class="gd-media">
+      <figure><img src="{{ m }}s-video.webp?v={{ v }}" alt="影片" loading="lazy"><figcaption>影片清單</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="gd-sec" id="events">
+    <h2>🎪 北部動漫活動</h2>
+    <p>每天自動整理北部的動漫展覽、快閃店、咖啡廳聯名、電影等活動，一天更新三次。</p>
+    <div class="gd-media">
+      <figure class="vid"><video src="{{ m }}v-event-plan.mp4?v={{ v }}" poster="{{ m }}p-event-plan.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>活動加入行程</figcaption></figure>
+      <figure><img src="{{ m }}s-events.webp?v={{ v }}" alt="活動" loading="lazy"><figcaption>活動清單</figcaption></figure>
+    </div>
+    <h3>怎麼用</h3>
+    <ul>
+      <li><b>篩選</b>：上方可以選「進行中／即將開始／這個週末」和活動類型，也能搜尋作品或地點，並切換排序。</li>
+      <li><b>地點</b>：點 📍 地址直接開 Google 地圖導航。</li>
+      <li><b>＋ 加入行程</b>：自動帶入活動名稱、地點、期間和連結，存起來之後到「行程」分頁決定哪天去。</li>
+      <li>標「資訊待確認」的活動，出發前請再看一下「查看來源」。右上角 🔄 可以手動抓最新資料。</li>
+    </ul>
+  </section>
+
+  <section class="gd-sec" id="plan">
+    <h2>📅 行程</h2>
+    <p>記錄要去的活動、跟朋友約出門，時間到了會推播提醒。</p>
+    <div class="gd-media">
+      <figure><img src="{{ m }}s-plan.webp?v={{ v }}" alt="行程" loading="lazy"><figcaption>行程清單</figcaption></figure>
+      <figure><img src="{{ m }}s-plan-new.webp?v={{ v }}" alt="新增行程" loading="lazy"><figcaption>新增行程</figcaption></figure>
+      <figure><img src="{{ m }}s-plan-groups.webp?v={{ v }}" alt="群組" loading="lazy"><figcaption>群組</figcaption></figure>
+    </div>
+    <h3>怎麼用</h3>
+    <ul>
+      <li><b>＋ 新增行程</b>：填標題、類型、時間、地點（📍 目前位置可自動帶入）、相關連結和提前提醒時間。</li>
+      <li><b>時間還沒決定</b>：勾起來先存到「時間未定」，之後按「🗓 決定時間」補上。</li>
+      <li><b>👥 群組</b>：建立群組後，用搜尋會員或「邀請連結」把朋友加進來；新增行程時勾選要分享的群組，群組成員都看得到、都能編輯，也都會收到提醒。</li>
+      <li><b>分享</b>：行程卡片的「📤 分享」可以產生連結傳給還沒加入群組的人。</li>
+      <li>分類：即將到來、時間未定、歷史（過去的行程，可以隱藏）。</li>
+    </ul>
+    <p class="gd-tip">🔔 要收到提醒，記得先在右上角開啟通知。</p>
+  </section>
+
+  <section class="gd-sec" id="drama">
+    <h2>📺 追劇</h2>
+    <p>整理每季新番與動畫電影，追了之後在「我的追劇」一眼看到最近播出的作品。劇庫每天自動更新。</p>
+    <div class="gd-media">
+      <figure class="vid"><video src="{{ m }}v-drama.mp4?v={{ v }}" poster="{{ m }}p-drama.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>探索並追劇</figcaption></figure>
+      <figure><img src="{{ m }}s-drama-mine.webp?v={{ v }}" alt="我的追劇" loading="lazy"><figcaption>我的追劇</figcaption></figure>
+      <figure><img src="{{ m }}s-drama-explore.webp?v={{ v }}" alt="探索劇庫" loading="lazy"><figcaption>探索劇庫</figcaption></figure>
+    </div>
+    <h3>怎麼用</h3>
+    <ul>
+      <li><b>🌐 探索劇庫</b>：用「分類導覽」選播出季度（例如 2026 年 10 月新番），或直接搜尋作品名（中文、日文、別名都可以）。</li>
+      <li><b>＋ 追劇</b>：按了就加到「⭐ 我的追劇」，依最新播出排序。再按一次取消。</li>
+      <li><b>NEW</b>：劇庫 14 天內新加入的作品會標 NEW，按「🆕 只看 NEW」可以只列出新作品。</li>
+      <li>點封面可以全螢幕看大圖，左右滑動換張、往下拉關閉。</li>
+    </ul>
+  </section>
+
+  <section class="gd-sec" id="gacha">
+    <h2>🎴 動畫小卡抽卡</h2>
+    <p>收集動畫角色小卡！每天送抽卡券，抽到的卡收進卡冊，重複的可以換星塵兌換想要的卡。</p>
+    <div class="gd-media">
+      <figure class="vid"><video src="{{ m }}v-gacha-pull.mp4?v={{ v }}" poster="{{ m }}p-gacha-pull.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>抽卡</figcaption></figure>
+      <figure class="vid"><video src="{{ m }}v-gacha-album.mp4?v={{ v }}" poster="{{ m }}p-gacha-album.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>翻卡冊、看大圖</figcaption></figure>
+      <figure><img src="{{ m }}s-gacha.webp?v={{ v }}" alt="抽卡首頁" loading="lazy"><figcaption>限定抽與展示櫃</figcaption></figure>
+      <figure><img src="{{ m }}s-gacha-works.webp?v={{ v }}" alt="選作品抽" loading="lazy"><figcaption>選作品抽</figcaption></figure>
+      <figure><img src="{{ m }}s-gacha-album.webp?v={{ v }}" alt="卡冊" loading="lazy"><figcaption>我的卡冊</figcaption></figure>
+      <figure><img src="{{ m }}s-gacha-shop.webp?v={{ v }}" alt="星塵商店" loading="lazy"><figcaption>星塵商店</figcaption></figure>
+      <figure><img src="{{ m }}s-gacha-ach.webp?v={{ v }}" alt="成就" loading="lazy"><figcaption>稱號與組合羈絆</figcaption></figure>
+      <figure><img src="{{ m }}s-gacha-quiz.webp?v={{ v }}" alt="問答" loading="lazy"><figcaption>問答</figcaption></figure>
+    </div>
+    <h3>抽卡券</h3>
+    <ul>
+      <li>每天台灣時間 00:00 補券：<b>自選抽卡券 10 張</b>（自己選作品抽）、<b>隨機抽卡券 5 張</b>（所有作品混在一起），當天沒用完不保留。</li>
+      <li><b>每日任務</b>：當天 App 開著累積 5 分鐘，可以領自選抽卡券 5 張（保留券，不會過期）。</li>
+      <li>一次可抽 1／5／10 張。新作品上架、活動時也會送保留券。</li>
+    </ul>
+    <h3>保底</h3>
+    <ul>
+      <li>每 10 抽必定 SR 以上、每 50 抽必定 SSR 以上、每 100 抽必中還沒拿過的卡。稀有度從低到高：N、R、SR、SSR、UR、秘・LR。</li>
+      <li>✨ <b>限定抽卡</b>：有華麗抽卡動畫的作品，每部送一次必中 SSR 以上的抽卡（抽卡頁最上面）。</li>
+    </ul>
+    <h3>卡冊、星塵與成就</h3>
+    <ul>
+      <li><b>📖 我的卡冊</b>：依作品排列，沒收集到的顯示剪影和卡號；點卡片看大圖，手指滑動可以傾斜欣賞。</li>
+      <li><b>✨ 星塵</b>：重複的卡可以分解成星塵（每張至少保留 1 張），在 🛒 星塵商店換抽卡券，或在卡冊點剪影直接兌換那張卡。</li>
+      <li><b>🏆 成就</b>：收集到一部作品 50%／100% 會解鎖稱號，可以選一個顯示；集齊「組合羈絆」裡的角色會送星塵。</li>
+      <li><b>⭐ 展示櫃</b>：在卡片大圖按「放進展示櫃」，最多擺 3 張最愛的卡在抽卡頁最上面。</li>
+      <li><b>🎯 問答</b>：🎵 聽歌猜作品、💬 名言猜猜看，各自每天 3 題，答對送星塵。</li>
+    </ul>
+  </section>
+
+  <section class="gd-sec" id="wheel">
+    <h2>🎡 決定轉盤</h2>
+    <p>午餐吃什麼、週末去哪裡，交給轉盤決定！在抽卡分頁的「🎡 轉盤」。</p>
+    <div class="gd-media">
+      <figure class="vid"><video src="{{ m }}v-wheel.mp4?v={{ v }}" poster="{{ m }}p-wheel.webp?v={{ v }}" controls muted playsinline preload="none"></video><figcaption>轉盤（超時空輝耀姬主題）</figcaption></figure>
+      <figure><img src="{{ m }}s-gacha-wheel.webp?v={{ v }}" alt="轉盤" loading="lazy"><figcaption>轉盤設定</figcaption></figure>
+    </div>
+    <ol>
+      <li><b>主題</b>：下拉選一部作品，轉盤的配色、logo 和背景都會換成那部作品的風格。</li>
+      <li><b>轉盤內容</b>：在下面的框框一行輸入一個選項（2～24 個），可以存好幾組，按「＋ 新增」建立新的。</li>
+      <li>點中間的按鈕開始轉，轉動時會播放那部作品的抽卡動畫，播完才揭曉結果；不想要的結果可以按「✂️ 拿掉這項再轉」。</li>
+    </ol>
+    <p class="gd-tip">轉盤的選項只存在這台手機上，換手機要重新輸入。</p>
+  </section>
+
+  <section class="gd-sec" id="more">
+    <h2>⚙️ 設定與通知</h2>
+    <div class="gd-media">
+      <figure><img src="{{ m }}s-settings.webp?v={{ v }}" alt="個人設定" loading="lazy"><figcaption>⚙️ 個人設定</figcaption></figure>
+      <figure><img src="{{ m }}s-notify.webp?v={{ v }}" alt="通知設定" loading="lazy"><figcaption>🔔 通知設定</figcaption></figure>
+    </div>
+    <ul>
+      <li><b>⚙️ 個人設定</b>：選擇要顯示哪些分頁，關掉的分頁資料都會保留，隨時可以再打開。</li>
+      <li><b>🔔 通知</b>：開啟後會收到行程提醒、新作品上架、活動送券等推播；可以按「📨 傳送測試通知」確認收得到，換手機要在新手機上再開一次。</li>
+      <li><b>自動更新</b>：網站有新版本時會自動重新整理（播放或填表單時會先提示，不會打斷你）。</li>
+    </ul>
+    <a class="btn sm gd-back" href="{% url 'player:home' %}">開始使用 Ukiyo →</a>
+  </section>
+</div>
+{% endwith %}
+<script>try { localStorage.setItem('ukiyoGuideSeen', '1'); } catch (e) { /* 無痕模式 */ }</script>
+{% endblock %}

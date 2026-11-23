@@ -446,3 +446,10 @@ body.offline-mode #m-off-get, body.offline-mode #m-off-del { display: none !impo
 .iv-dots { display: flex; justify-content: center; gap: 6px; padding: 10px 0 calc(env(safe-area-inset-bottom) + 14px); min-height: 8px; }
 .iv-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .3); }
 .iv-dots i.on { background: var(--pink); width: 18px; border-radius: 99px; }
+/* 第一次使用的功能介紹提示（home.html）與頁首 📖 */
+.guide-hint { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; padding: 10px 12px; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 111, 174, .2), rgba(94, 231, 255, .15)); border: 1px solid var(--line); font-size: .9rem; }
+.guide-hint[hidden] { display: none; }
+.guide-hint a { color: var(--cyan); font-weight: 700; text-decoration: none; flex: 1; }
+a.icon { display: inline-grid; place-items: center; text-decoration: none; }
+body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !important; }

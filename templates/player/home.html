@@ -6,6 +6,7 @@
 <header class="topbar">
   <div class="brand-sm">{% include "partials/avatar_rotator.html" %}{% include "partials/wordmark.html" %}</div>
   <div class="user">
+    <a class="icon sm bell" id="guide-open" href="{% url 'player:guide' %}" title="功能介紹" aria-label="功能介紹">📖</a>
     <button class="icon sm bell" id="s-open" type="button" title="個人設定" aria-label="個人設定">⚙️</button>
     <button class="icon sm bell" id="n-open" type="button" title="通知設定" aria-label="通知設定">🔔</button>
     <span id="u-name" data-name="{{ user.username }}">{{ user.username }}</span>
@@ -13,6 +14,23 @@
   </div>
 </header>
 
+{# 第一次使用：提示看功能介紹（看過或關掉就不再出現，記在這台手機） #}
+<div class="guide-hint" id="guide-hint" hidden>
+  <span>👋 第一次使用？</span><a href="{% url 'player:guide' %}">看看功能介紹與操作影片 →</a>
+  <button type="button" class="icon sm" id="guide-hint-close" aria-label="不用了">✕</button>
+</div>
+<script>
+  (() => {
+    const box = document.getElementById('guide-hint');
+    let seen = '1';
+    try { seen = localStorage.getItem('ukiyoGuideSeen'); } catch (e) { /* 無痕模式：不提示 */ }
+    if (seen || navigator.onLine === false) return;
+    box.hidden = false;
+    const done = () => { try { localStorage.setItem('ukiyoGuideSeen', '1'); } catch (e) { /* 忽略 */ } box.hidden = true; };
+    document.getElementById('guide-hint-close').addEventListener('click', done);
+    box.querySelector('a').addEventListener('click', done);
+  })();
+</script>
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="music" role="tab"><i>🎵</i><span>音樂 <b>{{ audio_count }}</b></span></button>
   {# 使用者在 ⚙️ 個人設定關掉的分頁不顯示（hidden_tabs） #}
