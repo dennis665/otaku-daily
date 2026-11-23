@@ -157,3 +157,23 @@ class CrawlerParseTests(TestCase):
         self.assertEqual(labels[:3], ["動畫化決定", "2026年7月新番", "2026年10月新番"])
         self.assertIn("2028年10月新番", labels)
         self.assertIn("2025年台版動畫電影", labels)
+
+
+class LinkSongsTests(TestCase):
+    """批次補歌後把新歌連到作品：只有管理員能用，同一網址不重複加，網址只能是影音庫的"""
+    def test_link(self):
+        from django.contrib.auth import get_user_model
+        from .models import Work
+        U = get_user_model()
+        w = Work.objects.create(source_id=991, title="測試", mp3_links=[])
+        url = "https://raw.githubusercontent.com/dennis665/fenglan-media-assets/main/video/%E6%B8%AC%E8%A9%A6.m4a"
+        body = json.dumps({"links": [{"work_id": w.id, "mp3": {"title": "測試", "url": url}, "mp4": {"title": "x", "url": "https://evil.example/x.mp4"}}]})
+        self.client.force_login(U.objects.create_user("normal", password="pw-123456"))
+        self.assertEqual(self.client.post("/dramas/api/link-songs/", body, content_type="application/json").status_code, 403)
+        self.client.force_login(U.objects.create_user("boss", password="pw-123456", is_staff=True))
+        for _ in range(2):
+            r = self.client.post("/dramas/api/link-songs/", body, content_type="application/json")
+            self.assertEqual(r.status_code, 200)
+        w.refresh_from_db()
+        self.assertEqual(w.mp3_links, [{"title": "測試", "url": url}])
+        self.assertEqual(w.mp4_links, [])

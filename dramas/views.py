@@ -231,3 +231,42 @@ def sync(request):
     SyncLog.objects.create(stats=summary)
     _dup_cache["at"] = _filter_cache["at"] = 0   # 分類與同名判斷重新計算
     return JsonResponse({"ok": True, **summary}, json_dumps_params={"ensure_ascii": False})
+
+
+# 新下載的主題曲連到追劇作品（管理員用；批次補歌後由管理員登入的瀏覽器呼叫）
+# body：{"links": [{"work_id": 作品 id, "mp3": {"title", "url"}?, "mp4": {"title", "url"}?}]}，已經有的同一網址不重複加
+_MEDIA_URL = "https://raw.githubusercontent.com/dennis665/fenglan-media-assets/main/video/"
+
+
+@login_required
+@require_POST
+def link_songs(request):
+    if not request.user.is_staff:
+        return JsonResponse({"error": "只有管理員可以使用"}, status=403)
+    try:
+        links = json.loads(request.body or "{}").get("links") or []
+    except ValueError:
+        return JsonResponse({"error": "格式錯誤"}, status=400)
+    done, missing = [], []
+    for item in links[:200]:
+        w = Work.objects.filter(pk=item.get("work_id")).first()
+        if not w:
+            missing.append(item.get("work_id"))
+            continue
+        changed = False
+        for field, key in (("mp3_links", "mp3"), ("mp4_links", "mp4")):
+            link = item.get(key)
+            if not link or not str(link.get("url", "")).startswith(_MEDIA_URL):
+                continue
+            current = list(getattr(w, field) or [])
+            if link["url"] not in [x.get("url") for x in current]:
+                current.append({"title": str(link.get("title") or "")[:200], "url": link["url"]})
+                setattr(w, field, current)
+                changed = True
+        if changed:
+            w.save(update_fields=["mp3_links", "mp4_links"])
+            done.append(w.id)
+    if done:
+        from player import songmeta
+        songmeta._cache["works"] = None   # 音樂清單的作品對應立刻重算
+    return JsonResponse({"ok": True, "linked": done, "missing": missing})
