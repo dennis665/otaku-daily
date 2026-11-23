@@ -57,11 +57,21 @@
             const tick = (n) => { const d = e.target.getDuration(); if (d > 0 || n > 20) finish(resolve, d || 0); else setTimeout(() => tick(n + 1), 200); };
             tick(0);
           },
-          onError: (e) => (e.data === 100 ? finish(reject, new Error('這部影片不存在或是私人影片，請換一個連結')) : finish(resolve, 0)),
+          // 100＝不存在／私人；101、150 可能是「禁止嵌入」也可能是不存在：看縮圖（不存在的只有 120 寬的預設灰圖）
+          onError: async (e) => {
+            if (e.data === 100 || !(await hasThumb(id))) finish(reject, new Error('這部影片不存在或是私人影片，請換一個連結'));
+            else finish(resolve, 0);
+          },
         },
       });
     });
   }
+  const hasThumb = (id) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth > 120);
+    img.onerror = () => resolve(false);
+    img.src = `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+  });
   async function checkVideo(url) {
     const sec = await ytDuration(url);
     if (sec > MAX_SEC) throw new Error(`影片長度 ${Math.floor(sec / 60)} 分 ${Math.round(sec % 60)} 秒，超過 10 分鐘，請找單首歌的影片`);
