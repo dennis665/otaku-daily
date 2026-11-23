@@ -163,3 +163,52 @@ class SongMetaTests(TestCase):
         self.assertNotIn("label", rows["米津玄師 - Lemon"])
         self.assertEqual(songs[1]["title"], "測試動畫1")   # 原清單不被改動
         songmeta._cache["works"] = None
+
+
+class SongRequestTests(TestCase):
+    """🙋 歌曲投稿：檢查欄位、只能收回自己未處理的、處理狀態看 song_meta.json、缺歌清單只在測試站"""
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("req", password="pw-123456")
+        self.client.force_login(self.user)
+
+    def post(self, **kw):
+        body = {"kind": "TV片頭曲", "url": "https://youtu.be/abcDEF12345", "audio": True, "video": True, "title": "自己的歌", **kw}
+        return self.client.post("/api/song-requests/", json.dumps(body), content_type="application/json")
+
+    def test_validate_and_list(self):
+        from dramas.models import Work
+        self.assertEqual(self.post(url="https://example.com/x").status_code, 400)
+        self.assertEqual(self.post(title="").status_code, 400)
+        self.assertEqual(self.post(kind="其他").status_code, 400)          # 其他要寫標籤
+        self.assertEqual(self.post(audio=False, video=False).status_code, 400)
+        w = Work.objects.create(source_id=991, title="測試動畫")
+        r = self.post(work_id=w.id, title="")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["item"]["work"], "測試動畫")
+        self.assertEqual(self.post(work_id=w.id).status_code, 400)        # 同一個連結不重複投稿
+        self.assertEqual(self.post(kind="其他", tags="角色歌", url="https://www.youtube.com/watch?v=xyz98765432").status_code, 200)
+        items = self.client.get("/api/song-requests/").json()["items"]
+        self.assertEqual([x["status"] for x in items], ["pending", "pending"])
+
+    def test_status_and_delete(self):
+        from unittest import mock
+
+        from player import songmeta
+        rid = self.post().json()["item"]["id"]
+        other = get_user_model().objects.create_user("other", password="pw-123456")
+        self.client.force_login(other)
+        self.assertEqual(self.client.post(f"/api/song-requests/{rid}/delete/").status_code, 404)   # 不能刪別人的
+        self.assertEqual(len(self.client.get("/api/song-requests/?scope=all").json()["items"]), 1)
+        self.client.force_login(self.user)
+        meta = {"requests": {str(rid): {"status": "done", "song": "自己的歌"}}}
+        with mock.patch.object(songmeta, "_meta", return_value=meta):
+            item = self.client.get("/api/song-requests/").json()["items"][0]
+            self.assertEqual((item["status"], item["song"]), ("done", "自己的歌"))
+            self.assertEqual(self.client.post(f"/api/song-requests/{rid}/delete/").status_code, 400)   # 處理過不能刪
+            self.assertEqual(self.client.get("/api/song-requests/?scope=all&pending=1").json()["items"], [])
+
+    def test_missing_only_on_staging(self):
+        from django.test import override_settings
+        self.assertEqual(self.client.get("/api/song-requests/missing/").status_code, 404)
+        with override_settings(APP_ENV="staging"):
+            self.assertEqual(self.client.get("/api/song-requests/missing/").status_code, 200)

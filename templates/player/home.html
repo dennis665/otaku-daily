@@ -84,6 +84,7 @@
   <div class="m-lists">
     <div class="chips" id="m-lists" role="group" aria-label="歌單"></div>
     <button class="chip add" id="m-list-new" type="button">＋ 新歌單</button>
+    <button class="chip add" id="sr-open" type="button">🙋 投稿歌曲</button>
   </div>
   <div class="m-list-bar" id="m-list-bar" hidden>
     <span id="m-list-info"></span>
@@ -385,6 +386,49 @@
   </div>
 </div>
 
+{# 🙋 歌曲投稿：選作品（或自己輸入名稱）＋類型＋YouTube 連結，管理者有空時批次下載（songreq.js） #}
+<div class="sheet-backdrop" id="sr-sheet" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><h3>🙋 投稿歌曲</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <div class="chips" id="sr-tabs" role="group" aria-label="投稿">
+      <button class="chip active" data-v="form" type="button">✍️ 投稿</button>
+      <button class="chip" data-v="mine" type="button">📜 我的投稿 <b id="sr-mine-n"></b></button>
+      {% if app_env == "staging" %}<button class="chip" data-v="missing" type="button">📋 我的追劇缺歌 <b id="sr-miss-n"></b></button>{% endif %}
+    </div>
+    <form id="sr-form" novalidate>
+      <p class="sheet-sub">想聽的歌清單裡沒有？貼上 YouTube 連結投稿，管理者會在有空時下載加進音樂清單。</p>
+      <div class="field sr-work">
+        <span>作品</span>
+        <div class="sr-picked" id="sr-picked" hidden><b id="sr-picked-name"></b><button class="act" type="button" id="sr-unpick">✕ 換一部</button></div>
+        <input id="sr-q" type="search" placeholder="搜尋追劇清單裡的作品（中文、日文都可以）" autocomplete="off">
+        <ul class="sr-results" id="sr-results" hidden></ul>
+        <label class="sr-own"><input type="checkbox" id="sr-own"> 不在追劇清單裡，自己輸入名稱</label>
+        <input id="sr-title" maxlength="150" placeholder="作品或歌曲名稱（例：米津玄師 - Lemon）" hidden>
+      </div>
+      <div class="field">
+        <span>類型</span>
+        <select id="sr-kind"><option>TV片頭曲</option><option>完整片頭曲</option><option>TV片尾曲</option><option>完整ED</option><option>劇中歌</option><option>完整劇中歌</option><option value="其他">其他（自己輸入標籤）</option></select>
+        <input id="sr-tags" maxlength="100" placeholder="標籤（選「其他」時必填，例：角色歌、Live 版）">
+      </div>
+      <div class="field">
+        <span>YouTube 連結</span>
+        <input id="sr-url" type="url" inputmode="url" placeholder="https://youtu.be/…" autocomplete="off">
+        <small>建議找官方頻道的「ノンクレジットOP／ED（無字幕片頭／片尾）」或 MV。</small>
+      </div>
+      <div class="sr-opts">
+        <label><input type="checkbox" id="sr-audio" checked> 🎵 音樂</label>
+        <label><input type="checkbox" id="sr-video" checked> 🎬 影片</label>
+      </div>
+      <div class="field"><span>備註（可不填）</span><input id="sr-note" maxlength="200" placeholder="例：第二季的 OP、想要完整版"></div>
+      <p class="alert" id="sr-error" hidden></p>
+      <p class="sr-ok" id="sr-ok" hidden></p>
+      <button class="btn primary" type="submit">送出投稿</button>
+    </form>
+    <div id="sr-mine" hidden></div>
+    <div id="sr-missing" hidden></div>
+  </div>
+</div>
+
 {# 加入歌單：勾選＝在歌單裡，取消勾選＝移出 #}
 <div class="sheet-backdrop" id="m-add" hidden>
   <div class="sheet">
@@ -467,6 +511,7 @@
 {% endblock %}
 {% block scripts %}
 <script src="{% static 'js/player.js' %}"></script>
+<script src="{% static 'js/songreq.js' %}"></script>
 <script src="{% static 'js/events.js' %}"></script>
 <script src="{% static 'js/planner.js' %}"></script>
 <script src="{% static 'js/notify.js' %}"></script>

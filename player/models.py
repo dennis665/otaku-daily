@@ -32,3 +32,26 @@ class Playlist(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# 🙋 歌曲投稿：大家可以投稿想加進音樂清單的歌（作品＋類型＋YouTube 連結），管理者有空時批次下載匯入
+SONG_KINDS = ("TV片頭曲", "完整片頭曲", "TV片尾曲", "完整ED", "劇中歌", "完整劇中歌", "其他")
+
+
+class SongRequest(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="song_requests")
+    work = models.ForeignKey("dramas.Work", null=True, blank=True, on_delete=models.SET_NULL, related_name="song_requests")
+    title = models.CharField("作品名稱（不在追劇清單時自己輸入）", max_length=150, blank=True)
+    kind = models.CharField("類型", max_length=20)
+    tags = models.CharField("自訂標籤", max_length=100, blank=True)
+    url = models.URLField("YouTube 連結", max_length=300)
+    audio = models.BooleanField("下載音樂", default=True)
+    video = models.BooleanField("下載影片", default=True)
+    note = models.CharField("備註", max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.work.title if self.work else self.title} {self.kind}"

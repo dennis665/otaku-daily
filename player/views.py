@@ -8,13 +8,14 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
 from django.templatetags.static import static
+from django.utils import timezone
 from django.views.decorators.cache import cache_control, never_cache
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from notifications.reminders import SCHEDULE_HINT
 
 from .events import fetched_at, get_events
-from .models import HIDEABLE_TABS, Playlist, UserPrefs
+from .models import HIDEABLE_TABS, SONG_KINDS, Playlist, SongRequest, UserPrefs
 from .playlist import alias_map, get_playlist, resolve_song
 from .songmeta import annotate
 
@@ -230,3 +231,105 @@ def manifest(request):
             {"src": static("icons/icon-maskable-512.png"), "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ],
     }, content_type="application/manifest+json", json_dumps_params={"ensure_ascii": False})
+
+
+# ---------- 🙋 歌曲投稿 ----------
+_YT = re.compile(r"^https?://(www\.|m\.|music\.)?(youtube\.com/(watch\?|shorts/|live/)|youtu\.be/)[\w\-?=&%./]+$")
+MAX_PENDING = 30
+
+
+def _req_status():
+    """處理結果記在 player/data/song_meta.json 的 requests：{投稿編號: {"status": "done"/"skip", "song": 歌名, "note": 說明}}"""
+    from .songmeta import _meta
+    return {str(k): v for k, v in (_meta().get("requests") or {}).items() if isinstance(v, dict)}
+
+
+def _req_json(r, status, me):
+    st = status.get(str(r.id)) or {}
+    return {"id": r.id, "work_id": r.work_id, "source_id": r.work.source_id if r.work else None, "work": r.work.title if r.work else "", "title": r.title, "kind": r.kind, "tags": r.tags,
+            "url": r.url, "audio": r.audio, "video": r.video, "note": r.note, "user": r.user.username, "mine": r.user_id == me.id,
+            "created": timezone.localtime(r.created_at).strftime("%Y/%m/%d %H:%M"),
+            "status": st.get("status") or "pending", "song": st.get("song", ""), "result": st.get("note", "")}
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def song_requests(request):
+    """GET：投稿清單（scope=all 列出所有人的，給管理者讀取處理）；POST：新增投稿"""
+    status = _req_status()
+    if request.method == "GET":
+        qs = SongRequest.objects.select_related("work", "user")
+        if request.GET.get("scope") != "all":
+            qs = qs.filter(user=request.user)
+        if request.GET.get("pending"):
+            qs = qs.exclude(id__in=[int(k) for k in status if k.isdigit()])
+        return _ok(items=[_req_json(r, status, request.user) for r in qs[:300]], kinds=list(SONG_KINDS))
+    data = _body(request)
+    url = (data.get("url") or "").strip()
+    kind = (data.get("kind") or "").strip()
+    tags = (data.get("tags") or "").strip()[:100]
+    title = (data.get("title") or "").strip()[:150]
+    work = None
+    if data.get("work_id"):
+        from dramas.models import Work
+        work = Work.objects.filter(pk=data.get("work_id")).first()
+        if not work:
+            return _err("找不到這部作品，請重新選擇")
+    if not work and not title:
+        return _err("請從追劇清單選一部作品，或自己輸入名稱")
+    if kind not in SONG_KINDS:
+        return _err("請選擇歌曲類型")
+    if kind == "其他" and not tags:
+        return _err("類型選「其他」時，請在標籤寫是什麼歌（例如：角色歌、Live 版）")
+    if not _YT.match(url):
+        return _err("請貼上 YouTube 影片連結（youtube.com/watch?v=… 或 youtu.be/…）")
+    if not (data.get("audio") or data.get("video")):
+        return _err("音樂和影片至少要勾一個")
+    pending = SongRequest.objects.filter(user=request.user).exclude(id__in=[int(k) for k in status if k.isdigit()])
+    if pending.count() >= MAX_PENDING:
+        return _err(f"你還有 {MAX_PENDING} 首投稿等待處理，處理完再投稿")
+    if pending.filter(url=url).exists():
+        return _err("這個連結你已經投稿過了，等待處理中")
+    r = SongRequest.objects.create(user=request.user, work=work, title="" if work else title, kind=kind, tags=tags, url=url,
+                                   audio=bool(data.get("audio")), video=bool(data.get("video")), note=(data.get("note") or "").strip()[:200])
+    return _ok(item=_req_json(r, status, request.user))
+
+
+@login_required
+@require_POST
+def song_request_delete(request, pk):
+    """收回自己還沒處理的投稿"""
+    r = get_object_or_404(SongRequest, pk=pk, user=request.user)
+    if str(r.id) in _req_status():
+        return _err("已經處理過的投稿不能刪除")
+    r.delete()
+    return _ok()
+
+
+@login_required
+@require_GET
+def song_request_missing(request):
+    """（只有測試站）我追的 TV 動畫中，2024 年 1 月以後播出、還沒有歌、也還沒投稿的作品"""
+    if settings.APP_ENV != "staging":
+        raise Http404
+    from dramas.models import Follow, Work
+
+    from .songmeta import song_works
+    have = {w.id for w in song_works().values()}
+    asked = set(SongRequest.objects.exclude(work=None).values_list("work_id", flat=True))
+    today = timezone.localdate()
+    now_key = today.year * 100 + today.month
+    out = []
+    ids = Follow.objects.filter(user=request.user).values_list("work_id", flat=True)
+    for w in Work.objects.filter(id__in=ids, media_type=Work.Media.TV).prefetch_related("airings"):
+        if w.mp3_links or w.mp4_links or w.id in have or w.id in asked:
+            continue
+        labels = []
+        for a in w.airings.all():
+            m = re.match(r"^(\d{4})年(\d{1,2})月新番$", a.label or "")
+            if m and 202401 <= int(m.group(1)) * 100 + int(m.group(2)) <= now_key:
+                labels.append((int(m.group(1)) * 100 + int(m.group(2)), a.label))
+        if labels:
+            out.append({"id": w.id, "title": w.title, "label": min(labels)[1], "jp": next((x for x in (w.alt_titles or []) if re.search(r"[ぁ-ヿ]", x)), "")})
+    out.sort(key=lambda x: x["label"], reverse=True)
+    return _ok(items=out)

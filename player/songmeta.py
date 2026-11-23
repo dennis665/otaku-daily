@@ -5,6 +5,8 @@
   沒對應到的可在 player/data/song_meta.json 的 work 手動指定作品編號
 - 類別：歌名有「劇中／主題曲」算劇中歌、有 ED 算片尾曲，其餘當片頭曲（song_meta.json 的 kind 可手動指定）；
   長度超過 105 秒（或歌名有「完整版」）算完整版，否則是 TV 尺寸（約 90 秒）
+- song_meta.json 的 label：手動指定顯示的類別文字（投稿選「其他」時的自訂標籤）；custom：不在追劇清單的作品
+  {歌名: {"work": 顯示的作品名, "label": 類別, "sub": 小字, "tags": 搜尋用}}；requests：投稿處理結果
 - 實際檔名不改（歌單、追劇連結、問答題庫都用檔名當編號），只改畫面上顯示的名稱
 """
 import json
@@ -83,16 +85,24 @@ def annotate(playlist):
     sub（系列・播出季度）、tags（搜尋用文字）；不是動畫歌的只有 name＝原檔名"""
     meta = _meta()
     secs, kinds = meta.get("sec") or {}, meta.get("kind") or {}
+    labels, custom = meta.get("label") or {}, meta.get("custom") or {}
     works = song_works()
     rows = []
     for s in playlist:
         w = works.get(s["id"])
+        c = custom.get(s["id"])
+        if not w and isinstance(c, dict) and c.get("work"):   # 投稿時自己輸入、不在追劇清單的作品
+            label = c.get("label") or ""
+            rows.append({**s, "name": f"{c['work']} {label}".strip(), "work": c["work"], "label": label, "sub": c.get("sub") or "",
+                         "tags": " ".join(x for x in [s["id"], c["work"], label, c.get("sub") or "", c.get("tags") or ""] if x),
+                         "_key": ("custom:" + c["work"], label)})
+            continue
         if not w:   # 不是動畫歌（歌手 - 歌名、放鬆音樂）：照原名顯示
             rows.append({**s, "name": s["title"], "sub": "", "tags": s["title"]})
             continue
         kind = _kind(s["id"], kinds)
         full = (secs.get(s["id"]) or 0) > FULL_SECONDS or "完整版" in s["id"]
-        label = LABELS[(kind, full)]
+        label = labels.get(s["id"]) or LABELS[(kind, full)]   # 投稿選「其他」時的自訂標籤（例：角色歌）
         season = _season(w)
         series = w.franchise.name if w.franchise else ""
         show_series = len(series) >= 3 and series != w.title   # 劇庫有些系列名稱太短（例：「Re」），不顯示

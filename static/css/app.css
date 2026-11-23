@@ -469,3 +469,30 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 /* 正在播放的那首：左邊編號換成芙莉蓮小動畫（和載入畫面同一張動圖，手機第一次載入後就有快取） */
 .list:not(.finder-results) li.active .no { flex: none; width: 46px; height: 46px; margin: -12px -8px -12px -12px; font-size: 0; color: transparent;
   background: url("../img/loading-frieren.webp") center / contain no-repeat; }
+/* 🙋 歌曲投稿（songreq.js） */
+#sr-sheet .chips { margin-bottom: 12px; }
+#sr-sheet select, #sr-sheet .field input { width: 100%; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font: inherit; }
+#sr-sheet .field input + input, #sr-sheet select + input { margin-top: 8px; }
+.sr-work { position: relative; }
+.sr-results { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); max-height: 240px; overflow-y: auto; }
+.sr-results li { padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.sr-results li:last-child { border-bottom: 0; }
+.sr-results li small { display: block; color: var(--muted); font-size: .75rem; }
+.sr-results li.muted { color: var(--muted); cursor: default; font-size: .85rem; }
+.sr-picked { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 111, 174, .12); border: 1px solid var(--pink); }
+.sr-picked b { flex: 1; }
+.sr-own, .sr-opts label { display: flex; align-items: center; gap: 6px; font-size: .88rem; color: var(--muted); margin-top: 8px; }
+.sr-own input, .sr-opts input { width: 18px; height: 18px; accent-color: var(--pink); }
+.sr-opts { display: flex; gap: 18px; margin: -4px 0 14px; }
+.sr-opts label { color: var(--text); margin: 0; }
+.sr-ok { color: #6fe3a1; font-size: .9rem; }
+.sr-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.sr-row > div { flex: 1; min-width: 0; }
+.sr-row small { display: block; color: var(--muted); font-size: .75rem; margin-top: 2px; }
+.sr-row a { color: var(--cyan); }
+.sr-kind { font-size: .75rem; color: var(--pink); }
+.sr-st { flex: none; font-size: .75rem; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
+.sr-st.done { color: #6fe3a1; border-color: #6fe3a1; }
+.sr-st.skip { color: var(--muted); }
+.sr-picked[hidden], #sr-sheet [hidden] { display: none !important; }
+#sr-sheet .sr-own input, #sr-sheet .sr-opts input { width: 18px; height: 18px; padding: 0; margin: 0; flex: none; }
