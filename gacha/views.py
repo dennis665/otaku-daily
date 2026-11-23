@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, JsonResponse
 from django.templatetags.static import static
+from django.views.decorators.gzip import gzip_page
 from django.views.decorators.http import require_GET, require_POST
 
 from dramas.models import Work
@@ -52,11 +53,23 @@ def _anim_ssr_url(work):
     return ""
 
 
-def _card(card, work_title, owned=None, new=False):
+def _work_media(work, memo=None):
+    """作品的卡背與抽卡動畫網址；同一次請求裡同一部作品只算一次（卡冊幾百張卡都屬於少數幾部作品，避免每張卡都查資料庫）"""
+    key = getattr(work, "id", None)
+    if memo is not None and key in memo:
+        return memo[key]
+    m = (cards.card_back_url(work), _anim_url(work), _anim_ssr_url(work))
+    if memo is not None:
+        memo[key] = m
+    return m
+
+
+def _card(card, work_title, owned=None, new=False, memo=None):
     title = card.work.franchise.name if (card.work and card.work.franchise) else work_title
+    back, anim, anim_ssr = _work_media(card.work, memo)
     return {"card_id": card.id, "work_id": card.work_id, "title": title, "name": card.name, "no": card.no,
             "rarity": card.rarity, "rarity_label": RARITY_LABEL[card.rarity], "image": cards.image_url(card),
-            "back_image": cards.card_back_url(card.work), "anim": _anim_url(card.work), "anim_ssr": _anim_ssr_url(card.work),
+            "back_image": back, "anim": anim, "anim_ssr": anim_ssr,
             "owned": owned is not None, "count": owned.count if owned else 0, "new": new,
             "first_at": owned.first_at.astimezone(service.TW).strftime("%Y/%m/%d") if owned else ""}
 
@@ -114,7 +127,8 @@ def status(request):
 
 def _pulled(user, pairs):
     owned = {o.card_id: o for o in OwnedCard.objects.filter(user=user, card_id__in=[p.card_id for p, _ in pairs])}
-    return [{**_card(p.card, p.card.work.title, owned.get(p.card_id), new), "pity": p.pity, "pity_kind": p.pity_kind} for p, new in pairs]
+    memo = {}
+    return [{**_card(p.card, p.card.work.title, owned.get(p.card_id), new, memo), "pity": p.pity, "pity_kind": p.pity_kind} for p, new in pairs]
 
 
 @login_required
@@ -191,10 +205,12 @@ def shop(request):
 
 @login_required
 @require_GET
+@gzip_page   # 卡冊資料約 240KB（幾百張卡），壓縮後約十分之一；只含卡片清單沒有機密，不受 BREACH 影響
 def album(request):
     """集卡冊：依系列/作品分組，列出這部作品所有卡片（還沒抽到的前端顯示剪影），依稀有度排序"""
     cards.sync()
-    owned = {o.card_id: o for o in OwnedCard.objects.filter(user=request.user).select_related("card", "work", "work__franchise")}
+    owned = {o.card_id: o for o in OwnedCard.objects.filter(user=request.user)
+             .select_related("card", "card__work", "card__work__franchise", "work", "work__franchise")}
     work_ids = {o.work_id for o in owned.values()}
     last = {}
     for o in owned.values():
@@ -202,12 +218,13 @@ def album(request):
     works = {w.id: w for w in Work.objects.filter(id__in=work_ids).select_related("franchise")}
     # 這些作品目前所有可抽的卡＋已經抽到的（包含停用的舊卡）
     pool = {c.id: c for c in Card.objects.filter(work_id__in=work_ids, active=True).select_related("work", "work__franchise")}
-    pool.update({cid: o.card for cid, o in owned.items() if o.card})
+    pool.update({cid: o.card for cid, o in owned.items() if o.card and cid not in pool})   # 停用的舊卡
     groups = {}
+    memo = {}
     for c in sorted(pool.values(), key=lambda c: (c.no or 9999, c.id)):
         w = works.get(c.work_id) or c.work
         title = w.franchise.name if (w and w.franchise) else (w.title if w else "")
-        groups.setdefault(c.work_id, []).append(_card(c, title, owned.get(c.id)))
+        groups.setdefault(c.work_id, []).append(_card(c, title, owned.get(c.id), memo=memo))
     items = []
     for wid in sorted(groups, key=lambda w: last.get(w), reverse=True):
         cs = groups[wid]
