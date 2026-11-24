@@ -400,14 +400,16 @@
   const showError = (id, msg) => { const el = $(id); el.textContent = msg || ''; el.hidden = !msg; };
 
   const songById = new Map(songs.map((s) => [s.id, s]));
+  const videoById = new Map(videos.map((s) => [s.id, s]));
   // 改過名的歌：舊名稱／舊網址 → 目前的（伺服器提供）
   const aliases = (() => { try { return JSON.parse($('song-aliases').textContent); } catch { return { ids: {}, urls: {} }; } })();
   const findSong = (id) => songById.get(id) || songById.get(aliases.ids[id]);
-  let myLists = [];
+  let myLists = [];   // 音樂歌單與影片歌單都在這裡（kind＝audio／video）
+  const listsOf = (kind) => myLists.filter((p) => (p.kind || 'audio') === kind);
   let listId = store.get('musicList', 'all');
   // 離線時選到的歌單如果沒有存到手機的歌，就先顯示「全部歌曲」（不改掉記住的選擇）
   const currentList = () => {
-    const p = myLists.find((x) => x.id === listId) || null;
+    const p = listsOf('audio').find((x) => x.id === listId) || null;
     if (p && !isOnline() && !p.songs.some((id) => songById.has(id) && saved.has(songById.get(id).audio))) return null;
     return p;
   };
@@ -430,7 +432,7 @@
     };
     const usable = (id) => songById.has(id) && playable(songById.get(id));
     chip('all', '🎵 全部歌曲', songs.filter(playable).length);
-    myLists.forEach((p) => {
+    listsOf('audio').forEach((p) => {
       const n = p.songs.filter(usable).length;
       if (n || isOnline()) chip(p.id, p.name, n);   // 離線模式：沒有存到手機的歌的歌單不顯示
     });
@@ -439,7 +441,22 @@
     if (cur) $('m-list-info').textContent = `「${cur.name}」共 ${queue.length} 首・依加入順序播放`;
   }
 
-  // 每一列右邊的按鈕：全部歌曲＝＋ 加入歌單（已在某個歌單裡顯示 ✓）；自訂歌單＝✕ 移出這個歌單
+  // 每一列右邊的按鈕：＋ 加入歌單（已在其他歌單裡顯示 ✓）；在自訂歌單裡多一個 ✕ 移出這個歌單
+  function addActs(li, song, kind, cur) {
+    const mk = (cls, text, title, fn) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `li-act${cls ? ` ${cls}` : ''}`;
+      btn.textContent = text;
+      btn.title = title;
+      btn.setAttribute('aria-label', title);
+      btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+      li.appendChild(btn);
+    };
+    const inOther = listsOf(kind).some((p) => (!cur || p.id !== cur.id) && p.songs.includes(song.id));
+    mk(inOther ? 'on' : '', inOther ? '✓' : '＋', cur ? '加入其他歌單' : '加入歌單', () => openAdd(song, kind));
+    if (cur) mk('rm', '✕', `從「${cur.name}」移除`, () => toggleSong(cur, song, false).catch((err) => alert(err.message)));
+  }
   function decorateSong(li, song) {
     li.classList.toggle('unavail', !playable(song));
     if (saved.has(song.audio)) {
@@ -449,24 +466,7 @@
       mark.title = '已存到手機，可離線播放';
       li.insertBefore(mark, li.querySelector('.playing'));
     }
-    const cur = currentList();
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'li-act';
-    if (cur) {
-      btn.classList.add('rm');
-      btn.textContent = '✕';
-      btn.title = `從「${cur.name}」移除`;
-      btn.addEventListener('click', (e) => { e.stopPropagation(); toggleSong(cur, song, false).catch((err) => alert(err.message)); });
-    } else {
-      const inAny = myLists.some((p) => p.songs.includes(song.id));
-      btn.classList.toggle('on', inAny);
-      btn.textContent = inAny ? '✓' : '＋';
-      btn.title = '加入歌單';
-      btn.addEventListener('click', (e) => { e.stopPropagation(); openAdd(song); });
-    }
-    btn.setAttribute('aria-label', btn.title);
-    li.appendChild(btn);
+    addActs(li, song, 'audio', currentList());
   }
 
   // 重新整理目前的播放清單；resetPage＝切換歌單時回到第一頁（或正在播的那一頁）
@@ -498,24 +498,27 @@
   async function toggleSong(p, song, on) {
     const res = await api(`/api/playlists/${p.id}/`, on ? { add: song.id } : { remove: song.id });
     replaceList(res.playlist);
-    refreshQueue(false);
+    refreshAll();
     return res.playlist;
   }
+  function refreshAll() { refreshQueue(false); refreshVQueue(false); }
 
   // 加入歌單視窗：每個歌單一個開關，打開＝加入、關掉＝移出
   let addSong = null;
+  let addKind = 'audio';   // 加入音樂歌單或影片歌單
   function paintAdd() {
     const box = $('m-add-lists');
+    const mine = listsOf(addKind);
     box.innerHTML = '';
-    box.hidden = !myLists.length;
-    $('m-add-name').placeholder = myLists.length ? '或建立新歌單並加入這首' : '還沒有歌單，輸入名稱建立一個';
-    myLists.forEach((p) => {
+    box.hidden = !mine.length;
+    $('m-add-name').placeholder = mine.length ? `或建立新歌單並加入這${addKind === 'video' ? '部' : '首'}` : '還沒有歌單，輸入名稱建立一個';
+    mine.forEach((p) => {
       const row = document.createElement('label');
       row.className = 'toggle-row';
       const name = document.createElement('span');
       name.textContent = p.name;
       const n = document.createElement('em');
-      n.textContent = `${p.songs.length} 首`;
+      n.textContent = `${p.songs.length} ${addKind === 'video' ? '部' : '首'}`;
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = p.songs.includes(addSong.id);
@@ -524,7 +527,7 @@
         showError('m-add-error', '');
         try {
           const np = await toggleSong(myLists.find((x) => x.id === p.id), addSong, cb.checked);
-          n.textContent = `${np.songs.length} 首`;
+          n.textContent = `${np.songs.length} ${addKind === 'video' ? '部' : '首'}`;
         } catch (err) {
           cb.checked = !cb.checked;
           showError('m-add-error', err.message);
@@ -535,9 +538,11 @@
       box.appendChild(row);
     });
   }
-  function openAdd(song) {
+  function openAdd(song, kind = 'audio') {
     addSong = song;
-    $('m-add-song').textContent = `🎵 ${song.name || song.title}`;
+    addKind = kind;
+    $('m-add').querySelector('h3').textContent = kind === 'video' ? '🎬 加入影片歌單' : '🎶 加入歌單';
+    $('m-add-song').textContent = `${kind === 'video' ? '🎬' : '🎵'} ${song.name || song.title}`;
     $('m-add-name').value = '';
     showError('m-add-error', '');
     paintAdd();
@@ -548,20 +553,22 @@
     const name = $('m-add-name').value.trim();
     if (!name) { showError('m-add-error', '請輸入歌單名稱'); return; }
     try {
-      const res = await api('/api/playlists/', { name, songs: [addSong.id] });
+      const res = await api('/api/playlists/', { name, kind: addKind, songs: [addSong.id] });
       replaceList(res.playlist);
       $('m-add-name').value = '';
       showError('m-add-error', '');
       paintAdd();
-      refreshQueue(false);
+      refreshAll();
     } catch (err) { showError('m-add-error', err.message); }
   });
 
   // 新增 / 改名 / 刪除歌單
   let editing = null;
-  function openEdit(p) {
+  let editKind = 'audio';
+  function openEdit(p, kind = 'audio') {
     editing = p;
-    $('m-edit-title').textContent = p ? '✏️ 編輯歌單' : '＋ 新歌單';
+    editKind = kind;
+    $('m-edit-title').textContent = p ? '✏️ 編輯歌單' : (kind === 'video' ? '＋ 新影片歌單' : '＋ 新歌單');
     $('m-edit-name').value = p ? p.name : '';
     $('m-edit-delete').hidden = !p;
     showError('m-edit-error', '');
@@ -569,15 +576,36 @@
   }
   $('m-list-new').addEventListener('click', () => openEdit(null));
   $('m-list-edit').addEventListener('click', () => openEdit(currentList()));
+  // 🎬 一鍵複製成影片歌單：同名的影片歌單已存在就整份更新，沒有影片的歌略過
+  $('m-list-copy').addEventListener('click', async () => {
+    const cur = currentList();
+    if (!cur) return;
+    const all = cur.songs.filter((id) => songById.has(id));
+    const ids = all.filter((id) => videoById.has(id));
+    if (!ids.length) { alert('這個歌單的歌都沒有影片'); return; }
+    const same = listsOf('video').find((p) => p.name === cur.name);
+    const skip = all.length - ids.length;
+    const msg = `${same ? '更新' : '建立'}影片歌單「${cur.name}」：共 ${ids.length} 部影片${skip ? `（${skip} 首沒有影片，略過）` : ''}`
+      + (same ? '\n原本這個影片歌單的內容會換成這一份。' : '');
+    if (!window.confirm(msg)) return;
+    try {
+      const res = same ? await api(`/api/playlists/${same.id}/`, { songs: ids })
+        : await api('/api/playlists/', { name: cur.name, kind: 'video', songs: ids });
+      replaceList(res.playlist);
+      selectVList(res.playlist.id);
+      refreshQueue(false);
+      if (window.confirm(`已${same ? '更新' : '建立'}影片歌單「${cur.name}」（${ids.length} 部），要切到影片分頁看看嗎？`)) tabBtnOf('video').click();
+    } catch (err) { alert(err.message); }
+  });
   $('m-edit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = $('m-edit-name').value.trim();
     if (!name) { showError('m-edit-error', '請輸入歌單名稱'); return; }
     try {
-      const res = editing ? await api(`/api/playlists/${editing.id}/`, { name }) : await api('/api/playlists/', { name });
+      const res = editing ? await api(`/api/playlists/${editing.id}/`, { name }) : await api('/api/playlists/', { name, kind: editKind });
       replaceList(res.playlist);
       closeSheet('m-edit');
-      if (editing) refreshQueue(false); else selectList(res.playlist.id);
+      if (editing) refreshAll(); else if (editKind === 'video') selectVList(res.playlist.id); else selectList(res.playlist.id);
     } catch (err) { showError('m-edit-error', err.message); }
   });
   $('m-edit-delete').addEventListener('click', async () => {
@@ -586,7 +614,7 @@
       await api(`/api/playlists/${editing.id}/delete/`, {});
       myLists = myLists.filter((p) => p.id !== editing.id);
       closeSheet('m-edit');
-      selectList('all');
+      if (editKind === 'video') selectVList('all'); else selectList('all');
     } catch (err) { showError('m-edit-error', err.message); }
   });
 
@@ -737,11 +765,13 @@
         store.set('myLists', myLists);
         if (store.get('loggedOut', false)) { store.set('loggedOut', false); showLoggedOut(false); }
         refreshQueue(true);
+        refreshVQueue(true);
       })
       .catch(() => {
         myLists = store.get('myLists', []);
         if (store.get('loggedOut', false)) showLoggedOut(true);
         refreshQueue(true);
+        refreshVQueue(true);
       });
   }
   myLists = isOnline() ? [] : store.get('myLists', []);
@@ -777,24 +807,78 @@
 
   // ---------- 影片 ----------
   const vList = $('v-list');
-  let vIndex = -1;
+  let vIndex = -1;            // 目前影片在 vQueue 裡的位置
+  let vQueue = videos;        // 目前選的影片歌單（全部影片或自訂），上一部／下一部照這個順序
+  let curVideo = null;
+  let vListId = store.get('videoList', 'all');
   const vLoop = setupLoop($('v-loop'), $('v-loop-text'), 'videoLoop');
+  const currentVList = () => listsOf('video').find((x) => x.id === vListId) || null;
 
   function loadVideo(i, autoplay = true) {
-    if (!videos.length) return;
+    if (!vQueue.length) return;
     vIndex = i;
+    const s = vQueue[i];
+    curVideo = s;
     if (autoplay) trackMediaLoading(video);
-    video.src = videos[i].video;
-    setMarqueeText($('v-title'), videos[i].name || videos[i].title);
+    video.src = s.video;
+    setMarqueeText($('v-title'), s.name || s.title);
     markActive(vList, i);
-    store.set('videoIndex', i);
+    store.set('videoId', s.id);
     if (autoplay) video.play().catch(() => {});
   }
-  $('v-prev').addEventListener('click', () => loadVideo(nextIndex(vLoop(), Math.max(vIndex, 0), videos.length, -1)));
-  $('v-next').addEventListener('click', () => loadVideo(nextIndex(vLoop(), vIndex, videos.length, 1)));
-  video.addEventListener('ended', () => (vLoop() === 'ONE' ? video.play() : loadVideo(nextIndex(vLoop(), vIndex, videos.length, 1))));
-  renderList(vList, videos, (i) => loadVideo(i));
-  setupFinder('v', videos, (i) => loadVideo(i), () => vIndex, '部');
+  $('v-prev').addEventListener('click', () => loadVideo(nextIndex(vLoop(), Math.max(vIndex, 0), vQueue.length, -1)));
+  $('v-next').addEventListener('click', () => loadVideo(nextIndex(vLoop(), vIndex, vQueue.length, 1)));
+  video.addEventListener('ended', () => (vLoop() === 'ONE' ? video.play() : loadVideo(nextIndex(vLoop(), vIndex, vQueue.length, 1))));
+
+  function paintVLists() {
+    const cur = currentVList();
+    const box = $('v-lists');
+    box.innerHTML = '';
+    const chip = (id, label, n) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.classList.toggle('active', cur ? cur.id === id : id === 'all');
+      b.textContent = `${label} `;
+      const count = document.createElement('b');
+      count.textContent = n;
+      b.append(count);
+      b.addEventListener('click', () => selectVList(id));
+      box.appendChild(b);
+    };
+    chip('all', '🎬 全部影片', videos.length);
+    listsOf('video').forEach((p) => chip(p.id, p.name, p.songs.filter((id) => videoById.has(id)).length));
+    $('v-list-bar').hidden = !cur;
+    $('v-list-empty').hidden = !cur || vQueue.length > 0;
+    if (cur) $('v-list-info').textContent = `「${cur.name}」共 ${vQueue.length} 部・依加入順序播放`;
+  }
+  function refreshVQueue(resetPage) {
+    const cur = currentVList();
+    vQueue = cur ? cur.songs.map((id) => videoById.get(id)).filter(Boolean) : videos;
+    vIndex = curVideo ? vQueue.indexOf(curVideo) : -1;
+    const state = lists[vList.id];
+    if (state) {
+      state.active = vIndex;
+      if (resetPage) state.pager.reset();
+    }
+    renderList(vList, vQueue, (i) => loadVideo(i), (li, s) => addActs(li, s, 'video', currentVList()));
+    if (resetPage && vIndex >= 0) lists[vList.id].pager.showIndex(vIndex, vQueue.length);
+    paintVLists();
+  }
+  function selectVList(id) {
+    vListId = id;
+    store.set('videoList', id);
+    refreshVQueue(true);
+  }
+  $('v-list-new').addEventListener('click', () => openEdit(null, 'video'));
+  $('v-list-edit').addEventListener('click', () => openEdit(currentVList(), 'video'));
+  refreshVQueue(false);
+  // 搜尋找的是全部影片；不在目前影片歌單裡的，先切回「全部影片」再播放
+  setupFinder('v', videos, (i) => {
+    let at = vQueue.indexOf(videos[i]);
+    if (at < 0) { selectVList('all'); at = i; }
+    loadVideo(at);
+  }, () => (curVideo ? videos.indexOf(curVideo) : -1), '部');
 
   // ---------- 鎖定畫面 / 耳機按鍵控制 ----------
   function updateMediaSession(s) {
@@ -817,9 +901,9 @@
   applyVol(store.get('volume', 100));
   const lastSong = findSong(store.get('musicId', '')) || songs[store.get('musicIndex', -1)];
   if (lastSong && queue.includes(lastSong)) loadSong(queue.indexOf(lastSong), false);
-  const lastVideo = store.get('videoIndex', -1);
+  const lastVideo = videoById.get(store.get('videoId', '')) || videos[store.get('videoIndex', -1)];
   const videoOn = !tabBtnOf('video').hidden;   // 影片分頁關掉時不預先載入影片
-  if (videoOn && lastVideo >= 0 && lastVideo < videos.length) loadVideo(lastVideo, false);
+  if (videoOn && lastVideo && vQueue.includes(lastVideo)) loadVideo(vQueue.indexOf(lastVideo), false);
   // 指定分頁：網址 ?tab=plan（例如從邀請頁回來）優先，否則還原上次的分頁
   const params = new URLSearchParams(location.search);
   window.appLaunchParams = params;   // 給行程頁讀取 ?invite= 等參數（網址列稍後會清掉）

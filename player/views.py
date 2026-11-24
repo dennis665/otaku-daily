@@ -116,7 +116,11 @@ def prefs(request):
 
 def _pl_json(p):
     # 已刪掉的重複歌曲換成保留的那首（同一首不重複出現）
-    return {"id": p.id, "name": p.name, "songs": list(dict.fromkeys(resolve_song(s) for s in p.songs))}
+    return {"id": p.id, "kind": p.kind, "name": p.name, "songs": list(dict.fromkeys(resolve_song(s) for s in p.songs))}
+
+
+def _clean_songs(value):
+    return [s for s in dict.fromkeys(value if isinstance(value, list) else []) if isinstance(s, str) and s][:MAX_SONGS]
 
 
 def _clean_name(value):
@@ -129,10 +133,14 @@ def _clean_name(value):
 @login_required
 @require_http_methods(["GET", "POST"])
 def playlists(request):
-    """GET 我的歌單；POST {name, songs?} 新增歌單"""
+    """GET 我的歌單（音樂與影片）；POST {name, kind?, songs?} 新增歌單（kind 預設 audio）"""
     mine = Playlist.objects.filter(user=request.user)
     if request.method == "POST":
         data = _body(request)
+        kind = data.get("kind") or "audio"
+        if kind not in Playlist.KINDS:
+            return _err("歌單類型錯誤")
+        mine = mine.filter(kind=kind)   # 音樂歌單與影片歌單各自計算數量、名稱可以相同
         if mine.count() >= MAX_PLAYLISTS:
             return _err(f"歌單最多 {MAX_PLAYLISTS} 個")
         try:
@@ -141,8 +149,7 @@ def playlists(request):
             return _err(str(exc))
         if mine.filter(name=name).exists():
             return _err("已經有同名的歌單")
-        songs = [s for s in dict.fromkeys(data.get("songs") or []) if isinstance(s, str) and s][:MAX_SONGS]
-        p = Playlist.objects.create(user=request.user, name=name, songs=songs)
+        p = Playlist.objects.create(user=request.user, kind=kind, name=name, songs=_clean_songs(data.get("songs")))
         return _ok(playlist=_pl_json(p))
     return _ok(playlists=[_pl_json(p) for p in mine])
 
@@ -150,7 +157,7 @@ def playlists(request):
 @login_required
 @require_POST
 def playlist_update(request, pk):
-    """POST {name} 改名、{add: 歌曲編號} 加歌、{remove: 歌曲編號} 移除歌曲"""
+    """POST {name} 改名、{add: 歌曲編號} 加歌、{remove: 歌曲編號} 移除歌曲、{songs: [...]} 整份換掉（從音樂歌單重新複製）"""
     p = get_object_or_404(Playlist, pk=pk, user=request.user)
     data = _body(request)
     if "name" in data:
@@ -158,9 +165,11 @@ def playlist_update(request, pk):
             name = _clean_name(data.get("name"))
         except ValueError as exc:
             return _err(str(exc))
-        if Playlist.objects.filter(user=request.user, name=name).exclude(pk=p.pk).exists():
+        if Playlist.objects.filter(user=request.user, kind=p.kind, name=name).exclude(pk=p.pk).exists():
             return _err("已經有同名的歌單")
         p.name = name
+    if "songs" in data:
+        p.songs = _clean_songs(data.get("songs"))
     add, remove = data.get("add"), data.get("remove")
     if isinstance(add, str) and add and add not in p.songs:
         if len(p.songs) >= MAX_SONGS:

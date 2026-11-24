@@ -88,7 +88,10 @@
   </div>
   <div class="m-list-bar" id="m-list-bar" hidden>
     <span id="m-list-info"></span>
-    <button class="act" id="m-list-edit" type="button">✏️ 改名／刪除</button>
+    <span class="m-list-btns">
+      <button class="act" id="m-list-copy" type="button" title="把這個歌單有影片的歌複製成影片歌單">🎬 複製成影片歌單</button>
+      <button class="act" id="m-list-edit" type="button">✏️ 改名／刪除</button>
+    </span>
   </div>
   {# 離線聽歌：把目前歌單存到手機，沒網路也能播 #}
   <div class="m-offline" id="m-offline" hidden>
@@ -99,7 +102,7 @@
     </span>
   </div>
   <p class="off-note" id="m-off-note" hidden></p>
-  <p class="empty sm" id="m-list-empty" hidden>這個歌單還沒有歌。到「全部歌曲」在歌名右邊按 ＋ 就能加進來。</p>
+  <p class="empty sm" id="m-list-empty" hidden>這個歌單還沒有歌。到「全部歌曲」或其他歌單，在歌名右邊按 ＋ 就能加進來。</p>
   <div id="m-list-pager-top"></div>
   <ol class="list" id="m-list"></ol>
   <div id="m-list-pager-bottom"></div>
@@ -126,6 +129,16 @@
     </div>
   </div>
   <p class="loop-text" id="v-loop-text">全部循環</p>
+  {# 影片歌單：和音樂歌單各自獨立；音樂歌單可以一鍵複製過來（沒有影片的歌略過） #}
+  <div class="m-lists">
+    <div class="chips" id="v-lists" role="group" aria-label="影片歌單"></div>
+    <button class="chip add" id="v-list-new" type="button">＋ 新影片歌單</button>
+  </div>
+  <div class="m-list-bar" id="v-list-bar" hidden>
+    <span id="v-list-info"></span>
+    <button class="act" id="v-list-edit" type="button">✏️ 改名／刪除</button>
+  </div>
+  <p class="empty sm" id="v-list-empty" hidden>這個影片歌單還沒有影片。到「全部影片」在右邊按 ＋ 加進來，或在音樂分頁的歌單按「🎬 複製成影片歌單」。</p>
   <div id="v-list-pager-top"></div>
   <ol class="list" id="v-list"></ol>
   <div id="v-list-pager-bottom"></div>

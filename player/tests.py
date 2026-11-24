@@ -42,6 +42,19 @@ class PrefsAndPlaylistTests(TestCase):
         self.post(f"{url}delete/", {})
         self.assertFalse(Playlist.objects.exists())
 
+    def test_video_playlist(self):
+        a = self.post("/api/playlists/", {"name": "通勤", "songs": ["a", "b"]}).json()["playlist"]
+        self.assertEqual(a["kind"], "audio")
+        # 影片歌單和音樂歌單各自獨立，名稱可以相同（一鍵複製時沿用音樂歌單的名稱）
+        v = self.post("/api/playlists/", {"name": "通勤", "kind": "video", "songs": ["b"]}).json()["playlist"]
+        self.assertEqual((v["kind"], v["songs"]), ("video", ["b"]))
+        self.assertEqual(self.post("/api/playlists/", {"name": "通勤", "kind": "video"}).status_code, 400)
+        self.assertEqual(self.post("/api/playlists/", {"name": "x", "kind": "bogus"}).status_code, 400)
+        # 重新複製：整份換掉
+        res = self.post(f"/api/playlists/{v['id']}/", {"songs": ["a", "b", "a"]}).json()["playlist"]
+        self.assertEqual(res["songs"], ["a", "b"])
+        self.assertEqual(sorted(p["kind"] for p in self.client.get("/api/playlists/").json()["playlists"]), ["audio", "video"])
+
     def test_cannot_touch_others_playlist(self):
         p = Playlist.objects.create(user=self.other, name="bob 的歌")
         self.assertEqual(self.post(f"/api/playlists/{p.id}/", {"add": "x"}).status_code, 404)

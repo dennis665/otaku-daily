@@ -20,8 +20,10 @@ class UserPrefs(models.Model):
 
 
 class Playlist(models.Model):
-    """個人歌單：songs 存歌曲編號（影音儲存庫的檔名，不含副檔名），依加入順序"""
+    """個人歌單：songs 存歌曲編號（影音儲存庫的檔名，不含副檔名），依加入順序；kind＝音樂歌單或影片歌單（各自獨立）"""
+    KINDS = ("audio", "video")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="playlists")
+    kind = models.CharField("類型", max_length=5, default="audio", choices=[("audio", "音樂"), ("video", "影片")])
     name = models.CharField("名稱", max_length=40)
     songs = models.JSONField("歌曲", default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

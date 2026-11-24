@@ -388,6 +388,8 @@ body.sheet-open { overflow: hidden; }
 .m-list-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .85rem; margin: 0 2px 8px; }
 .m-list-bar[hidden] { display: none; }
 .m-list-bar .act { flex: none; white-space: nowrap; }
+.m-list-bar { flex-wrap: wrap; }
+.m-list-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
 .empty.sm { font-size: .85rem; margin: 6px 0 12px; }
 /* 離線模式：只留音樂分頁的歌單與存在手機的歌 */
 body.offline-mode .tabs .tab:not([data-tab="music"]):not([data-tab="gacha"]),
@@ -395,7 +397,7 @@ body.offline-mode .tab[data-tab="gacha"] b, body.offline-mode #g-draw, body.offl
 body.offline-mode #g-local-clear,
 body.offline-mode #s-open, body.offline-mode #n-open, body.offline-mode .topbar .user form,
 body.offline-mode #m-finder, body.offline-mode #m-dl,
-body.offline-mode #m-list-new, body.offline-mode #m-list-edit,
+body.offline-mode #m-list-new, body.offline-mode #m-list-edit, body.offline-mode #m-list-copy,
 body.offline-mode .list .li-act,
 body.offline-mode #m-off-get, body.offline-mode #m-off-del { display: none !important; }
 /* 離線聽歌 */
@@ -410,6 +412,7 @@ body.offline-mode #m-off-get, body.offline-mode #m-off-del { display: none !impo
 .list .li-act { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg2); color: var(--text); cursor: pointer; font-size: .95rem; line-height: 1; }
 .list .li-act.on { border-color: var(--pink); color: var(--pink); }
 .list .li-act.rm { color: var(--err); }
+.list .li-act + .li-act { margin-left: 6px; }
 #m-add-form, #m-add-form input { margin-top: 0; }
 #m-add-form input { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); font-size: 1rem; }
 .danger-text { width: 100%; color: var(--err) !important; border-color: rgba(255, 128, 128, .4) !important; margin: 4px 0 8px; }
