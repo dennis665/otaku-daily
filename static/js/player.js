@@ -219,7 +219,8 @@
     input.addEventListener('input', update);
     input.addEventListener('focus', () => { if (input.value.trim()) update(); });
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && matches.length) { e.preventDefault(); pick(matches[0].i); }
+      // 注音／日文輸入法按 Enter 是在選字，不能當成「播放第一首」（iPhone Safari 選字時 keyCode 是 229）
+      if (e.key === 'Enter' && matches.length && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); pick(matches[0].i); }
       if (e.key === 'Escape') { input.value = ''; update(); }
     });
     clear.addEventListener('click', () => { input.value = ''; update(); input.focus(); });
