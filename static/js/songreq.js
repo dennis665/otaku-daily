@@ -229,14 +229,20 @@
     const box = $('sr-missing');
     const q = (box.querySelector('#sr-mq') || {}).value || '';
     const airedOnly = box.querySelector('#sr-maired') ? box.querySelector('#sr-maired').checked : true;
+    let noMovie = false;   // 「不看劇場版」記在這台手機
+    try { noMovie = localStorage.getItem('ukiyoMissNoMovie') === '1'; } catch (e) { /* 無痕模式 */ }
     $('sr-miss-n').textContent = missing.length || '';
-    const list = missing.filter((w) => (!airedOnly || w.aired) && (!q || `${w.title} ${w.jp}`.toLowerCase().includes(q.toLowerCase())));
+    const list = missing.filter((w) => (!airedOnly || w.aired) && (!noMovie || w.media !== '劇場版') && (!q || `${w.title} ${w.jp}`.toLowerCase().includes(q.toLowerCase())));
     box.innerHTML = `<p class="sheet-sub">你追的作品中還沒有歌、也還沒投稿的有 ${missing.length} 部（已播出 ${missing.filter((w) => w.aired).length} 部）。
       每部選好連結、類型與要下載的檔案後按「儲存」，<b>沒按儲存的不會處理</b>。</p>
-      <div class="sr-mtools"><input id="sr-mq" type="search" placeholder="搜尋作品" value="${esc(q)}"><label><input type="checkbox" id="sr-maired"${airedOnly ? ' checked' : ''}> 只看已播出</label></div>`;
+      <div class="sr-mtools"><input id="sr-mq" type="search" placeholder="搜尋作品" value="${esc(q)}"><label><input type="checkbox" id="sr-maired"${airedOnly ? ' checked' : ''}> 只看已播出</label><label><input type="checkbox" id="sr-mnomovie"${noMovie ? ' checked' : ''}> 不看劇場版（${missing.filter((w) => w.media === '劇場版').length}）</label></div>`;
     const mq = box.querySelector('#sr-mq');
     mq.addEventListener('input', () => { missLimit = 30; const pos = mq.selectionStart; paintMissing(); const n = $('sr-mq'); n.focus(); n.setSelectionRange(pos, pos); });
     box.querySelector('#sr-maired').addEventListener('change', () => { missLimit = 30; paintMissing(); });
+    box.querySelector('#sr-mnomovie').addEventListener('change', (e) => {
+      try { localStorage.setItem('ukiyoMissNoMovie', e.target.checked ? '1' : '0'); } catch (err) { /* 無痕模式 */ }
+      missLimit = 30; paintMissing();
+    });
     list.slice(0, missLimit).forEach((w) => box.appendChild(missRow(w)));
     if (list.length > missLimit) {
       const more = document.createElement('button');
