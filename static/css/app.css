@@ -382,8 +382,8 @@ body.sheet-open { overflow: hidden; }
 .toggle-row em { font-style: normal; color: var(--muted); font-size: .75rem; }
 
 /* 自訂歌單 */
-.m-lists { display: flex; gap: 8px; align-items: flex-start; margin-top: 4px; }
-.m-lists .chips { flex: 1; min-width: 0; }
+.m-lists { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin: 4px 0 8px; }
+.m-lists .chips { flex: 1 1 100%; min-width: 0; }   /* 歌單自己一整行（可左右滑），新歌單／投稿按鈕放下一行，歌單才不會被擠扁 */
 .chip.add { flex: none; color: var(--pink); border-style: dashed; }
 .m-list-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .85rem; margin: 0 2px 8px; }
 .m-list-bar[hidden] { display: none; }
