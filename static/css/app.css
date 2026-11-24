@@ -40,6 +40,7 @@ body.auth { display: grid; place-items: center; max-width: none; background: rad
 .user { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .9rem; min-width: 0; }
 .user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user form { margin: 0; }
+.user form .btn { white-space: nowrap; }
 .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; background: var(--bg2); padding: 5px; border-radius: 14px; margin-bottom: 16px; }
 .tab { border: 0; background: transparent; color: var(--muted); padding: 10px; border-radius: 10px; cursor: pointer; }
 .tab b { font-size: .75rem; background: var(--line); border-radius: 99px; padding: 1px 8px; margin-left: 4px; }
@@ -436,7 +437,7 @@ body.sheet-open { overflow: hidden; }
 body.offline-mode .tabs .tab:not([data-tab="music"]):not([data-tab="gacha"]),
 body.offline-mode .tab[data-tab="gacha"] b, body.offline-mode #g-draw, body.offline-mode .g-views .chip[data-g="draw"],
 body.offline-mode #g-local-clear,
-body.offline-mode #s-open, body.offline-mode #n-open, body.offline-mode .topbar .user form,
+body.offline-mode #s-open, body.offline-mode #n-open, body.offline-mode #x-open, body.offline-mode .topbar .user form,
 body.offline-mode #m-finder, body.offline-mode #m-dl,
 body.offline-mode #m-list-new, body.offline-mode #m-list-edit, body.offline-mode #m-list-copy,
 body.offline-mode .list .li-act,
@@ -562,3 +563,42 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 .sr-mopts input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--pink); margin: 0; }
 .sr-mrow .alert { margin: 6px 0 0; }
 .sr-more { width: 100%; margin-top: 4px; }
+/* 📲 傳檔案（transfer.js） */
+.x-me { color: var(--muted); font-size: .85rem; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.x-me b { color: var(--text); }
+.x-h { margin: 14px 0 8px; font-size: .95rem; }
+.x-h small { color: var(--muted); font-weight: normal; font-size: .75rem; }
+.x-empty { color: var(--muted); font-size: .85rem; margin: 4px 0; }
+.x-devices { display: grid; gap: 8px; }
+.x-dev-row { display: flex; gap: 8px; align-items: center; }
+.x-dev { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--bg2); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+.x-dev.active { border-color: var(--pink); box-shadow: 0 0 0 1px var(--pink) inset; }
+.x-dev.off { opacity: .55; cursor: default; }
+.x-dev-icon { font-size: 1.3rem; }
+.x-dev-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x-dev-state { font-size: .75rem; color: var(--muted); }
+.x-dev:not(.off) .x-dev-state { color: #6be38a; }
+.x-pick { display: grid; gap: 8px; }
+.x-pick[hidden] { display: none; }
+.x-pick .x-h { margin-bottom: 0; }
+.x-choose { cursor: pointer; text-align: center; }
+.x-limit { color: var(--muted); font-size: .75rem; }
+.x-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .85rem; }
+.x-files li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--bg2); word-break: break-all; }
+#x-error { margin: 10px 0 0; }
+.x-job { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; background: var(--bg2); }
+.x-job.ok { border-color: rgba(107, 227, 138, .5); }
+.x-job.failed { border-color: var(--err); }
+.x-job-head { display: flex; justify-content: space-between; gap: 8px; font-size: .9rem; }
+.x-job-head span { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.x-bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 8px 0 4px; }
+.x-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--pink)); transition: width .2s; }
+.x-job-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+.x-job-msg { color: var(--muted); font-size: .8rem; }
+.x-job.failed .x-job-msg { color: var(--err); }
+.x-got { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.x-got li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .85rem; }
+.x-got img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; }
+.x-got-name { flex: 1; min-width: 120px; word-break: break-all; }
+.x-got-btns { display: flex; gap: 6px; flex-wrap: wrap; }

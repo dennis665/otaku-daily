@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "notifications",
     "dramas",
     "gacha",
+    "transfer",
 ]
 
 MIDDLEWARE = [

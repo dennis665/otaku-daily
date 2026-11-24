@@ -7,6 +7,7 @@
   <div class="brand-sm">{% include "partials/avatar_rotator.html" %}{% include "partials/wordmark.html" %}</div>
   <div class="user">
     <a class="icon sm bell" id="guide-open" href="{% url 'player:guide' %}" title="功能介紹" aria-label="功能介紹">📖</a>
+    <button class="icon sm bell" id="x-open" type="button" title="傳檔案" aria-label="傳檔案">📲</button>
     <button class="icon sm bell" id="s-open" type="button" title="個人設定" aria-label="個人設定">⚙️</button>
     <button class="icon sm bell" id="n-open" type="button" title="通知設定" aria-label="通知設定">🔔</button>
     <span id="u-name" data-name="{{ user.username }}">{{ user.username }}</span>
@@ -467,6 +468,38 @@
   </form>
 </div>
 
+{# 📲 傳檔案：自己的手機、電腦之間點對點直傳，伺服器只牽線（transfer.js） #}
+<div class="sheet-backdrop" id="x-sheet" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><h3>📲 傳檔案</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <p class="sheet-sub">在自己的手機、電腦之間直接傳檔案，不經過伺服器。兩台都要打開 Ukiyo（最好連同一個 Wi-Fi），傳送時畫面不要關掉。</p>
+    <p class="x-me">這台：<b id="x-me-name">…</b> <button class="act" id="x-rename" type="button">✏️ 改名</button></p>
+    <h4 class="x-h">要傳給哪一台？</h4>
+    <div class="x-devices" id="x-devices"><p class="x-empty">讀取中…</p></div>
+    <div class="x-pick" id="x-pick" hidden>
+      <h4 class="x-h" id="x-to"></h4>
+      <label class="btn ghost x-choose"><input type="file" id="x-file" multiple hidden>📎 選擇檔案</label>
+      <small class="x-limit" id="x-limit"></small>
+      <ul class="x-files" id="x-files"></ul>
+      <button class="btn primary" id="x-send" type="button" disabled>📤 傳送</button>
+    </div>
+    <p class="alert" id="x-error" hidden></p>
+    <h4 class="x-h" id="x-jobs-h" hidden>傳送紀錄 <small>（收到的檔案只在這個畫面，關掉 App 前記得儲存）</small></h4>
+    <div id="x-jobs"></div>
+  </div>
+</div>
+
+{# 有人要傳檔案過來：問要不要接收 #}
+<div class="sheet-backdrop" id="x-ask" hidden>
+  <div class="sheet small">
+    <div class="sheet-head"><h3>📥 收到檔案</h3><button class="icon sm" type="button" data-close aria-label="拒絕">✕</button></div>
+    <p id="x-ask-from"></p>
+    <ul class="x-files" id="x-ask-files"></ul>
+    <p class="sheet-sub" id="x-ask-warn" hidden>接收時請留在 Ukiyo、不要鎖定螢幕，否則會中斷。</p>
+    <div class="sheet-foot"><button class="btn ghost" type="button" data-close>拒絕</button><button class="btn primary" type="button" id="x-accept">接收</button></div>
+  </div>
+</div>
+
 {# 通知設定 #}
 <div class="sheet-backdrop" id="n-sheet" hidden>
   <div class="sheet">
@@ -532,4 +565,5 @@
 <script src="{% static 'js/drama.js' %}"></script>
 <script src="{% static 'js/gacha.js' %}"></script>
 <script src="{% static 'js/wheel.js' %}"></script>
+<script src="{% static 'js/transfer.js' %}"></script>
 {% endblock %}

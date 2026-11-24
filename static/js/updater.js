@@ -14,12 +14,13 @@
   let checking = false;
   let toast = null;
 
-  // 正在播放影音，或表單有輸入內容（搜尋框除外）→ 不要自動重新整理
+  // 正在播放影音、表單有輸入內容（搜尋框除外）或正在傳檔案 → 不要自動重新整理
   function busy() {
     const playing = [...document.querySelectorAll('audio, video')].some((m) => !m.paused && !m.ended);
     const typing = [...document.querySelectorAll('form input:not([type=hidden]):not([type=search]), form textarea')]
       .some((f) => f.value && f.value !== f.defaultValue);
-    return playing || typing;
+    const transferring = document.body.classList.contains('x-busy');   // 📲 傳檔案進行中
+    return playing || typing || transferring;
   }
 
   function showToast() {
