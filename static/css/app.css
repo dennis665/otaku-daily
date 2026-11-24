@@ -178,6 +178,35 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
 /* ---------- 北部動漫活動 ---------- */
 .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
+/* 可滑動的提示：橫向標籤列（捲軸隱藏）在還有內容的那一邊淡出，滑到底那邊的淡出就消失（Modern Web Guidance: scrollability-affordance-hints）
+   新瀏覽器用捲動驅動動畫，不用程式；舊瀏覽器（例如 iOS 18 以前）由 scrollhint.js 加上 more-start／more-end */
+@property --fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.chips:not(.wrap) {
+  --fade-size: 28px;
+  scroll-padding-inline: var(--fade-size);   /* 用鍵盤或程式捲到某個標籤時，不要停在淡出的地方 */
+  -webkit-mask:
+    linear-gradient(black, black),
+    linear-gradient(to right, black, transparent) 0 0 / var(--fade-start) 100% no-repeat,
+    linear-gradient(to right, transparent, black) 100% 0 / var(--fade-end) 100% no-repeat;
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(black, black) no-clip subtract,
+    linear-gradient(to right, black, transparent) 0 0 / var(--fade-start) 100% no-repeat no-clip,
+    linear-gradient(to right, transparent, black) 100% 0 / var(--fade-end) 100% no-repeat no-clip;
+}
+@supports (animation-timeline: scroll()) {
+  .chips:not(.wrap) {
+    animation: chips-fade-start linear both, chips-fade-end linear both;
+    animation-timeline: scroll(self inline);
+    animation-range: 0 var(--fade-size), calc(100% - var(--fade-size)) 100%;
+  }
+}
+@keyframes chips-fade-start { to { --fade-start: var(--fade-size); } }
+@keyframes chips-fade-end { from { --fade-end: var(--fade-size); } }
+.chips.more-start { --fade-start: var(--fade-size); }
+.chips.more-end { --fade-end: var(--fade-size); }
+.chips:not(.wrap) { transition: --fade-start .2s, --fade-end .2s; }
 .chip { flex: none; border: 1px solid var(--line); background: var(--bg2); color: var(--muted); border-radius: 99px; padding: 6px 14px; font-size: .85rem; cursor: pointer; }
 .chip.active { background: var(--grad); color: #fff; border-color: transparent; font-weight: 700; }
 .e-meta { color: var(--muted); font-size: .8rem; margin: 2px 4px 10px; }
