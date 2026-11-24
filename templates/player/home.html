@@ -479,9 +479,14 @@
 <div class="sheet-backdrop" id="x-sheet" hidden>
   <div class="sheet">
     <div class="sheet-head"><h3>📲 傳檔案</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
-    <p class="sheet-sub">在自己的手機、電腦之間直接傳檔案，不經過伺服器。兩台都要打開 Ukiyo（最好連同一個 Wi-Fi），傳送時畫面不要關掉。</p>
+    <p class="sheet-sub">在自己的手機、電腦之間，或跟行程群組的朋友直接傳檔案，不經過伺服器。雙方都要打開 Ukiyo（最好連同一個 Wi-Fi），傳送時畫面不要關掉。</p>
     <p class="x-me">這台：<b id="x-me-name">…</b> <button class="act" id="x-rename" type="button">✏️ 改名</button></p>
-    <h4 class="x-h">要傳給哪一台？</h4>
+    <h4 class="x-h">要傳給誰？<small>可以複選</small></h4>
+    <div class="chips wrap x-views" id="x-views" role="group" aria-label="傳送對象">
+      <button class="chip active" data-v="mine" type="button">📱 我的裝置 <b></b></button>
+      <button class="chip" data-v="friends" type="button">👥 群組朋友 <b></b></button>
+    </div>
+    <div class="chips wrap" id="x-gfilter" role="group" aria-label="依群組篩選" hidden></div>
     <div class="x-devices" id="x-devices"><p class="x-empty">讀取中…</p></div>
     <div class="x-pick" id="x-pick" hidden>
       <h4 class="x-h" id="x-to"></h4>

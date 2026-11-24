@@ -615,3 +615,8 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 .x-got img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; }
 .x-got-name { flex: 1; min-width: 120px; word-break: break-all; }
 .x-got-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.x-views, #x-gfilter { margin-bottom: 8px; }
+.x-dev-name small { display: block; color: var(--muted); font-size: .72rem; overflow: hidden; text-overflow: ellipsis; }
+.x-dev[aria-pressed="true"] .x-dev-state { color: var(--pink); }
+.x-all { justify-self: start; }
+#x-error { white-space: pre-line; }

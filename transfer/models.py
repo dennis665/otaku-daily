@@ -15,6 +15,8 @@ ONLINE_SECONDS = 30            # 多久內有回報算在線
 WAIT_SECONDS = 120             # 對方多久沒按接收就算逾時
 KEEP_HOURS = 24                # 傳送紀錄（只有檔名與大小）保留多久
 DEVICE_KEEP_DAYS = 60          # 多久沒出現的裝置自動移除
+MAX_TARGETS = 5                # 一次最多同時傳給幾台裝置（每台各一條連線，傳送端要上傳好幾份）
+NUDGE_SECONDS = 60             # 「叫他打開 Ukiyo」推播的間隔
 
 
 class Device(models.Model):

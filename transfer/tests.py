@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -119,6 +120,78 @@ class TransferTests(TestCase):
         self.assertEqual(self.post(self.bob, f"/transfer/api/devices/{phone_id}/remove/").status_code, 404)
         self.post(self.alice, f"/transfer/api/devices/{phone_id}/remove/")
         self.assertFalse(Device.objects.filter(pk=phone_id).exists())
+
+    def make_group(self, *users):
+        from planner.models import Group, GroupMember
+        g = Group.objects.create(name="週末團")
+        for u in users:
+            GroupMember.objects.create(group=g, user=u)
+        return g
+
+    def test_group_friends_listed_and_can_send(self):
+        self.alice.first_name = "小愛"
+        self.alice.save()
+        self.make_group(self.alice, self.bob)
+        a_pc = self.poll(self.alice, "pc-00000001")["me"]["id"]
+        b_phone = self.poll(self.bob, "bob-0000001", "ios", "iPhone")["me"]["id"]
+        data = self.poll(self.alice, "pc-00000001")
+        self.assertEqual(data["groups"][0]["name"], "週末團")
+        self.assertEqual(data["friends"][0]["name"], "bob")
+        self.assertEqual([d["id"] for d in data["friends"][0]["devices"]], [b_phone])
+        # 朋友的裝置不會出現在「我的裝置」
+        self.assertEqual(data["devices"], [])
+
+        tid = self.send(self.alice, "pc-00000001", b_phone).json()["id"]
+        incoming = self.poll(self.bob, "bob-0000001", "ios")["incoming"]
+        self.assertEqual(incoming[0]["from_name"], "小愛（電腦）")
+        r = self.post(self.bob, f"/transfer/api/{tid}/answer/", {"device_id": "bob-0000001", "answer": "ans"})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self.poll(self.alice, "pc-00000001")["outgoing"][0]["to_name"], "bob（iPhone）")
+        # 朋友的 iPhone 一樣有單檔上限
+        big = [{"name": "v.mp4", "size": MAX_FILE_IOS + 1}]
+        self.assertEqual(self.send(self.alice, "pc-00000001", b_phone, big).status_code, 400)
+
+    def test_offline_friend_listed_without_devices(self):
+        self.make_group(self.alice, self.bob)
+        self.poll(self.alice, "pc-00000001")
+        friends = self.poll(self.alice, "pc-00000001")["friends"]
+        self.assertEqual((friends[0]["name"], friends[0]["devices"]), ("bob", []))
+
+    def test_max_targets(self):
+        from .models import MAX_TARGETS
+        users = [User.objects.create_user(f"u{i}", password="pw-123456-x") for i in range(MAX_TARGETS + 1)]
+        self.make_group(self.alice, *users)
+        self.poll(self.alice, "pc-00000001")
+        ids = [self.poll(u, f"dev-{u.username}-0001")["me"]["id"] for u in users]
+        for pk in ids[:MAX_TARGETS]:
+            self.assertEqual(self.send(self.alice, "pc-00000001", pk).status_code, 200)
+        r = self.send(self.alice, "pc-00000001", ids[MAX_TARGETS])
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("同時最多", r.json()["error"])
+
+    @mock.patch("transfer.views.send_to_users", return_value=(1, 0))
+    def test_nudge(self, push):
+        from django.core.cache import cache
+        cache.clear()
+        self.make_group(self.alice, self.bob)
+        r = self.post(self.alice, "/transfer/api/nudge/", {"user": self.bob.id})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(push.call_args.args[0], [self.bob])
+        self.assertEqual(push.call_args.kwargs["url"], "/?transfer=1")
+        # 1 分鐘內不重複通知
+        self.assertEqual(self.post(self.alice, "/transfer/api/nudge/", {"user": self.bob.id}).status_code, 400)
+        # 不是群組朋友不能通知
+        eve = User.objects.create_user("eve", password="pw-eve-123")
+        self.assertEqual(self.post(self.alice, "/transfer/api/nudge/", {"user": eve.id}).status_code, 404)
+
+    @mock.patch("transfer.views.send_to_users", return_value=(0, 0))
+    def test_nudge_without_push(self, push):
+        from django.core.cache import cache
+        cache.clear()
+        self.make_group(self.alice, self.bob)
+        r = self.post(self.alice, "/transfer/api/nudge/", {"user": self.bob.id})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("沒有開啟通知", r.json()["error"])
 
     def test_login_required(self):
         r = self.client.post("/transfer/api/poll/", "{}", content_type="application/json", secure=True)

@@ -38,9 +38,13 @@
   })();
 
   let me = null;
-  let devices = [];
-  let limits = { max_files: 10, max_total: 500 * MB, max_file_ios: 200 * MB };
-  let target = null;          // 選中的裝置 id
+  let devices = [];           // 我的其他裝置
+  let friends = [];           // 群組朋友 [{id, name, groups, devices:[在線裝置]}]
+  let groups = [];            // 我的行程群組
+  let view = 'mine';          // 目前看「我的裝置」或「群組朋友」
+  let groupFilter = 'all';
+  let limits = { max_files: 10, max_total: 500 * MB, max_file_ios: 200 * MB, max_targets: 5 };
+  const targets = new Set();  // 選中的裝置 id（可以同時傳給好幾台）
   let picked = [];            // 選好的檔案
   const jobs = new Map();     // 進行中與完成的傳送（傳出 out／收到 in）
   const asked = new Set();    // 已經問過使用者的收檔請求
@@ -90,8 +94,11 @@
       const data = await api('/transfer/api/poll/', { device_id: deviceId, name: defaultName, platform }, true);
       me = data.me;
       devices = data.devices;
+      friends = data.friends || [];
+      groups = data.groups || [];
       limits = data.limits || limits;
-      if (target && !devices.some((d) => d.id === target && d.online)) target = null;
+      const online = new Set(allTargets().filter((d) => d.online).map((d) => d.id));
+      [...targets].forEach((id) => { if (!online.has(id)) targets.delete(id); });
       data.incoming.forEach((t) => {
         if (asked.has(t.id)) return;
         asked.add(t.id);
@@ -105,6 +112,7 @@
         }
       });
       renderDevices();
+      renderPick();
       nextAsk();
     } catch (e) { /* 離線或伺服器休眠：下次再試 */ }
     polling = false;
@@ -169,53 +177,72 @@
   }
 
   // ---------- 傳送 ----------
+  // 可以傳送的對象：我的其他裝置＋群組朋友在線的裝置（label 是畫面上顯示的名稱）
+  function allTargets() {
+    return [
+      ...devices.map((d) => ({ ...d, label: d.name })),
+      ...friends.flatMap((f) => f.devices.map((d) => ({ ...d, label: `${f.name}（${d.name}）`, friend: f.id }))),
+    ];
+  }
+  const chosen = () => allTargets().filter((d) => targets.has(d.id));
+
   function checkPicked() {
-    const dev = devices.find((d) => d.id === target);
     if (!picked.length) return '請選擇要傳的檔案';
     if (picked.length > limits.max_files) return `一次最多傳 ${limits.max_files} 個檔案`;
     const total = picked.reduce((s, f) => s + f.size, 0);
     if (total > limits.max_total) return `一次最多傳 ${size(limits.max_total)}，請分批傳送`;
-    const big = dev && dev.platform === 'ios' && picked.find((f) => f.size > limits.max_file_ios);
+    const ios = chosen().some((d) => d.platform === 'ios');
+    const big = ios && picked.find((f) => f.size > limits.max_file_ios);
     if (big) return `「${big.name}」太大了：傳到 iPhone／iPad 每個檔案最多 ${size(limits.max_file_ios)}`;
     return '';
   }
 
-  async function startSend() {
-    const err = checkPicked();
-    const dev = devices.find((d) => d.id === target);
-    if (err || !dev) { showError(err || '請選擇要傳送的裝置'); return; }
-    showError('');
-    const files = picked.slice();
+  // 對一台裝置建立連線資訊並登記傳送；回傳傳送紀錄（還沒開始傳）
+  async function createOut(dev, files) {
     const pc = new RTCPeerConnection({ iceServers: ICE });
     const dc = pc.createDataChannel('files', { ordered: true });
-    let id;
     try {
-      await AppLoading.track((async () => {
-        await pc.setLocalDescription(await pc.createOffer());
-        await waitIce(pc);
-        const res = await api('/transfer/api/send/', {
-          device_id: deviceId, to: dev.id, offer: JSON.stringify(pc.localDescription),
-          files: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
-        }, true);
-        id = res.id;
-      })());
+      await pc.setLocalDescription(await pc.createOffer());
+      await waitIce(pc);
+      const res = await api('/transfer/api/send/', {
+        device_id: deviceId, to: dev.id, offer: JSON.stringify(pc.localDescription),
+        files: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+      }, true);
+      return {
+        id: res.id, dir: 'out', peer: dev.label, pc, dc, files: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+        total: files.reduce((s, f) => s + f.size, 0), done: 0, msg: `等「${dev.label}」按接收…`,
+      };
     } catch (e) {
       pc.close();
-      showError(e.message || '傳送失敗，請稍後再試');
-      return;
+      throw new Error(`${dev.label}：${e.message || '傳送失敗'}`);
     }
-    const j = {
-      id, dir: 'out', peer: dev.name, pc, dc, files: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
-      total: files.reduce((s, f) => s + f.size, 0), done: 0, msg: `等「${dev.name}」按接收…`,
-    };
-    jobs.set(id, j);
+  }
+
+  async function startSend() {
+    const err = checkPicked();
+    const list = chosen();
+    if (err || !list.length) { showError(err || '請選擇要傳給誰'); return; }
+    showError('');
+    const files = picked.slice();
+    // 傳給好幾台時同時建立（每台各一條連線，各自按接收、各自傳）
+    const results = await AppLoading.track(Promise.allSettled(list.map((dev) => createOut(dev, files))));
+    const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
+    const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    if (!ok.length) { showError(errors.join('\n')); return; }
     picked = [];
+    targets.clear();
     $('x-file').value = '';
+    ok.forEach((j) => { jobs.set(j.id, j); runOut(j, files); });
+    renderDevices();
     renderPick();
+    showError(errors.join('\n'));
     renderJobs();
     lockScreen();
     schedule();
+  }
 
+  async function runOut(j, files) {
+    const { pc, dc, id } = j;
     dc.binaryType = 'arraybuffer';
     dc.bufferedAmountLowThreshold = LOW_WATER;
     dc.addEventListener('open', () => {
@@ -399,46 +426,136 @@
   // ---------- 畫面 ----------
   function showError(msg) { const p = $('x-error'); p.textContent = msg; p.hidden = !msg; }
 
-  function renderDevices() {
-    if (me) $('x-me-name').textContent = me.name;
-    const box = $('x-devices');
-    if (!devices.length) {
-      box.replaceChildren(el('p', 'x-empty', '還沒有其他裝置。用同一個帳號在另一台手機或電腦登入 Ukiyo，就會出現在這裡。'));
-    } else {
-      box.replaceChildren(...devices.map((d) => {
-        const b = el('button', `x-dev${d.id === target ? ' active' : ''}${d.online ? '' : ' off'}`);
-        b.type = 'button';
-        b.disabled = !d.online;
-        b.append(el('span', 'x-dev-icon', icon(d.platform)), el('span', 'x-dev-name', d.name),
-          el('span', 'x-dev-state', d.online ? '● 在線' : '不在線'));
-        b.addEventListener('click', () => { target = d.id; renderDevices(); renderPick(); });
-        const wrap = el('div', 'x-dev-row');
-        wrap.append(b);
-        if (!d.online) {
-          const rm = el('button', 'act x-dev-rm', '移除');
-          rm.type = 'button';
-          rm.title = '從清單移除（那台下次打開 Ukiyo 會再出現）';
-          rm.addEventListener('click', async () => {
-            try { await api(`/transfer/api/devices/${d.id}/remove/`, {}); devices = devices.filter((x) => x !== d); renderDevices(); } catch (e) { showError(e.message); }
-          });
-          wrap.append(rm);
-        }
-        return wrap;
-      }));
-    }
-    $('x-pick').hidden = !target;
-    if (!target && devices.length && !devices.some((d) => d.online)) {
-      box.append(el('p', 'x-empty', '要傳送的話，先在另一台裝置打開 Ukiyo（不用開這個視窗，App 開著就好）。'));
+  function toggleTarget(id) {
+    if (targets.has(id)) targets.delete(id);
+    else if (targets.size >= limits.max_targets) { showError(`一次最多傳給 ${limits.max_targets} 台裝置`); return; }
+    else targets.add(id);
+    showError('');
+    renderDevices();
+    renderPick();
+  }
+
+  function devButton(d, label, sub) {
+    const on = targets.has(d.id);
+    const b = el('button', `x-dev${on ? ' active' : ''}${d.online ? '' : ' off'}`);
+    b.type = 'button';
+    b.disabled = !d.online;
+    b.setAttribute('aria-pressed', String(on));
+    const name = el('span', 'x-dev-name', label);
+    if (sub) name.append(el('small', '', sub));
+    b.append(el('span', 'x-dev-icon', icon(d.platform)), name,
+      el('span', 'x-dev-state', on ? '✔ 已選' : (d.online ? '● 在線' : '不在線')));
+    if (d.online) b.addEventListener('click', () => toggleTarget(d.id));
+    return b;
+  }
+
+  async function nudge(f, btn) {
+    btn.disabled = true;
+    try {
+      await api('/transfer/api/nudge/', { user: f.id });
+      btn.textContent = '✅ 已通知';
+    } catch (e) {
+      showError(e.message);
+      btn.disabled = false;
     }
   }
 
+  function renderMine(box) {
+    if (!devices.length) {
+      box.append(el('p', 'x-empty', '還沒有其他裝置。用同一個帳號在另一台手機或電腦登入 Ukiyo，就會出現在這裡。'));
+      return;
+    }
+    devices.forEach((d) => {
+      const row = el('div', 'x-dev-row');
+      row.append(devButton(d, d.name));
+      if (!d.online) {
+        const rm = el('button', 'act x-dev-rm', '移除');
+        rm.type = 'button';
+        rm.title = '從清單移除（那台下次打開 Ukiyo 會再出現）';
+        rm.addEventListener('click', async () => {
+          try { await api(`/transfer/api/devices/${d.id}/remove/`, {}); devices = devices.filter((x) => x !== d); renderDevices(); } catch (e) { showError(e.message); }
+        });
+        row.append(rm);
+      }
+      box.append(row);
+    });
+    if (!devices.some((d) => d.online)) box.append(el('p', 'x-empty', '要傳送的話，先在另一台裝置打開 Ukiyo（App 開著就好）。'));
+  }
+
+  function renderFriends(box) {
+    const gf = $('x-gfilter');
+    if (!groups.length) {
+      box.append(el('p', 'x-empty', '還沒有加入任何群組。到「📅 行程」→「👥 群組」建立群組並邀請朋友，就能互傳檔案。'));
+      return;
+    }
+    // 依群組篩選（只有一個群組就不顯示）
+    if (groups.length > 1) {
+      gf.hidden = false;
+      gf.replaceChildren(...[{ id: 'all', name: '全部' }, ...groups].map((g) => {
+        const c = el('button', `chip${String(g.id) === String(groupFilter) ? ' active' : ''}`, g.id === 'all' ? g.name : `👥 ${g.name}`);
+        c.type = 'button';
+        c.addEventListener('click', () => { groupFilter = g.id; renderDevices(); });
+        return c;
+      }));
+    }
+    const list = friends.filter((f) => groupFilter === 'all' || f.groups.includes(Number(groupFilter)));
+    if (!list.length) { box.append(el('p', 'x-empty', '這個群組還沒有其他成員。')); return; }
+    const onlineList = list.filter((f) => f.devices.length);
+    if (onlineList.length > 1) {
+      const all = el('button', 'act x-all', `✔ 全選在線的人（最多 ${limits.max_targets} 台）`);
+      all.type = 'button';
+      all.addEventListener('click', () => {
+        onlineList.forEach((f) => {
+          if (targets.size < limits.max_targets && !f.devices.some((d) => targets.has(d.id))) targets.add(f.devices[0].id);
+        });
+        showError('');
+        renderDevices();
+        renderPick();
+      });
+      box.append(all);
+    }
+    list.forEach((f) => {
+      if (f.devices.length) {
+        f.devices.forEach((d) => {
+          const row = el('div', 'x-dev-row');
+          row.append(devButton(d, f.name, d.name));
+          box.append(row);
+        });
+        return;
+      }
+      const row = el('div', 'x-dev-row');
+      row.append(devButton({ id: `u${f.id}`, platform: 'mobile', online: false }, f.name));
+      const nb = el('button', 'act x-dev-rm', '🔔 叫他上線');
+      nb.type = 'button';
+      nb.title = '推播通知對方打開 Ukiyo（對方要有開通知）';
+      nb.addEventListener('click', () => nudge(f, nb));
+      row.append(nb);
+      box.append(row);
+    });
+  }
+
+  function renderDevices() {
+    if (me) $('x-me-name').textContent = me.name;
+    $('x-views').querySelectorAll('.chip').forEach((c) => {
+      c.classList.toggle('active', c.dataset.v === view);
+      const n = c.querySelector('b');
+      const count = c.dataset.v === 'mine' ? devices.filter((d) => d.online).length : friends.filter((f) => f.devices.length).length;
+      if (n) n.textContent = count ? `${count} 在線` : '';
+    });
+    const box = $('x-devices');
+    box.replaceChildren();
+    $('x-gfilter').hidden = true;
+    if (view === 'mine') renderMine(box); else renderFriends(box);
+  }
+
   function renderPick() {
-    const dev = devices.find((d) => d.id === target);
-    $('x-pick').hidden = !dev;
-    if (!dev) return;
-    $('x-to').textContent = `傳給「${dev.name}」`;
+    const list = chosen();
+    $('x-pick').hidden = !list.length;
+    if (!list.length) return;
+    $('x-to').textContent = list.length === 1 ? `傳給「${list[0].label}」` : `傳給 ${list.length} 台：${list.map((d) => d.label).join('、')}`;
     const lim = `一次最多 ${limits.max_files} 個檔案、共 ${size(limits.max_total)}`
-      + (dev.platform === 'ios' ? `；傳到 iPhone／iPad 每個檔案最多 ${size(limits.max_file_ios)}` : '');
+      + (list.some((d) => d.platform === 'ios') ? `；傳到 iPhone／iPad 每個檔案最多 ${size(limits.max_file_ios)}` : '')
+      + (list.length > 1 ? '；同時傳給好幾台會比較慢（每台各傳一份）' : '');
     $('x-limit').textContent = lim;
     const ul = $('x-files');
     ul.replaceChildren(...picked.map((f, i) => {
@@ -446,12 +563,12 @@
       const rm = el('button', 'act', '✕');
       rm.type = 'button';
       rm.setAttribute('aria-label', `移除 ${f.name}`);
-      rm.addEventListener('click', () => { picked.splice(i, 1); renderPick(); });
+      rm.addEventListener('click', () => { picked.splice(i, 1); showError(''); renderPick(); });
       li.append(rm);
       return li;
     }));
     const err = picked.length ? checkPicked() : '';
-    showError(err);
+    if (picked.length) showError(err);
     const send = $('x-send');
     send.disabled = !picked.length || !!err;
     send.textContent = picked.length ? `📤 傳送 ${picked.length} 個檔案（${size(picked.reduce((s, f) => s + f.size, 0))}）` : '📤 傳送';
@@ -529,6 +646,19 @@
   }
 
   $('x-open').addEventListener('click', openSheet);
+  $('x-views').addEventListener('click', (e) => {
+    const c = e.target.closest('.chip');
+    if (!c || c.dataset.v === view) return;
+    view = c.dataset.v;
+    renderDevices();
+  });
+  // 朋友按了「🔔 叫他上線」的推播：打開 App 就直接開傳檔案視窗
+  const launch = window.appLaunchParams || new URLSearchParams(location.search);
+  if (launch.get('transfer')) {
+    history.replaceState(null, '', location.pathname);
+    setTimeout(openSheet, 300);
+  }
+  window.addEventListener('app-link', (e) => { if (e.detail.get('transfer')) openSheet(); });
   sheet.addEventListener('click', (e) => { if (e.target === sheet || e.target.closest('[data-close]')) closeSheet(); });
   $('x-file').addEventListener('change', (e) => {
     const add = [...e.target.files].filter((f) => !picked.some((p) => p.name === f.name && p.size === f.size));

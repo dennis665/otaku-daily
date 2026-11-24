@@ -8,6 +8,7 @@ urlpatterns = [
     path("api/poll/", views.poll, name="poll"),
     path("api/send/", views.send, name="send"),
     path("api/rename/", views.rename, name="rename"),
+    path("api/nudge/", views.nudge, name="nudge"),
     path("api/devices/<int:pk>/remove/", views.remove_device, name="remove_device"),
     path("api/<uuid:pk>/", views.detail, name="detail"),
     path("api/<uuid:pk>/answer/", views.answer, name="answer"),
