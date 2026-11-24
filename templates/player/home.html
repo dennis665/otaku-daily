@@ -5,13 +5,20 @@
 {% block content %}
 <header class="topbar">
   <div class="brand-sm">{% include "partials/avatar_rotator.html" %}{% include "partials/wordmark.html" %}</div>
+  {# 帳號選單：點暱稱展開（個人設定、傳檔案、分頁設定、通知、功能介紹、登出）（usermenu.js） #}
   <div class="user">
-    <a class="icon sm bell" id="guide-open" href="{% url 'player:guide' %}" title="功能介紹" aria-label="功能介紹">📖</a>
-    <button class="icon sm bell" id="x-open" type="button" title="傳檔案" aria-label="傳檔案">📲</button>
-    <button class="icon sm bell" id="s-open" type="button" title="個人設定" aria-label="個人設定">⚙️</button>
-    <button class="icon sm bell" id="n-open" type="button" title="通知設定" aria-label="通知設定">🔔</button>
-    <span id="u-name" data-name="{{ user.username }}">{{ user.username }}</span>
-    <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn ghost sm" type="submit">登出</button></form>
+    <button class="u-btn" id="u-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="u-menu">
+      <span id="u-name" data-name="{{ user.first_name|default:user.username }}">{{ user.first_name|default:user.username }}</span><i aria-hidden="true">▾</i>
+    </button>
+    <div class="u-menu" id="u-menu" role="menu" hidden>
+      <a class="u-item" role="menuitem" id="u-profile" href="{% url 'accounts:profile' %}">👤 個人設定</a>
+      <button class="u-item" role="menuitem" id="x-open" type="button">📲 傳檔案</button>
+      <button class="u-item" role="menuitem" id="s-open" type="button">🧩 分頁設定</button>
+      <button class="u-item" role="menuitem" id="n-open" type="button">🔔 通知設定</button>
+      <a class="u-item" role="menuitem" id="guide-open" href="{% url 'player:guide' %}">📖 功能介紹</a>
+      <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="u-item u-logout" role="menuitem" type="submit">🚪 登出</button></form>
+      <button type="button" data-close hidden>關閉</button>
+    </div>
   </div>
 </header>
 
@@ -34,7 +41,7 @@
 </script>
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="music" role="tab"><i>🎵</i><span>音樂 <b>{{ audio_count }}</b></span></button>
-  {# 使用者在 ⚙️ 個人設定關掉的分頁不顯示（hidden_tabs） #}
+  {# 使用者在 🧩 分頁設定關掉的分頁不顯示（hidden_tabs） #}
   <button class="tab" data-tab="video" role="tab"{% if "video" in hidden_tabs %} hidden{% endif %}><i>🎬</i><span>影片 <b>{{ video_count }}</b></span></button>
   <button class="tab" data-tab="events" role="tab"{% if "events" in hidden_tabs %} hidden{% endif %}><i>🎪</i><span>活動 <b id="e-count">…</b></span></button>
   <button class="tab" data-tab="plan" role="tab"{% if "plan" in hidden_tabs %} hidden{% endif %}><i>📅</i><span>行程 <b id="p-count">…</b></span></button>
@@ -383,10 +390,10 @@
   </div>
 </div>
 
-{# 個人設定 #}
+{# 分頁設定（帳號選單的 🧩 分頁設定） #}
 <div class="sheet-backdrop" id="s-sheet" hidden>
   <div class="sheet">
-    <div class="sheet-head"><h3>⚙️ 個人設定</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
+    <div class="sheet-head"><h3>🧩 分頁設定</h3><button class="icon sm" type="button" data-close aria-label="關閉">✕</button></div>
     <p class="sheet-sub">要顯示哪些分頁？關掉的分頁不會出現，用不到的功能可以先收起來（隨時可以再打開，資料都會保留）。</p>
     <div class="tab-toggles" id="s-tabs">
       <label class="toggle-row is-fixed"><span>🎵 音樂</span><small>首頁，固定顯示</small><input type="checkbox" checked disabled></label>
@@ -566,4 +573,5 @@
 <script src="{% static 'js/gacha.js' %}"></script>
 <script src="{% static 'js/wheel.js' %}"></script>
 <script src="{% static 'js/transfer.js' %}"></script>
+<script src="{% static 'js/usermenu.js' %}"></script>
 {% endblock %}

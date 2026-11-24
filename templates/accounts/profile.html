@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}個人設定｜Ukiyo{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block content %}
+<main class="auth-card">
+  <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>個人設定</h1></div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if request.GET.saved and not form.errors %}<div class="alert notice">✅ 已儲存</div>{% endif %}
+    <label class="field"><span>帳號</span><input value="{{ user.username }}" disabled><small>帳號不能更改，登入時使用</small></label>
+    {% for field in form %}{% include "accounts/_field.html" %}{% endfor %}
+    <button class="btn primary" type="submit" data-busy="儲存中…">儲存</button>
+  </form>
+  <p class="switch"><a href="{% url 'player:home' %}">← 回首頁</a></p>
+</main>
+{% endblock %}

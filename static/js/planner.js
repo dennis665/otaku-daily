@@ -394,7 +394,7 @@
         if (!r.users.length) { results.append(el('p', 'empty', '找不到符合的會員')); return; }
         r.users.forEach((u) => {
           const line = el('div', 'member-line');
-          line.append(el('span', null, `👤 ${u.username}`));
+          line.append(el('span', null, u.name && u.name !== u.username ? `👤 ${u.name}（${u.username}）` : `👤 ${u.username}`));
           const b = el('button', 'btn ghost sm', u.invited ? '已邀請' : '邀請');
           b.type = 'button';
           b.disabled = u.invited;

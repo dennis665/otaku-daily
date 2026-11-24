@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.http import Http404
 from django.views.decorators.http import require_POST
@@ -10,7 +11,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 
-from .forms import LoginForm, RegisterForm
+from .forms import LoginForm, ProfileForm, RegisterForm
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,22 @@ def register(request):
     else:
         form = RegisterForm()
     return render(request, "accounts/register.html", {"form": form})
+
+
+@never_cache
+@login_required
+def profile(request):
+    """個人設定頁：設定暱稱（存在 User.first_name）"""
+    user = request.user
+    if request.method == "POST":
+        form = ProfileForm(request.POST)
+        if form.is_valid():
+            user.first_name = form.cleaned_data["nickname"]
+            user.save(update_fields=["first_name"])
+            return redirect(f"{reverse('accounts:profile')}?saved=1")
+    else:
+        form = ProfileForm(initial={"nickname": user.first_name})
+    return render(request, "accounts/profile.html", {"form": form})
 
 
 def csrf_failure(request, reason=""):

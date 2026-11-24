@@ -37,10 +37,23 @@ body.auth { display: grid; place-items: center; max-width: none; background: rad
 .topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; }
 .brand-sm { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; }
 .brand-sm .logo { width: 34px; height: 34px; border-radius: 10px; font-size: 1.05rem; }
-.user { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .9rem; min-width: 0; }
-.user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user { position: relative; display: flex; align-items: center; color: var(--muted); font-size: .9rem; min-width: 0; }
 .user form { margin: 0; }
-.user form .btn { white-space: nowrap; }
+/* 帳號選單（usermenu.js）：點暱稱展開 */
+.u-btn { display: flex; align-items: center; gap: 6px; max-width: 46vw; min-width: 0; padding: 8px 12px; border-radius: 99px; border: 1px solid var(--line);
+  background: var(--bg2); color: var(--text); font: inherit; font-size: .9rem; cursor: pointer; }
+.u-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-btn i { font-style: normal; font-size: .7rem; color: var(--muted); transition: transform .2s; }
+.u-btn[aria-expanded="true"] { border-color: var(--pink); }
+.u-btn[aria-expanded="true"] i { transform: rotate(180deg); }
+.u-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 450; min-width: 190px; padding: 6px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(0, 0, 0, .45); display: grid; gap: 2px; }
+.u-menu[hidden] { display: none; }
+.u-item { display: block; width: 100%; text-align: left; padding: 11px 14px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--text); font: inherit; font-size: .95rem; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.u-item:hover, .u-item:focus-visible { background: var(--bg2); outline: none; }
+.u-item[hidden] { display: none; }
+.u-logout { color: var(--muted); border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; margin-top: 4px; }
 .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; background: var(--bg2); padding: 5px; border-radius: 14px; margin-bottom: 16px; }
 .tab { border: 0; background: transparent; color: var(--muted); padding: 10px; border-radius: 10px; cursor: pointer; }
 .tab b { font-size: .75rem; background: var(--line); border-radius: 99px; padding: 1px 8px; margin-left: 4px; }
@@ -437,7 +450,7 @@ body.sheet-open { overflow: hidden; }
 body.offline-mode .tabs .tab:not([data-tab="music"]):not([data-tab="gacha"]),
 body.offline-mode .tab[data-tab="gacha"] b, body.offline-mode #g-draw, body.offline-mode .g-views .chip[data-g="draw"],
 body.offline-mode #g-local-clear,
-body.offline-mode #s-open, body.offline-mode #n-open, body.offline-mode #x-open, body.offline-mode .topbar .user form,
+body.offline-mode #u-menu, body.offline-mode .u-btn i,
 body.offline-mode #m-finder, body.offline-mode #m-dl,
 body.offline-mode #m-list-new, body.offline-mode #m-list-edit, body.offline-mode #m-list-copy,
 body.offline-mode .list .li-act,

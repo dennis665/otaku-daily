@@ -4,7 +4,7 @@
 // 各視窗原本的開關程式都不用改：這裡只觀察視窗的 hidden 屬性。
 (() => {
   // 會蓋住畫面的視窗；新增這類視窗時加進來（關閉鈕也要加進 CLOSE）
-  const SEL = '.sheet-backdrop, #g-pick, #g-detail, #g-stage, .iv';
+  const SEL = '.sheet-backdrop, #g-pick, #g-detail, #g-stage, .iv, #u-menu';
   // 按返回時要按的關閉鈕（抽卡動畫的「略過／返回」：播放中按返回＝略過到結果，再按一次才關閉）
   const CLOSE = '[data-close], #g-pick-close, #g-detail-close, #g-skip, .iv-close';
   const stack = [];   // 目前打開的視窗，依打開順序

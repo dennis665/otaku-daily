@@ -6,7 +6,7 @@
   <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>{% include "partials/wordmark.html" %}</h1></div>
   <p class="invite-kicker">行程群組邀請</p>
   <h2 class="invite-title">👥 {{ group.name }}</h2>
-  <p class="invite-sub">目前成員：{% for m in members %}{{ m.user.username }}{% if not forloop.last %}、{% endif %}{% endfor %}</p>
+  <p class="invite-sub">目前成員：{% for m in members %}{{ m.user.first_name|default:m.user.username }}{% if not forloop.last %}、{% endif %}{% endfor %}</p>
   {% if is_member %}
     <div class="alert notice">你已經是這個群組的成員了</div>
   {% endif %}

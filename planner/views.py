@@ -7,12 +7,14 @@ from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from accounts.names import display_name
 from notifications.push import send_to_users
 
 from .models import Group, GroupInvitation, GroupMember, Itinerary
@@ -93,7 +95,7 @@ def serialize(it, user, request):
         "notify_minutes_before": it.notify_minutes_before,
         "notify_label": dict(Itinerary.NOTIFY_CHOICES).get(it.notify_minutes_before, f"{it.notify_minutes_before} 分鐘前"),
         "groups": [{"id": g.id, "name": g.name} for g in it.groups.all()],
-        "creator": it.creator.username,
+        "creator": display_name(it.creator),
         "is_mine": it.creator_id == user.id,
         "can_manage": it.can_manage(user),
         "share_url": request.build_absolute_uri(reverse("planner:share", args=[it.share_token])),
@@ -167,7 +169,7 @@ def itineraries(request):
             local = timezone.localtime(it.date_time) if it.date_time else None
             when = f"{local.month}/{local.day} {local:%H:%M}" if local else "時間未定"
             names = "、".join(g.name for g in groups)
-            notify(others, f"👥 {names} 有新行程", f"{user.username} 新增了「{it.title}」（{when}）", f"group-itinerary-{it.pk}")
+            notify(others, f"👥 {names} 有新行程", f"{display_name(user)} 新增了「{it.title}」（{when}）", f"group-itinerary-{it.pk}")
         return JsonResponse({"ok": True, "item": serialize(it, user, request)})
 
     now = timezone.now()
@@ -178,7 +180,7 @@ def itineraries(request):
     groups = Group.objects.filter(members__user=user).order_by("name")
     invitations = GroupInvitation.objects.filter(invitee=user).select_related("group", "inviter").order_by("-created_at")
     return JsonResponse({
-        "invitations": [{"id": i.id, "group": i.group.name, "inviter": i.inviter.username if i.inviter else "有人"} for i in invitations],
+        "invitations": [{"id": i.id, "group": i.group.name, "inviter": display_name(i.inviter) if i.inviter else "有人"} for i in invitations],
         "upcoming": [serialize(i, user, request) for i in upcoming],
         "tbd": [serialize(i, user, request) for i in tbd],
         "history": [serialize(i, user, request) for i in history],
@@ -254,8 +256,8 @@ def _group_json(g, user, request):
     return {
         "id": g.id,
         "name": g.name,
-        "members": [m.user.username for m in members],
-        "pending": [i.invitee.username for i in g.invitations.select_related("invitee")],
+        "members": [display_name(m.user) for m in members],
+        "pending": [display_name(i.invitee) for i in g.invitations.select_related("invitee")],
         "is_owner": any(m.user_id == user.id and m.is_owner for m in members),
         "invite_url": request.build_absolute_uri(reverse("planner:join", args=[g.invite_code])),
     }
@@ -298,17 +300,17 @@ SEARCH_LIMIT = 10
 @login_required
 @require_GET
 def search_users(request):
-    """用帳號名稱搜尋會員（至少 2 個字，最多 10 筆），邀請進群組用"""
+    """用帳號或暱稱搜尋會員（至少 2 個字，最多 10 筆），邀請進群組用"""
     q = (request.GET.get("q") or "").strip()
     group_id = request.GET.get("group")
     if len(q) < 2:
         return JsonResponse({"users": []})
-    qs = User.objects.filter(username__icontains=q, is_active=True).exclude(pk=request.user.pk)
+    qs = User.objects.filter(Q(username__icontains=q) | Q(first_name__icontains=q), is_active=True).exclude(pk=request.user.pk)
     if group_id:
         qs = qs.exclude(plan_groups__group_id=group_id)
     pending = set(GroupInvitation.objects.filter(group_id=group_id).values_list("invitee_id", flat=True)) if group_id else set()
     users = list(qs.order_by("username")[:SEARCH_LIMIT])
-    return JsonResponse({"users": [{"username": u.username, "invited": u.pk in pending} for u in users]})
+    return JsonResponse({"users": [{"username": u.username, "name": display_name(u), "invited": u.pk in pending} for u in users]})
 
 
 @login_required
@@ -323,11 +325,11 @@ def group_invite(request, pk):
     if not invitee:
         return _error("找不到這個會員")
     if group.members.filter(user=invitee).exists():
-        return _error(f"{invitee.username} 已經在群組裡了")
+        return _error(f"{display_name(invitee)} 已經在群組裡了")
     inv, created = GroupInvitation.objects.get_or_create(group=group, invitee=invitee, defaults={"inviter": request.user})
     if not created:
-        return _error(f"已經邀請過 {invitee.username}，等對方回覆")
-    notify([invitee], "📨 群組邀請", f"{request.user.username} 邀請你加入「{group.name}」，點這裡回覆", f"invite-{group.pk}",
+        return _error(f"已經邀請過 {display_name(invitee)}，等對方回覆")
+    notify([invitee], "📨 群組邀請", f"{display_name(request.user)} 邀請你加入「{group.name}」，點這裡回覆", f"invite-{group.pk}",
            url=f"/?tab=plan&invite={inv.pk}")
     return JsonResponse({"ok": True})
 
@@ -339,7 +341,7 @@ def invitation_accept(request, pk):
     GroupMember.objects.get_or_create(group=inv.group, user=request.user)
     inviter, group = inv.inviter, inv.group
     inv.delete()
-    notify([inviter], f"✅ {request.user.username} 加入了群組", f"{request.user.username} 接受邀請，加入「{group.name}」", f"joined-{group.pk}")
+    notify([inviter], f"✅ {display_name(request.user)} 加入了群組", f"{display_name(request.user)} 接受邀請，加入「{group.name}」", f"joined-{group.pk}")
     return JsonResponse({"ok": True})
 
 

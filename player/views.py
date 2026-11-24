@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.views.decorators.cache import cache_control, never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from accounts.names import display_name
 from notifications.reminders import SCHEDULE_HINT
 
 from .events import fetched_at, get_events
@@ -278,7 +279,7 @@ def _req_status():
 def _req_json(r, status, me):
     st = status.get(str(r.id)) or {}
     return {"id": r.id, "work_id": r.work_id, "source_id": r.work.source_id if r.work else None, "work": r.work.title if r.work else "", "title": r.title, "kind": r.kind, "tags": r.tags,
-            "url": r.url, "audio": r.audio, "video": r.video, "note": r.note, "sec": r.sec, "user": r.user.username, "mine": r.user_id == me.id,
+            "url": r.url, "audio": r.audio, "video": r.video, "note": r.note, "sec": r.sec, "user": display_name(r.user), "mine": r.user_id == me.id,
             "created": timezone.localtime(r.created_at).strftime("%Y/%m/%d %H:%M"),
             "status": st.get("status") or "pending", "song": st.get("song", ""), "result": st.get("note", "")}
 

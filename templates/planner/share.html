@@ -4,7 +4,7 @@
 {% block content %}
 <main class="auth-card invite">
   <div class="brand">{% include "partials/avatar_rotator.html" %}<h1>{% include "partials/wordmark.html" %}</h1></div>
-  <p class="invite-kicker">{{ it.creator.username }} 邀請你參加</p>
+  <p class="invite-kicker">{{ it.creator.first_name|default:it.creator.username }} 邀請你參加</p>
   <h2 class="invite-title">{{ it.title }}</h2>
   <ul class="ev-info invite-info">
     <li>{{ it.get_activity_type_display }}{% for g in groups %}・👥 {{ g.name }}{% endfor %}</li>
