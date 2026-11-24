@@ -183,7 +183,7 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
 @property --fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
 .chips:not(.wrap) {
-  --fade-size: 28px;
+  --fade-size: 40px;
   scroll-padding-inline: var(--fade-size);   /* 用鍵盤或程式捲到某個標籤時，不要停在淡出的地方 */
   -webkit-mask:
     linear-gradient(black, black),
@@ -207,6 +207,18 @@ body.is-staging { padding-top: calc(env(safe-area-inset-top) + 34px); }
 .chips.more-start { --fade-start: var(--fade-size); }
 .chips.more-end { --fade-end: var(--fade-size); }
 .chips:not(.wrap) { transition: --fade-start .2s, --fade-end .2s; }
+/* 淡色箭頭 ‹ ›：scrollhint.js 把標籤列包進 .chips-box，還有內容的那一邊顯示（點了往那邊滑） */
+.chips-box { position: relative; min-width: 0; }
+.chips-arrow {
+  position: absolute; top: 2px; bottom: 8px; width: 22px; display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; line-height: 1; font-weight: 700; color: var(--text); opacity: 0; pointer-events: none;
+  transition: opacity .2s; cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+.chips-arrow.start { left: -2px; }
+.chips-arrow.end { right: -2px; }
+.chips-box.more-start .chips-arrow.start, .chips-box.more-end .chips-arrow.end { opacity: .55; pointer-events: auto; }
+.chips-arrow:hover { opacity: .9 !important; }
+.chips-box:has(> .chips[hidden]) { display: none; }
 .chip { flex: none; border: 1px solid var(--line); background: var(--bg2); color: var(--muted); border-radius: 99px; padding: 6px 14px; font-size: .85rem; cursor: pointer; }
 .chip.active { background: var(--grad); color: #fff; border-color: transparent; font-weight: 700; }
 .e-meta { color: var(--muted); font-size: .8rem; margin: 2px 4px 10px; }
@@ -412,7 +424,7 @@ body.sheet-open { overflow: hidden; }
 
 /* 自訂歌單 */
 .m-lists { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin: 4px 0 8px; }
-.m-lists .chips { flex: 1 1 100%; min-width: 0; }   /* 歌單自己一整行（可左右滑），新歌單／投稿按鈕放下一行，歌單才不會被擠扁 */
+.m-lists .chips, .m-lists .chips-box { flex: 1 1 100%; min-width: 0; }   /* 歌單自己一整行（可左右滑），新歌單／投稿按鈕放下一行，歌單才不會被擠扁 */
 .chip.add { flex: none; color: var(--pink); border-style: dashed; }
 .m-list-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .85rem; margin: 0 2px 8px; }
 .m-list-bar[hidden] { display: none; }
