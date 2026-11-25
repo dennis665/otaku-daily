@@ -271,6 +271,10 @@ CAMPAIGNS = [
     {"key": "2026-11-20-three-works", "tickets": 30,
      "title": "🎉 Ukiyo 三部作品正式上架",
      "body": "鬼滅之刃、SPY×FAMILY、【我推的孩子】推出抽卡動畫與新卡背，正式開放抽卡！送你 🎫 自選抽卡券 30 張，也能在 🎡 轉盤選它們當主題"},
+    # 更版公告（不送券）：url＝點推播要開的頁面（沒寫就開抽卡分頁）
+    {"key": "2026-11-25-update", "tickets": 0, "url": "/guide/",
+     "title": "🆕 Ukiyo 更新：帳號選單與傳檔案",
+     "body": "點右上角自己的名字打開新的帳號選單，可以設定暱稱；新增 📲 傳檔案，手機、電腦和群組朋友之間直接傳照片、影片；📖 功能介紹頁也更新了"},
 ]
 
 
@@ -302,7 +306,7 @@ def run_campaigns():
         logger.info("活動 %s 已發給 %s 個帳號", c["key"], len(users))
         try:
             from notifications.push import send_to_users
-            send_to_users(get_user_model().objects.filter(is_active=True), c["title"], c["body"], url="/?tab=gacha", tag=f"gacha-{c['key']}")
+            send_to_users(get_user_model().objects.filter(is_active=True), c["title"], c["body"], url=c.get("url") or "/?tab=gacha", tag=f"gacha-{c['key']}")
         except Exception as exc:
             logger.warning("活動推播失敗：%s", exc)
     _state["campaigns_done"] = True

@@ -463,6 +463,9 @@ class ExtrasTests(TestCase):
                 cards._state["campaigns_done"] = False
                 self.assertEqual(cards.run_campaigns(), [])          # 同一個活動不會再發
             self.assertEqual(send.call_count, len(cards.CAMPAIGNS))
+            urls = {c.kwargs["tag"]: c.kwargs["url"] for c in send.call_args_list}
+            self.assertEqual(urls["gacha-2026-11-25-update"], "/guide/")   # 更版公告點了開功能介紹
+            self.assertEqual(urls["gacha-2026-11-12-update"], "/?tab=gacha")
             total = sum(c["tickets"] for c in cards.CAMPAIGNS)
             for u in (self.user, other):
                 st = GachaState.objects.get(user=u)
