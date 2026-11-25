@@ -193,3 +193,14 @@ class ManualSongLinkTests(TestCase):
             data = serialize(w, set())
         self.assertEqual([x["url"] for x in data["mp3"]], ["https://x/a.m4a", "https://x/new.m4a"])
         self.assertEqual([x["url"] for x in data["mp4"]], ["https://x/new.mp4"])
+
+    def test_removed_video_hidden(self):
+        from unittest import mock
+
+        from player.playlist import RAW_BASE
+
+        from .views import serialize
+        gone, kept = RAW_BASE + "gone.mp4", RAW_BASE + "kept.mp4"   # gone 的影片已移除、只留音樂
+        w = Work.objects.create(source_id=994, title="影片移除", mp4_links=[{"title": "a", "url": gone}, {"title": "b", "url": kept}])
+        with mock.patch("dramas.views.songs_by_source", return_value={}),                 mock.patch("player.playlist.song_urls", return_value={"kept": ("", kept), "gone": ("x.m4a", "")}),                 mock.patch("player.playlist.audio_urls", return_value={}):
+            self.assertEqual([x["url"] for x in serialize(w, set())["mp4"]], [kept])

@@ -54,11 +54,22 @@ def _current_audio(links):
 
 def _song_links(w):
     """主題曲／影片連結：作品本身記錄的連結＋歌曲設定檔手動對應到這部的歌（投稿匯入的歌只記在 song_meta.json）"""
-    mp3, mp4 = _current_audio(w.mp3_links), list(w.mp4_links or [])
+    from player.playlist import RAW_BASE, resolve_song, song_urls
+    urls = song_urls()
+    mp3 = _current_audio(w.mp3_links)
+    # 影音庫的影片連結依檔名換成目前的檔案（改過名的照改名紀錄）；影片已經移除（只留音樂）的不顯示，免得點了打不開
+    mp4 = []
+    for x in w.mp4_links or []:
+        url = str(x.get("url") or "")
+        if url.startswith(RAW_BASE):
+            name = resolve_song(urllib.parse.unquote(url.rsplit("/", 1)[-1]).rsplit(".", 1)[0])
+            url = urls.get(name, ("", ""))[1]
+            if not url:
+                continue
+        if url not in [y["url"] for y in mp4]:
+            mp4.append({**x, "url": url})
     names = songs_by_source().get(w.source_id) if w.source_id else None
     if names:
-        from player.playlist import song_urls
-        urls = song_urls()
         for name in names:
             audio, video = urls.get(name, ("", ""))
             if audio and audio not in [x.get("url") for x in mp3]:
