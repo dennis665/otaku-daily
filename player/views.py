@@ -20,6 +20,7 @@ from .events import fetched_at, get_events
 from .models import HIDEABLE_TABS, SONG_KINDS, Playlist, SongMissSkip, SongRequest, UserPrefs
 from .playlist import alias_map, get_playlist, resolve_song
 from .songmeta import annotate
+from .works import WORKS
 
 
 @login_required
@@ -33,6 +34,7 @@ def home(request):
         "hidden_tabs": UserPrefs.hidden_for(request.user),
         "song_aliases": alias_map(),
         "song_owner": is_song_owner(request.user),
+        "works": WORKS,
     })
 
 
