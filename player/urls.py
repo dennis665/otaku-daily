@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/events/", views.events_api, name="events_api"),
     path("api/song-requests/", views.song_requests, name="song_requests"),
     path("api/song-requests/missing/", views.song_request_missing, name="song_request_missing"),
+    path("api/song-requests/missing/skip/", views.song_request_skip, name="song_request_skip"),
     path("api/song-requests/<int:pk>/delete/", views.song_request_delete, name="song_request_delete"),
     path("api/prefs/", views.prefs, name="prefs"),
     path("api/playlists/", views.playlists, name="playlists"),

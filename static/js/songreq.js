@@ -231,14 +231,19 @@
     const airedOnly = box.querySelector('#sr-maired') ? box.querySelector('#sr-maired').checked : true;
     let noMovie = false;   // 「不看劇場版」記在這台手機
     try { noMovie = localStorage.getItem('ukiyoMissNoMovie') === '1'; } catch (e) { /* 無痕模式 */ }
-    $('sr-miss-n').textContent = missing.length || '';
-    const list = missing.filter((w) => (!airedOnly || w.aired) && (!noMovie || w.media !== '劇場版') && (!q || `${w.title} ${w.jp}`.toLowerCase().includes(q.toLowerCase())));
-    box.innerHTML = `<p class="sheet-sub">你追的作品中還沒有歌、也還沒投稿的有 ${missing.length} 部（已播出 ${missing.filter((w) => w.aired).length} 部）。
-      每部選好連結、類型與要下載的檔案後按「儲存」，<b>沒按儲存的不會處理</b>。</p>
-      <div class="sr-mtools"><input id="sr-mq" type="search" placeholder="搜尋作品" value="${esc(q)}"><label><input type="checkbox" id="sr-maired"${airedOnly ? ' checked' : ''}> 只看已播出</label><label><input type="checkbox" id="sr-mnomovie"${noMovie ? ' checked' : ''}> 不看劇場版（${missing.filter((w) => w.media === '劇場版').length}）</label></div>`;
+    const showSkip = box.querySelector('#sr-mskip') ? box.querySelector('#sr-mskip').checked : false;
+    const todo = missing.filter((w) => !w.skipped);   // 按過「已看過不處理」的不算
+    const nSkip = missing.length - todo.length;
+    $('sr-miss-n').textContent = todo.length || '';
+    const list = (showSkip ? missing.filter((w) => w.skipped) : todo)
+      .filter((w) => (!airedOnly || w.aired) && (!noMovie || w.media !== '劇場版') && (!q || `${w.title} ${w.jp}`.toLowerCase().includes(q.toLowerCase())));
+    box.innerHTML = `<p class="sheet-sub">你追的作品中還沒有歌、也還沒投稿的有 ${todo.length} 部（已播出 ${todo.filter((w) => w.aired).length} 部）。
+      每部選好連結、類型與要下載的檔案後按「儲存」，<b>沒按儲存的不會處理</b>；不想處理的按「🙈 已看過不處理」就不再列出。</p>
+      <div class="sr-mtools"><input id="sr-mq" type="search" placeholder="搜尋作品" value="${esc(q)}"><label><input type="checkbox" id="sr-maired"${airedOnly ? ' checked' : ''}> 只看已播出</label><label><input type="checkbox" id="sr-mnomovie"${noMovie ? ' checked' : ''}> 不看劇場版（${todo.filter((w) => w.media === '劇場版').length}）</label>${nSkip ? `<label><input type="checkbox" id="sr-mskip"${showSkip ? ' checked' : ''}> 只看已略過（${nSkip}）</label>` : ''}</div>`;
     const mq = box.querySelector('#sr-mq');
     mq.addEventListener('input', () => { missLimit = 30; const pos = mq.selectionStart; paintMissing(); const n = $('sr-mq'); n.focus(); n.setSelectionRange(pos, pos); });
     box.querySelector('#sr-maired').addEventListener('change', () => { missLimit = 30; paintMissing(); });
+    if (box.querySelector('#sr-mskip')) box.querySelector('#sr-mskip').addEventListener('change', () => { missLimit = 30; paintMissing(); });
     box.querySelector('#sr-mnomovie').addEventListener('change', (e) => {
       try { localStorage.setItem('ukiyoMissNoMovie', e.target.checked ? '1' : '0'); } catch (err) { /* 無痕模式 */ }
       missLimit = 30; paintMissing();
@@ -267,7 +272,24 @@
         <input class="sr-mtags" maxlength="100" placeholder="標籤（選其他時必填）">
         <label><input type="checkbox" class="sr-ma" checked> 🎵</label><label><input type="checkbox" class="sr-mv" checked> 🎬</label>
         <button class="btn primary sm sr-msave" type="button">儲存</button></div>
+      <div class="sr-mskipbar"><button class="btn ghost sm sr-mskipbtn" type="button">${w.skipped ? '↩ 恢復到待處理' : '🙈 已看過不處理'}</button></div>
       <p class="alert" hidden></p>`;
+    // 已看過不處理（或恢復）：記在伺服器，換手機也一樣
+    row.querySelector('.sr-mskipbtn').addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+      try {
+        await api('/api/song-requests/missing/skip/', { work_id: w.id, undo: !!w.skipped });
+        w.skipped = !w.skipped;
+        row.className = 'sr-mrow saved';
+        row.innerHTML = `<b>${esc(w.title)}</b> <span class="sr-st">${w.skipped ? '🙈 已略過，不再列出' : '↩ 已恢復到待處理'}</span>`;
+        const n = missing.filter((x) => !x.skipped).length;
+        $('sr-miss-n').textContent = n || '';
+      } catch (e) {
+        const err = row.querySelector('.alert');
+        err.textContent = e.message; err.hidden = false; btn.disabled = false;
+      }
+    });
     const urlIn = row.querySelector('.sr-murl');
     urlIn.addEventListener('input', () => { if (urlIn.value.trim()) row.querySelector(`input[name="${group}"][value="own"]`).checked = true; });
     row.querySelector('.sr-msave').addEventListener('click', async (ev) => {
@@ -286,7 +308,7 @@
         missing = missing.filter((x) => x.id !== w.id);
         row.className = 'sr-mrow saved';
         row.innerHTML = `<b>${esc(w.title)}</b> <span class="sr-st done">✅ 已儲存，等待處理</span>`;
-        $('sr-miss-n').textContent = missing.length || '';
+        $('sr-miss-n').textContent = missing.filter((x) => !x.skipped).length || '';
         loadMine(true);
       } catch (e) { err.textContent = e.message; err.hidden = false; btn.disabled = false; btn.textContent = '儲存'; }
     });

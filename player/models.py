@@ -58,3 +58,13 @@ class SongRequest(models.Model):
 
     def __str__(self):
         return f"{self.work.title if self.work else self.title} {self.kind}"
+
+
+class SongMissSkip(models.Model):
+    """「我的追劇缺歌」按了「已看過不處理」的作品（之後不再列出，可恢復）"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="song_miss_skips")
+    work = models.ForeignKey("dramas.Work", on_delete=models.CASCADE, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "work"], name="uniq_song_miss_skip")]

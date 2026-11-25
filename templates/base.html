@@ -43,6 +43,10 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
     }
+    // 加入主畫面的 App 固定直式（Android 支援；瀏覽器分頁與 iPhone 不允許鎖定，會直接略過）
+    if (window.matchMedia('(display-mode: standalone)').matches && screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('portrait').catch(() => {});
+    }
 
   </script>
   {# 全站載入遮罩，要在各頁面的程式之前載入，頁面程式才能使用 AppLoading #}

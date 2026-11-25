@@ -247,3 +247,20 @@ class SongRequestTests(TestCase):
             self.assertIn("我的追劇缺歌", self.client.get("/").content.decode())
             self.post(work_id=w.id, title="")   # 儲存（投稿）後就不再列出
             self.assertEqual(self.client.get("/api/song-requests/missing/").json()["items"], [])
+
+    def test_missing_skip(self):
+        from django.test import override_settings
+
+        from dramas.models import Follow, Work
+        w = Work.objects.create(source_id=992, title="不想處理的動畫")
+        Follow.objects.create(user=self.user, work=w)
+        url = "/api/song-requests/missing/skip/"
+        body = lambda d: self.client.post(url, json.dumps(d), content_type="application/json")   # noqa: E731
+        self.assertEqual(body({"work_id": w.id}).status_code, 404)   # 不是管理者帳號
+        with override_settings(SONG_OWNER="req"):
+            self.assertTrue(body({"work_id": w.id}).json()["skipped"])
+            body({"work_id": w.id})   # 重複按不會出錯
+            items = self.client.get("/api/song-requests/missing/").json()["items"]
+            self.assertEqual([(x["title"], x["skipped"]) for x in items], [("不想處理的動畫", True)])
+            self.assertFalse(body({"work_id": w.id, "undo": True}).json()["skipped"])
+            self.assertFalse(self.client.get("/api/song-requests/missing/").json()["items"][0]["skipped"])

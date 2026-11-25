@@ -17,7 +17,7 @@ from accounts.names import display_name
 from notifications.reminders import SCHEDULE_HINT
 
 from .events import fetched_at, get_events
-from .models import HIDEABLE_TABS, SONG_KINDS, Playlist, SongRequest, UserPrefs
+from .models import HIDEABLE_TABS, SONG_KINDS, Playlist, SongMissSkip, SongRequest, UserPrefs
 from .playlist import alias_map, get_playlist, resolve_song
 from .songmeta import annotate
 
@@ -234,6 +234,7 @@ def manifest(request):
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
+        "orientation": "portrait",   # 加入主畫面的 App 固定直式（Android 支援；iPhone 不支援，靠 CSS 避免橫放變形）
         "background_color": "#14122b",
         "theme_color": "#14122b",
         "lang": "zh-Hant",
@@ -378,6 +379,7 @@ def song_request_missing(request):
     from .songmeta import song_works
     have = {w.id for w in song_works().values()}
     asked = set(SongRequest.objects.exclude(work=None).values_list("work_id", flat=True))
+    skipped = set(SongMissSkip.objects.filter(user=request.user).values_list("work_id", flat=True))
     cands = _candidates()
     today = timezone.localdate()
     now_key = today.year * 100 + today.month
@@ -396,6 +398,25 @@ def song_request_missing(request):
                     "label": latest[1], "key": latest[0], "aired": bool(aired),
                     "jp": next((x for x in (w.alt_titles or []) if re.search(r"[ぁ-ヿ]", x)), ""),
                     "kind": "TV片頭曲" if w.media_type == Work.Media.TV else "完整劇中歌",
+                    "skipped": w.id in skipped,   # 按過「已看過不處理」：前端預設不顯示
                     "candidates": cands.get(str(w.source_id)) or []})
     out.sort(key=lambda x: (not x["aired"], -x["key"]))   # 已播出的在前，新的在前
     return _ok(items=out)
+
+
+@login_required
+@require_POST
+def song_request_skip(request):
+    """（只開放給 SONG_OWNER）「我的追劇缺歌」標記已看過不處理：{work_id, undo?}"""
+    if not is_song_owner(request.user):
+        raise Http404
+    from dramas.models import Work
+    data = _body(request)
+    work = Work.objects.filter(pk=data.get("work_id")).first()
+    if not work:
+        return _err("找不到這部作品")
+    if data.get("undo"):
+        SongMissSkip.objects.filter(user=request.user, work=work).delete()
+    else:
+        SongMissSkip.objects.get_or_create(user=request.user, work=work)
+    return _ok(skipped=not data.get("undo"))

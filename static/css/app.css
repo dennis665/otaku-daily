@@ -7,6 +7,12 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif; }
 body { min-height: 100vh; padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px); max-width: 640px; margin: 0 auto; }
+/* 手機橫放不要變形：iPhone 橫放時會自動放大文字（text-size-adjust），版面就跑掉；
+   版面寬度維持直式手機的寬度置中，左右避開瀏海（加入主畫面的 Android App 由 manifest 固定直式） */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (orientation: landscape) and (max-height: 500px) {
+  body { max-width: 480px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+}
 a { color: var(--cyan); }
 button { font: inherit; }
 
@@ -570,6 +576,8 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 .sr-cand small { display: block; color: var(--muted); font-size: .72rem; }
 .sr-cand.own input[type=url] { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: .82rem; }
 .sr-mopts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.sr-mskipbar { display: flex; justify-content: flex-end; margin-top: 6px; }
+.sr-mskipbar .btn { color: var(--muted); }
 .sr-mopts select, .sr-mopts .sr-mtags { padding: 7px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: .82rem; }
 .sr-mopts .sr-mtags { flex: 1; min-width: 110px; }
 .sr-mopts label { display: flex; gap: 4px; align-items: center; font-size: .85rem; }
