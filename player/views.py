@@ -37,7 +37,7 @@ def home(request):
 
 
 # ---------- 📖 功能介紹（第一次使用的人看）：截圖與影片放在不公開的卡面庫 guide/，登入才看得到 ----------
-GUIDE_VERSION = 2   # 介紹頁的截圖或影片重新錄製時加 1，讓手機重新下載
+GUIDE_VERSION = 3   # 介紹頁的截圖或影片重新錄製時加 1，讓手機重新下載
 _GUIDE_FILE = re.compile(r"^[a-z0-9-]+\.(webp|mp4)$")
 _guide_cache = {}
 
