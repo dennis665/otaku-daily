@@ -16,6 +16,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
+from player.songmeta import songs_by_source
+
 from .models import Airing, Follow, SyncLog, Work, normalize
 from .sync import upsert_works
 
@@ -50,6 +52,22 @@ def _current_audio(links):
     return out
 
 
+def _song_links(w):
+    """主題曲／影片連結：作品本身記錄的連結＋歌曲設定檔手動對應到這部的歌（投稿匯入的歌只記在 song_meta.json）"""
+    mp3, mp4 = _current_audio(w.mp3_links), list(w.mp4_links or [])
+    names = songs_by_source().get(w.source_id) if w.source_id else None
+    if names:
+        from player.playlist import song_urls
+        urls = song_urls()
+        for name in names:
+            audio, video = urls.get(name, ("", ""))
+            if audio and audio not in [x.get("url") for x in mp3]:
+                mp3.append({"title": name, "url": audio})
+            if video and video not in [x.get("url") for x in mp4]:
+                mp4.append({"title": name, "url": video})
+    return {"mp3": mp3, "mp4": mp4}
+
+
 def serialize(w, followed_ids):
     airings = sorted(w.airings.all(), key=_airing_sort)
     title = w.title
@@ -67,8 +85,7 @@ def serialize(w, followed_ids):
         "info_url": w.info_url,
         "airings": [a.label for a in airings],
         "latest": airings[-1].label if airings else "",   # 有實際播出就是最新那季；只有動畫化決定才顯示它
-        "mp3": _current_audio(w.mp3_links),
-        "mp4": w.mp4_links,
+        **_song_links(w),
         "followers": getattr(w, "n_followers", None),
         "followed": w.id in followed_ids,
         "is_new": bool(w.first_seen and w.first_seen >= date.today() - timedelta(days=NEW_DAYS)),

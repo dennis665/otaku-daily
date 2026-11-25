@@ -25,6 +25,7 @@ LABELS = {("OP", False): "TV片頭曲", ("OP", True): "完整片頭曲",
 KIND_WORDS = {"OP": "OP 片頭 片頭曲 opening", "ED": "ED 片尾 片尾曲 ending", "劇中": "劇中歌 插入曲 主題曲"}
 CIRCLED = "①②③④⑤⑥⑦⑧⑨⑩"
 _cache = {"at": 0.0, "works": None}
+_by_source = {"mtime": None, "data": {}}
 
 
 def _meta():
@@ -68,6 +69,20 @@ def song_works():
                 found[name] = by_sid[sid]
     _cache.update(at=time.time(), works=found)
     return found
+
+
+def songs_by_source():
+    """{作品 source_id: [歌名…]}：song_meta.json 的 work 手動對應（投稿匯入的歌），追劇卡片的主題曲／影片連結也要列出"""
+    try:
+        mtime = META_PATH.stat().st_mtime
+    except OSError:
+        mtime = 0
+    if _by_source["mtime"] != mtime:   # 一頁有好幾部作品，設定檔沒變就不重讀
+        out = {}
+        for name, sid in (_meta().get("work") or {}).items():
+            out.setdefault(sid, []).append(name)
+        _by_source.update(mtime=mtime, data=out)
+    return _by_source["data"]
 
 
 def _kind(name, manual):

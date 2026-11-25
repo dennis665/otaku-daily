@@ -177,3 +177,19 @@ class LinkSongsTests(TestCase):
         w.refresh_from_db()
         self.assertEqual(w.mp3_links, [{"title": "測試", "url": url}])
         self.assertEqual(w.mp4_links, [])
+
+
+class ManualSongLinkTests(TestCase):
+    """投稿匯入的歌只記在 song_meta.json 的 work（作品 source_id）：追劇卡片也要列出主題曲／影片，且不重複"""
+    def test_manual_mapping_shown(self):
+        from unittest import mock
+
+        from .views import serialize
+        w = Work.objects.create(source_id=993, title="手動對應", mp3_links=[{"title": "舊", "url": "https://x/a.m4a"}])
+        urls = {"新歌": ("https://x/new.m4a", "https://x/new.mp4"), "舊": ("https://x/a.m4a", "")}
+        with mock.patch("dramas.views.songs_by_source", return_value={993: ["新歌", "舊"]}), \
+                mock.patch("player.playlist.song_urls", return_value=urls), \
+                mock.patch("player.playlist.audio_urls", return_value={}):
+            data = serialize(w, set())
+        self.assertEqual([x["url"] for x in data["mp3"]], ["https://x/a.m4a", "https://x/new.m4a"])
+        self.assertEqual([x["url"] for x in data["mp4"]], ["https://x/new.mp4"])

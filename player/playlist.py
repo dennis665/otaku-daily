@@ -114,6 +114,11 @@ def alias_map():
     return {"ids": ids, "urls": urls}
 
 
+def song_urls():
+    """歌名（檔名，不含副檔名）→ (音樂網址, 影片網址)；沒有的是空字串"""
+    return {s["id"]: (s["audio"] or "", s["video"] or "") for s in get_playlist()}
+
+
 def audio_urls():
     """歌名（檔名，不含副檔名）→ 目前的音樂網址；追劇卡片的「主題曲」連結用它換成最新檔案"""
     urls = {s["id"]: s["audio"] for s in get_playlist() if s["audio"]}
