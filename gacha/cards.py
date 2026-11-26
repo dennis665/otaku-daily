@@ -271,6 +271,9 @@ CAMPAIGNS = [
     {"key": "2026-11-20-three-works", "tickets": 30,
      "title": "🎉 Ukiyo 三部作品正式上架",
      "body": "鬼滅之刃、SPY×FAMILY、【我推的孩子】推出抽卡動畫與新卡背，正式開放抽卡！送你 🎫 自選抽卡券 30 張，也能在 🎡 轉盤選它們當主題"},
+    {"key": "2026-11-26-ssr-anim-3", "tickets": 0,
+     "title": "✨ Ukiyo 新抽卡動畫追加",
+     "body": "鬼滅之刃、SPY×FAMILY、【我推的孩子】推出 SSR 華麗動畫！各送一次必中 SSR 以上的限定抽卡，到抽卡頁最上面領取"},
     # 更版公告（不送券）：url＝點推播要開的頁面（沒寫就開抽卡分頁）
     {"key": "2026-11-25-update", "tickets": 0, "url": "/guide/",
      "title": "🆕 Ukiyo 更新：帳號選單與傳檔案",
