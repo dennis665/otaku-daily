@@ -645,3 +645,9 @@ body.offline-mode #guide-open, body.offline-mode .guide-hint { display: none !im
 .wk-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .wk-tags span { font-size: .72rem; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
 .wk-card .alert { margin: 0 16px 16px; }
+.wk-sec { margin: 18px 2px 10px; font-size: 1rem; color: var(--cyan); }
+.wk-city { position: relative; display: block; aspect-ratio: 16 / 9; background: #2a1d17; }
+.wk-city img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.wk-enter { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px 20px; border-radius: 999px;
+  background: var(--grad); color: #fff; font-weight: 700; font-size: .95rem; box-shadow: 0 6px 18px rgba(0, 0, 0, .45); white-space: nowrap; }
+.wk-city:active .wk-enter { transform: translate(-50%, -50%) scale(.96); }

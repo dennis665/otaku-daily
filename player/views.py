@@ -45,6 +45,12 @@ _guide_cache = {}
 
 
 @login_required
+def city3d(request):
+    """🏙️ 3D 城市《夕陽山城》：three.js 即時產生的城市（原始專案是 dennis/city_3D，打包到 static/city3d/）"""
+    return render(request, "player/city3d.html")
+
+
+@login_required
 def guide(request):
     return render(request, "player/guide.html", {"v": GUIDE_VERSION})
 

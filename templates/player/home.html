@@ -43,7 +43,7 @@
   <button class="tab active" data-tab="music" role="tab"><i>🎵</i><span>音樂 <b>{{ audio_count }}</b></span></button>
   {# 使用者在 🧩 分頁設定關掉的分頁不顯示（hidden_tabs） #}
   <button class="tab" data-tab="video" role="tab"{% if "video" in hidden_tabs %} hidden{% endif %}><i>🎬</i><span>影片 <b>{{ video_count }}</b></span></button>
-  <button class="tab" data-tab="works" role="tab"{% if "works" in hidden_tabs %} hidden{% endif %}><i>🎞️</i><span>AI動畫</span></button>
+  <button class="tab" data-tab="works" role="tab"{% if "works" in hidden_tabs %} hidden{% endif %}><i>✨</i><span>AI創作</span></button>
   <button class="tab" data-tab="events" role="tab"{% if "events" in hidden_tabs %} hidden{% endif %}><i>🎪</i><span>活動 <b id="e-count">…</b></span></button>
   <button class="tab" data-tab="plan" role="tab"{% if "plan" in hidden_tabs %} hidden{% endif %}><i>📅</i><span>行程 <b id="p-count">…</b></span></button>
   <button class="tab" data-tab="drama" role="tab"{% if "drama" in hidden_tabs %} hidden{% endif %}><i>📺</i><span>追劇 <b id="d-count">…</b></span></button>
@@ -156,9 +156,25 @@
 {# 🎞 AI 動畫：自己用 AI 製作的原創動畫（作品清單在 player/works.py，works.js） #}
 <section id="panel-works" class="panel">
   <div class="wk-hero">
-    <h2>🎞️ AI 動畫作品</h2>
-    <p>用 AI 從劇本、角色設計、分鏡到配樂一手打造的台灣原創動畫。</p>
+    <h2>✨ AI 創作</h2>
+    <p>用 AI 打造的原創作品：可以逛的 3D 城市，和從劇本、角色設計、分鏡到配樂一手完成的台灣原創動畫。</p>
   </div>
+  {# 🏙️ 3D 城市：按了才進入（另開全螢幕頁 /ai/city/，沒進去就不會下載、不耗電） #}
+  <h3 class="wk-sec">🏙️ 3D 城市</h3>
+  <article class="wk-card">
+    <a class="wk-city" href="{% url 'player:city3d' %}">
+      <img src="{% static 'video/works/city3d.jpg' %}" alt="夕陽山城" loading="lazy" width="960" height="540">
+      <span class="wk-enter">▶ 進入城市</span>
+    </a>
+    <div class="wk-body">
+      <h3>夕陽山城 <small>Sunset Hill Town</small></h3>
+      <p class="wk-tagline">「在夕陽下的山城散步，操控芙莉蓮逛街、飛上天空。」</p>
+      <p class="wk-desc">整座城市都是程式即時蓋出來的：260 位居民在街上生活、電車經過平交道、從清晨到深夜的光影變化。可以點居民跟著他走，或按 🧙 操控芙莉蓮用搖桿散步、跑步、飛行、施展魔法。</p>
+      <p class="wk-meta">第一次進入約下載 0.2 MB・建議用近兩三年的手機・手機預設省電模式</p>
+      <div class="wk-tags"><span>即時 3D</span><span>可操控</span><span>three.js</span></div>
+    </div>
+  </article>
+  <h3 class="wk-sec">🎞️ AI 動畫</h3>
   {% for w in works %}
   <article class="wk-card">
     <div class="wk-player">
@@ -425,7 +441,7 @@
     <div class="tab-toggles" id="s-tabs">
       <label class="toggle-row is-fixed"><span>🎵 音樂</span><small>首頁，固定顯示</small><input type="checkbox" checked disabled></label>
       <label class="toggle-row"><span>🎬 影片</span><input type="checkbox" data-tab="video"></label>
-      <label class="toggle-row"><span>🎞️ AI動畫</span><input type="checkbox" data-tab="works"></label>
+      <label class="toggle-row"><span>✨ AI創作</span><input type="checkbox" data-tab="works"></label>
       <label class="toggle-row"><span>🎪 活動</span><input type="checkbox" data-tab="events"></label>
       <label class="toggle-row"><span>📅 行程</span><input type="checkbox" data-tab="plan"></label>
       <label class="toggle-row"><span>📺 追劇</span><input type="checkbox" data-tab="drama"></label>
